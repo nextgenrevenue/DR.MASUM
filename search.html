@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="q6qnX2SH5llFty6Oy1rgN5_49L_ChMSuhR4jn8mZJNE" />
+  <title>সিরিয়াল খুঁজুন</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Required Libraries for PDF/PNG Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #f59e0b;
+      --info: #3b82f6;
+      --gray: #6b7280;
+      --light-gray: #f3f4f6;
+      --white: #ffffff;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Noto Sans Bengali', sans-serif;
+      background: linear-gradient(135deg, #f0f8ff, #e1f5fe);
+      padding: 20px;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 20px auto;
+      background: var(--white);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .header {
+      background: var(--primary);
+      color: var(--white);
+      padding: 20px;
+      text-align: center;
+      position: relative;
+    }
+    
+    .header h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+    }
+    
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 0;
+      right: 0;
+      height: 20px;
+      background: var(--white);
+      clip-path: ellipse(50% 50% at 50% 50%);
+    }
+    
+    .search-section {
+      padding: 30px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    
+    .input-field {
+      position: relative;
+    }
+    
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: 'Noto Sans Bengali', sans-serif;
+      transition: all 0.2s ease;
+      background-color: var(--white);
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    input::placeholder {
+      color: var(--gray);
+      opacity: 0.6;
+    }
+    
+    .error-msg {
+      color: var(--danger);
+      font-size: 13px;
+      margin-top: 5px;
+      display: none;
+    }
+    
+    .info-text {
+      color: var(--gray);
+      font-size: 13px;
+      margin-top: 5px;
+      display: block;
+    }
+    
+    .search-btn {
+      width: 100%;
+      padding: 14px;
+      background-color: var(--primary);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 0.2s ease;
+      font-family: 'Noto Sans Bengali', sans-serif;
+    }
+    
+    .search-btn:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(37, 99, 235, 0.2);
+    }
+    
+    .search-btn:active {
+      transform: translateY(0);
+    }
+    
+    .search-btn.loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    
+    .back-btn {
+      background-color: var(--gray);
+      color: var(--white);
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-bottom: 20px;
+      transition: all 0.2s ease;
+    }
+    
+    .back-btn:hover {
+      background-color: #4b5563;
+    }
+
+    /* Results Section */
+    .results-section {
+      padding: 0 30px 30px;
+      display: none;
+    }
+    
+    .results-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #1f2937;
+      text-align: center;
+    }
+    
+    .no-results {
+      text-align: center;
+      padding: 40px;
+      color: var(--gray);
+    }
+    
+    .no-results i {
+      font-size: 48px;
+      margin-bottom: 15px;
+      color: var(--gray);
+    }
+    
+    .appointment-card {
+      background: var(--white);
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 15px;
+      transition: all 0.3s ease;
+    }
+    
+    .appointment-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+    }
+    
+    .appointment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .appointment-serial {
+      background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    
+    .appointment-status {
+      background: var(--success);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .appointment-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .detail-label {
+      font-weight: 600;
+      color: #374151;
+    }
+    
+    .detail-value {
+      color: #1f2937;
+      text-align: right;
+    }
+    
+    .download-btn {
+      background: var(--success);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 10px;
+    }
+    
+    .download-btn:hover {
+      background: #15803d;
+      transform: translateY(-1px);
+    }
+
+    /* Fixed Super Compact Slip - No Scroll, All Devices Friendly */
+    .confirmation-slip {
+        background: white;
+        border: 2px solid #2563eb;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+        max-width: 280px;
+    }
+
+    .slip-header {
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+    }
+
+    .slip-header h3 {
+        color: #2563eb;
+        font-size: 14px;
+        margin-bottom: 3px;
+        font-weight: 700;
+    }
+
+    .slip-header p {
+        color: #6b7280;
+        font-size: 12px;
+        margin: 0;
+    }
+
+    .slip-details {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+        margin-bottom: 12px;
+        font-size: 12px;
+    }
+
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 3px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .detail-label {
+        font-weight: 600;
+        color: #374151;
+        text-align: left;
+        flex: 1;
+        min-width: 60px;
+    }
+
+    .detail-value {
+        color: #1f2937;
+        text-align: right;
+        flex: 1;
+        font-weight: 500;
+        min-width: 100px;
+    }
+
+    .serial-number {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: white;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 10px 0;
+        font-size: 20px;
+        font-weight: 700;
+        border: 2px solid #3b82f6;
+    }
+
+    .slip-footer {
+        border-top: 1px solid #e5e7eb;
+        padding-top: 8px;
+        color: #6b7280;
+        font-size: 10px;
+        line-height: 1.3;
+        margin-top: 8px;
+    }
+
+    /* Download Buttons CSS */
+    .download-buttons {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 12px;
+        flex-wrap: wrap;
+    }
+
+    .download-btn-slip {
+        background: #16a34a;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        min-width: 120px;
+        justify-content: center;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+    .download-btn-slip:hover {
+        background: #15803d;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .download-btn-slip.pdf {
+        background: #dc2626;
+    }
+
+    .download-btn-slip.pdf:hover {
+        background: #b91c1c;
+    }
+
+    /* Custom Popup Modal */
+    .popup-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .popup-content {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      text-align: center;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      animation: popupIn 0.3s ease-out;
+    }
+
+    @keyframes popupIn {
+      from {
+        opacity: 0;
+        transform: scale(0.8) translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .popup-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+
+    .popup-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #1f2937;
+    }
+
+    .popup-message {
+      font-size: 16px;
+      margin-bottom: 20px;
+      color: #6b7280;
+      line-height: 1.5;
+      text-align: left;
+    }
+
+    .popup-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .popup-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 120px;
+    }
+
+    .popup-btn:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+    }
+
+    .popup-btn.cancel {
+      background: var(--gray);
+    }
+
+    .popup-btn.cancel:hover {
+      background: #4b5563;
+    }
+
+    .popup-btn.success {
+      background: var(--success);
+    }
+
+    .popup-btn.success:hover {
+      background: #15803d;
+    }
+
+    /* Mobile First Design */
+    @media (max-width: 600px) {
+      .container {
+        margin: 10px auto;
+        border-radius: 0;
+      }
+      
+      .search-section {
+        padding: 20px;
+      }
+      
+      .results-section {
+        padding: 0 20px 20px;
+      }
+      
+      .appointment-details {
+        grid-template-columns: 1fr;
+      }
+      
+      .appointment-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      
+      .download-buttons {
+        flex-direction: column;
+      }
+      
+      .download-btn-slip {
+        min-width: 100%;
+      }
+
+      .confirmation-slip {
+          max-width: 100%;
+          padding: 12px;
+      }
+      
+      .slip-details {
+          gap: 4px;
+          font-size: 11px;
+      }
+      
+      .detail-item {
+          padding: 2px 0;
+      }
+      
+      .serial-number {
+          font-size: 18px;
+          padding: 10px;
+      }
+      
+      .slip-footer {
+          font-size: 9px;
+          padding-top: 6px;
+          margin-top: 6px;
+      }
+    }
+
+    /* Animation */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .appointment-card {
+      animation: fadeIn 0.3s ease forwards;
+    }
+  </style>
+</head>
+<body>
+  <!-- Unified Popup Modal -->
+  <div class="popup-modal" id="universalPopup">
+    <div class="popup-content">
+      <div class="popup-icon" id="popupIcon">⚠️</div>
+      <div class="popup-title" id="popupTitle">শিরোনাম</div>
+      <div class="popup-message" id="popupMessage">
+        মেসেজ এখানে দেখানো হবে
+      </div>
+      <!-- Confirmation Slip for Download -->
+      <div class="confirmation-slip" id="confirmationSlip" style="display: none;">
+        <div class="slip-header">
+          <h3>🏥 ডাক্তার অ্যাপয়েন্টমেন্ট</h3>
+          <p>কনফার্মেশন স্লিপ</p>
+        </div>
+        <div class="slip-details">
+          <div class="detail-item">
+            <div class="detail-label">নাম:</div>
+            <div class="detail-value" id="slipName">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">বয়স:</div>
+            <div class="detail-value" id="slipAge">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">ফোন:</div>
+            <div class="detail-value" id="slipPhone">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">ধরন:</div>
+            <div class="detail-value" id="slipType">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">দিন:</div>
+            <div class="detail-value" id="slipDay">-</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">সময়:</div>
+            <div class="detail-value" id="slipTime">-</div>
+          </div>
+        </div>
+        <div class="serial-number" id="slipSerial">#০</div>
+        <div class="slip-footer">
+          তারিখ ও সময়: <span id="slipDateTime">-</span> | এই স্লিপটি সংরক্ষণ করুন এবং অ্যাপয়েন্টমেন্টের দিন সাথে নিয়ে আসুন
+        </div>
+      </div>
+      <div class="popup-buttons" id="popupButtons">
+        <button class="popup-btn cancel" onclick="resetEverything()">বন্ধ করুন</button>
+      </div>
+      <!-- Download Buttons for Confirmation Slip -->
+      <div class="download-buttons" id="downloadButtons" style="display: none;">
+        <button class="download-btn-slip" onclick="downloadPNG()">
+          📸 PNG ডাউনলোড
+        </button>
+        <button class="download-btn-slip pdf" onclick="downloadPDF()">
+          📄 PDF ডাউনলোড
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="container">
+    <div class="header">
+      <h2>সিরিয়াল খুঁজুন</h2>
+    </div>
+    
+    <div class="search-section">
+     <button class="back-btn" onclick="location.href='/'">
+      ← হোম পেজে ফিরে যান
+     </button>
+
+      <div class="form-group">
+        <label for="searchPhone">ফোন নম্বর</label>
+        <div class="input-field">
+          <input type="tel" id="searchPhone" name="searchPhone" placeholder="01XXXXXXXXX" required pattern="01[0-9]{9}"
+            title="বাংলাদেশের ১১ ডিজিটের মোবাইল নম্বর লিখুন">
+        </div>
+        <small id="phoneError" class="error-msg">অনুগ্রহ করে সঠিক ফোন নম্বর লিখুন (01XXXXXXXXX)</small>
+        <small class="info-text">আপনার রেজিস্টার্ড ফোন নম্বরটি লিখুন</small>
+      </div>
+
+      <button type="button" class="search-btn" id="searchBtn" onclick="searchAppointments()">
+        🔍 সিরিয়াল খুঁজুন
+      </button>
+    </div>
+    
+    <div class="results-section" id="resultsSection">
+      <h3 class="results-title">আপনার অ্যাপয়েন্টমেন্টস</h3>
+      <div id="resultsContainer">
+        <!-- Results will be loaded here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+  <script>
+    // ==================== FIREBASE CONFIGURATION ====================
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+      authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+      projectId: "doctor-appointment-syste-23828",
+      storageBucket: "doctor-appointment-syste-23828.appspot.com",
+      messagingSenderId: "79600391014",
+      appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+    };
+
+    // Global db variable
+    let db;
+    let currentAppointmentData = null;
+
+    // Firebase initialization
+    function initializeFirebase() {
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.firestore();
+        console.log("✅ Firebase initialized successfully in search page");
+        return true;
+      } catch (error) {
+        console.error("❌ Firebase initialization error in search page:", error);
+        return false;
+      }
+    }
+
+    // Initialize Firebase immediately
+    initializeFirebase();
+
+    // ==================== DOM ELEMENTS ====================
+    const searchPhone = document.getElementById('searchPhone');
+    const phoneError = document.getElementById('phoneError');
+    const searchBtn = document.getElementById('searchBtn');
+    const resultsSection = document.getElementById('resultsSection');
+    const resultsContainer = document.getElementById('resultsContainer');
+
+    // Popup Elements
+    const universalPopup = document.getElementById('universalPopup');
+    const popupIcon = document.getElementById('popupIcon');
+    const popupTitle = document.getElementById('popupTitle');
+    const popupMessage = document.getElementById('popupMessage');
+    const popupButtons = document.getElementById('popupButtons');
+    const confirmationSlip = document.getElementById('confirmationSlip');
+    const downloadButtons = document.getElementById('downloadButtons');
+
+    // Slip Elements
+    const slipName = document.getElementById('slipName');
+    const slipAge = document.getElementById('slipAge');
+    const slipPhone = document.getElementById('slipPhone');
+    const slipType = document.getElementById('slipType');
+    const slipDay = document.getElementById('slipDay');
+    const slipTime = document.getElementById('slipTime');
+    const slipSerial = document.getElementById('slipSerial');
+    const slipDateTime = document.getElementById('slipDateTime');
+
+    // ==================== COMPLETE RESET FUNCTION ====================
+    function resetEverything() {
+      console.log('🔄 Resetting everything...');
+      
+      // 1. Reset popup and data
+      currentAppointmentData = null;
+      confirmationSlip.style.display = 'none';
+      downloadButtons.style.display = 'none';
+      universalPopup.style.display = 'none';
+      
+      // 2. Reset slip visual data
+      slipName.textContent = '-';
+      slipAge.textContent = '-';
+      slipPhone.textContent = '-';
+      slipType.textContent = '-';
+      slipDay.textContent = '-';
+      slipTime.textContent = '-';
+      slipSerial.textContent = '#০';
+      slipDateTime.textContent = '-';
+      
+      // 3. Clear search results
+      resultsSection.style.display = 'none';
+      resultsContainer.innerHTML = '';
+      
+      // 4. Clear phone input
+      searchPhone.value = '';
+      phoneError.style.display = 'none';
+      
+      // 5. Focus back on search input for new search
+      searchPhone.focus();
+      
+      console.log('✅ Everything reset completed');
+    }
+
+    function resetPopup() {
+      resetEverything();
+    }
+
+    function closePopup() {
+      resetEverything();
+    }
+
+    // ==================== UNIFIED POPUP SYSTEM ====================
+    function showPopup(type, title, message, options = {}) {
+      // Reset popup state
+      confirmationSlip.style.display = 'none';
+      downloadButtons.style.display = 'none';
+      popupButtons.innerHTML = '';
+
+      // Reset current appointment data when showing new popup (unless we're showing slip)
+      if (!options.showSlip) {
+        currentAppointmentData = null;
+      }
+
+      // Set icon based on type
+      const icons = {
+        warning: '⚠️',
+        error: '❌',
+        success: '✅',
+        info: 'ℹ️'
+      };
+
+      popupIcon.textContent = icons[type] || '⚠️';
+      popupTitle.textContent = title;
+      popupMessage.innerHTML = message;
+
+      // Set button colors based on type
+      const buttonColors = {
+        warning: 'warning',
+        error: 'cancel',
+        success: 'success',
+        info: 'primary'
+      };
+
+      // For all popups - reset everything when closed
+      popupButtons.innerHTML = `
+        <button class="popup-btn ${buttonColors[type]}" onclick="resetEverything()">ঠিক আছে</button>
+      `;
+
+      // Show confirmation slip if requested
+      if (options.showSlip && currentAppointmentData) {
+        showConfirmationSlip(currentAppointmentData);
+      }
+
+      universalPopup.style.display = 'flex';
+    }
+
+    // Close popup when clicking outside
+    universalPopup.addEventListener('click', function(e) {
+      if (e.target === universalPopup) {
+        resetEverything();
+      }
+    });
+
+    // ==================== CONFIRMATION SLIP SYSTEM ====================
+    function showConfirmationSlip(appointmentData) {
+      // Update slip content
+      slipName.textContent = appointmentData.name;
+      slipAge.textContent = appointmentData.age + ' বছর';
+      slipPhone.textContent = appointmentData.phone;
+      slipType.textContent = appointmentData.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+      slipDay.textContent = appointmentData.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
+      slipTime.textContent = appointmentData.time + "\n" + "অনুগ্রহ করে নির্ধারিত/সম্ভাব্য সময়ে চেম্বারে উপস্থিত থাকবেন";
+      slipSerial.textContent = '#' + appointmentData.serial;
+      
+      // Set current date and time
+      const now = new Date();
+      const dateTimeString = now.toLocaleDateString('bn-BD', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      }) + ' ' + now.toLocaleTimeString('bn-BD', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      
+      slipDateTime.textContent = dateTimeString;
+      
+      // Show slip and download buttons
+      confirmationSlip.style.display = 'block';
+      downloadButtons.style.display = 'flex';
+    }
+
+    // ==================== DOWNLOAD FUNCTIONS ====================
+    async function downloadPNG() {
+      try {
+        console.log('🔄 Starting PNG download...');
+        
+        if (typeof html2canvas === 'undefined') {
+          throw new Error('html2canvas library not loaded');
+        }
+        
+        const slipElement = document.getElementById('confirmationSlip');
+        
+        if (!slipElement) {
+          throw new Error('Confirmation slip element not found');
+        }
+
+        // Create a clone for screenshot
+        const clone = slipElement.cloneNode(true);
+        clone.style.display = 'block';
+        clone.style.position = 'fixed';
+        clone.style.left = '0';
+        clone.style.top = '0';
+        clone.style.transform = 'none';
+        clone.style.zIndex = '9999';
+        clone.style.margin = '0';
+        clone.style.background = 'white';
+        
+        // Append clone to body
+        document.body.appendChild(clone);
+
+        console.log('🎨 Generating canvas...');
+        const canvas = await html2canvas(clone, {
+          scale: 3,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          width: clone.offsetWidth,
+          height: clone.offsetHeight,
+          x: 0,
+          y: 0,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: clone.offsetWidth,
+          windowHeight: clone.offsetHeight
+        });
+
+        // Remove clone
+        document.body.removeChild(clone);
+
+        console.log('✅ Canvas generated, creating download...');
+        const link = document.createElement('a');
+        link.download = `appointment-serial-${currentAppointmentData.serial}.png`;
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log('✅ PNG download completed');
+        
+        // Show success message with OK button
+        showPopup('success', 'ডাউনলোড সফল', 'PNG ফাইলটি সফলভাবে ডাউনলোড হয়েছে!');
+        
+      } catch (error) {
+        console.error('❌ PNG download error:', error);
+        showPopup('error', 'ত্রুটি', `PNG ডাউনলোড করতে সমস্যা হয়েছে: ${error.message}`);
+      }
+    }
+
+    async function downloadPDF() {
+      try {
+        console.log('🔄 Starting PDF download...');
+        
+        if (typeof window.jspdf === 'undefined') {
+          throw new Error('jsPDF library not loaded');
+        }
+        if (typeof html2canvas === 'undefined') {
+          throw new Error('html2canvas library not loaded');
+        }
+
+        const jsPDF = window.jspdf.jsPDF;
+        const slipElement = document.getElementById('confirmationSlip');
+        
+        if (!slipElement) {
+          throw new Error('Confirmation slip element not found');
+        }
+
+        // Create a clone for screenshot
+        const clone = slipElement.cloneNode(true);
+        clone.style.display = 'block';
+        clone.style.position = 'fixed';
+        clone.style.left = '0';
+        clone.style.top = '0';
+        clone.style.transform = 'none';
+        clone.style.zIndex = '9999';
+        clone.style.margin = '0';
+        clone.style.background = 'white';
+        
+        // Append clone to body
+        document.body.appendChild(clone);
+
+        console.log('🎨 Generating canvas for PDF...');
+        const canvas = await html2canvas(clone, {
+          scale: 3,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          width: clone.offsetWidth,
+          height: clone.offsetHeight,
+          x: 0,
+          y: 0,
+          scrollX: 0,
+          scrollY: 0
+        });
+
+        // Remove clone
+        document.body.removeChild(clone);
+
+        console.log('📄 Creating PDF...');
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a6'
+        });
+        
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        // Add image to PDF
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`appointment-serial-${currentAppointmentData.serial}.pdf`);
+        
+        console.log('✅ PDF download completed');
+        
+        // Show success message with OK button
+        showPopup('success', 'ডাউনলোড সফল', 'PDF ফাইলটি সফলভাবে ডাউনলোড হয়েছে!');
+        
+      } catch (error) {
+        console.error('❌ PDF download error:', error);
+        showPopup('error', 'ত্রুটি', `PDF ডাউনলোড করতে সমস্যা হয়েছে: ${error.message}`);
+      }
+    }
+
+    // ==================== SEARCH FUNCTIONS ====================
+
+    async function searchAppointments() {
+      const phone = searchPhone.value.trim();
+      
+      // Validation
+      if (!phone) {
+        phoneError.textContent = 'ফোন নম্বর লিখতে হবে';
+        phoneError.style.display = 'block';
+        searchPhone.focus();
+        return;
+      }
+      
+      if (!/^01[0-9]{9}$/.test(phone)) {
+        phoneError.textContent = 'অনুগ্রহ করে সঠিক ফোন নম্বর লিখুন (01XXXXXXXXX)';
+        phoneError.style.display = 'block';
+        searchPhone.focus();
+        return;
+      }
+      
+      phoneError.style.display = 'none';
+      
+      if (!db) {
+        showPopup('error', 'ত্রুটি', 'ডেটাবেস সংযোগ সমস্যা। পৃষ্ঠাটি রিফ্রেশ করুন।');
+        return;
+      }
+      
+      try {
+        // Show loading
+        searchBtn.classList.add('loading');
+        searchBtn.textContent = '🔍 খুঁজছি...';
+        
+        console.log(`🔍 Searching appointments for phone: ${phone}`);
+        
+        const snapshot = await db.collection('appointments')
+          .where('phone', '==', phone)
+          .get();
+        
+        const appointments = [];
+        snapshot.forEach(doc => {
+          appointments.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+        
+        // Hide loading
+        searchBtn.classList.remove('loading');
+        searchBtn.textContent = '🔍 সিরিয়াল খুঁজুন';
+        
+        // Display results
+        displaySearchResults(appointments);
+        
+      } catch (error) {
+        console.error('❌ Error searching appointments:', error);
+        searchBtn.classList.remove('loading');
+        searchBtn.textContent = '🔍 সিরিয়াল খুঁজুন';
+        showPopup('error', 'ত্রুটি', 'ডেটা লোড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      }
+    }
+
+    function displaySearchResults(appointments) {
+      resultsContainer.innerHTML = '';
+      
+      if (!appointments || appointments.length === 0) {
+        resultsContainer.innerHTML = `
+          <div class="no-results">
+            <div>🔍</div>
+            <h3>কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি</h3>
+            <p>এই ফোন নম্বর দিয়ে কোনো অ্যাপয়েন্টমেন্ট রেকর্ড নেই</p>
+            <p>অনুগ্রহ করে সঠিক ফোন নম্বর দিন অথবা নতুন অ্যাপয়েন্টমেন্ট করুন</p>
+          </div>
+        `;
+        resultsSection.style.display = 'block';
+        return;
+      }
+      
+      // Sort appointments by day and serial
+      appointments.sort((a, b) => {
+        if (a.day !== b.day) {
+          return a.day === 'Thursday' ? -1 : 1;
+        }
+        return a.serial - b.serial;
+      });
+      
+      let html = '';
+      
+      appointments.forEach(app => {
+        const dayText = app.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
+        const typeText = app.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+        const statusText = app.status === 'confirmed' ? 'কনফার্মড' : 'পেন্ডিং';
+        
+        html += `
+          <div class="appointment-card">
+            <div class="appointment-header">
+              <div class="appointment-serial">সিরিয়াল #${app.serial}</div>
+              <div class="appointment-status">${statusText}</div>
+            </div>
+            
+            <div class="appointment-details">
+              <div class="detail-row">
+                <span class="detail-label">নাম:</span>
+                <span class="detail-value">${app.name}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">বয়স:</span>
+                <span class="detail-value">${app.age} বছর</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">দিন:</span>
+                <span class="detail-value">${dayText}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">সময়:</span>
+                <span class="detail-value">${app.time}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">ধরন:</span>
+                <span class="detail-value">${typeText}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">বুকিং তারিখ:</span>
+                <span class="detail-value">${formatTimestamp(app.timestamp)}</span>
+              </div>
+            </div>
+            
+            <button class="download-btn" onclick="downloadAppointmentSlip(${JSON.stringify(app).replace(/"/g, '&quot;')})">
+              📄 স্লিপ ডাউনলোড করুন
+            </button>
+          </div>
+        `;
+      });
+      
+      resultsContainer.innerHTML = html;
+      resultsSection.style.display = 'block';
+      
+      // Scroll to results
+      resultsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function downloadAppointmentSlip(appointmentData) {
+      // Store for slip generation
+      currentAppointmentData = appointmentData;
+      
+      // Show popup with slip
+      showPopup('success', 'আপনার অ্যাপয়েন্টমেন্ট স্লিপ', 
+        'আপনার অ্যাপয়েন্টমেন্টের তথ্য নিচে দেখানো হয়েছে। আপনি চাইলে স্লিপ ডাউনলোড করতে পারেন।',
+        { showSlip: true });
+    }
+
+    function formatTimestamp(timestamp) {
+      if (!timestamp) return 'N/A';
+      
+      try {
+        const date = timestamp.toDate();
+        return date.toLocaleDateString('bn-BD', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      } catch (error) {
+        return 'N/A';
+      }
+    }
+
+    // ==================== UTILITY FUNCTIONS ====================
+
+    // Phone validation
+    searchPhone.addEventListener('input', () => {
+      const val = searchPhone.value;
+      const valid = /^01[0-9]{9}$/.test(val);
+      
+      if(!valid && val.length > 0) {
+        phoneError.style.display = 'block';
+      } else {
+        phoneError.style.display = 'none';
+      }
+    });
+
+    // Enter key support
+    searchPhone.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        searchAppointments();
+      }
+    });
+
+    // ==================== INITIALIZATION ====================
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('🔍 Search page loaded');
+      
+      // Auto-focus on phone input
+      searchPhone.focus();
+    });
+  </script>
+</body>
+</html>

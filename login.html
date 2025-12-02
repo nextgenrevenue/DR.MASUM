@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login </title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #8ecae6 0%, #7ab8d4 100%); /* Index header color */
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .login-container {
+      background: white;
+      padding: 50px 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #8ecae6, #7ab8d4); /* Index header color */
+    }
+
+    .logo {
+      margin-bottom: 40px;
+    }
+
+    .logo h1 {
+      color: #1f2937;
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .logo p {
+      color: #6b7280;
+      font-size: 16px;
+      font-weight: 400;
+    }
+
+    .login-form {
+      text-align: left;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 10px;
+      font-weight: 600;
+      color: #374151;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: 16px;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.3s ease;
+      background: #fafafa;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #8ecae6; 
+      background: white;
+      box-shadow: 0 0 0 3px rgba(142, 202, 230, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .form-group input::placeholder {
+      color: #9ca3af;
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #8ecae6 0%, #8ecae6 100%); 
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'Inter', sans-serif;
+      margin-top: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(255, 111, 145, 0.3); /* Pink shadow */
+    }
+
+    .login-btn:active {
+      transform: translateY(0);
+    }
+
+    .login-btn::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      transform: translate(-50%, -50%);
+    }
+
+    .login-btn:hover::after {
+      width: 300px;
+      height: 300px;
+    }
+
+    .admin-notice {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 15px;
+      background: #f0f9ff; /* Light blue background (header color tint) */
+      border-radius: 10px;
+      color: #8ecae6; /* Header color text */
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      /* Border removed as requested */
+    }
+
+
+    .admin-notice i {
+      font-size: 18px;
+    }
+
+    .error-message {
+      color: #dc2626;
+      font-size: 14px;
+      font-weight: 500;
+      margin-top: 12px;
+      padding: 12px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .error-message::before {
+      content: '⚠️';
+      font-size: 16px;
+    }
+
+    /* Remove security badge */
+    .security-badge {
+      display: none;
+    }
+
+    @media (max-width: 480px) {
+      .login-container {
+        padding: 40px 24px;
+        border-radius: 16px;
+      }
+      
+      .logo h1 {
+        font-size: 24px;
+      }
+      
+      .logo p {
+        font-size: 14px;
+      }
+      
+      .admin-notice {
+        font-size: 12px;
+        padding: 12px;
+      }
+    }
+
+    /* Loading animation */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="logo">
+      <h1>Admin Portal</h1>
+      <p>Doctor Appointment System</p>
+    </div>
+
+    <form class="login-form" id="loginForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="Enter your username" required autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
+      </div>
+
+      <div class="error-message" id="errorMessage">
+        Invalid username or password
+      </div>
+
+      <button type="submit" class="login-btn" id="loginButton">
+        Sign In to Dashboard
+      </button>
+      
+      <div class="admin-notice">
+        <span>ONLY ADMIN</span>
+      </div>
+    </form>
+  </div>
+
+ <script>
+    // Admin Credentials
+    const ADMIN_CREDENTIALS = {
+      username: "admin",
+      password: "admin123"
+    };
+
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+      authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+      projectId: "doctor-appointment-syste-23828",
+      storageBucket: "doctor-appointment-syste-23828.appspot.com",
+      messagingSenderId: "79600391014",
+      appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+    };
+
+    // Firebase থেকে credentials load করার function
+    async function loadAdminCredentials() {
+      try {
+        console.log('🔄 Loading admin credentials from Firebase...');
+        
+        // Firebase initialize করুন
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+          console.log('✅ Firebase initialized for credentials');
+        }
+        
+        const db = firebase.firestore();
+        const doc = await db.collection('settings').doc('adminCredentials').get();
+        
+        if (doc.exists) {
+          const firebaseCredentials = doc.data();
+          console.log('✅ Credentials found in Firebase:', firebaseCredentials);
+          return firebaseCredentials;
+        } else {
+          console.log('ℹ️ No credentials in Firebase, using defaults');
+          return ADMIN_CREDENTIALS;
+        }
+      } catch (error) {
+        console.error('❌ Error loading credentials:', error);
+        console.log('🔄 Using default credentials due to error');
+        return ADMIN_CREDENTIALS;
+      }
+    }
+
+    // Login form handling - SINGLE VERSION
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      console.log('🚀 Login process started...');
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errorMessage = document.getElementById('errorMessage');
+      const loginButton = document.getElementById('loginButton');
+
+      console.log('📝 Username entered:', username);
+      console.log('🔐 Password entered:', '***' + password.slice(-3)); // Security
+
+      // Show loading state
+      loginButton.innerHTML = '<div class="loading"></div>';
+      loginButton.disabled = true;
+
+      try {
+        // Firebase থেকে credentials load করুন
+        console.log('🔄 Loading credentials...');
+        const currentCredentials = await loadAdminCredentials();
+        
+        console.log('🔑 Current credentials to check against:', {
+          username: currentCredentials.username,
+          password: '***' + (currentCredentials.password || '').slice(-3)
+        });
+
+        // Validate credentials
+        if (username === currentCredentials.username && password === currentCredentials.password) {
+          console.log('✅ Login successful!');
+          
+          // Successful login
+          sessionStorage.setItem('adminLoggedIn', 'true');
+          sessionStorage.setItem('loginTime', new Date().getTime());
+          sessionStorage.setItem('adminUser', username);
+          
+          // Show success state
+          loginButton.innerHTML = '✓ Access Granted';
+          loginButton.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+          
+          // Redirect to dashboard after brief delay - NETLIFY COMPATIBLE
+          setTimeout(() => {
+            console.log('🔄 Redirecting to dashboard...');
+            
+            // Environment detection for both Netlify and Local
+            if (window.location.protocol === 'file:') {
+              // Local file system
+              window.location.href = 'dashboard.html';
+            } else {
+        window.location.href = '/dashboard/';            
+    }
+          }, 800);
+        } else {
+          console.log('❌ Login failed - credentials mismatch');
+          console.log('Expected:', currentCredentials.username, 'Got:', username);
+          console.log('Password match:', password === currentCredentials.password);
+          
+          // Show error message
+          errorMessage.style.display = 'flex';
+          document.getElementById('password').value = '';
+          loginButton.innerHTML = 'Sign In to Dashboard';
+          loginButton.disabled = false;
+          
+          // Hide error after 4 seconds
+          setTimeout(() => {
+            errorMessage.style.display = 'none';
+          }, 4000);
+        }
+      } catch (error) {
+        console.error('❌ Error during login process:', error);
+        errorMessage.textContent = 'Login error: ' + error.message;
+        errorMessage.style.display = 'flex';
+        loginButton.innerHTML = 'Sign In to Dashboard';
+        loginButton.disabled = false;
+      }
+    });
+
+    // Focus on username field when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('username').focus();
+    });
+
+    // Enter key support
+    document.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+      }
+    });
+
+    // Input field animations
+    document.querySelectorAll('input').forEach(input => {
+      input.addEventListener('focus', function() {
+        this.style.transform = 'translateY(-2px)';
+        this.style.boxShadow = '0 5px 15px rgba(255, 111, 145, 0.3)';
+      });
+      
+      input.addEventListener('blur', function() {
+        this.style.transform = 'translateY(0)';
+        this.style.boxShadow = 'none';
+      });
+    });
+
+    // Check if already logged in - UPDATED PATHS
+    if (sessionStorage.getItem('adminLoggedIn')) {
+      const loginTime = sessionStorage.getItem('loginTime');
+      const currentTime = new Date().getTime();
+      
+      // If session is still valid (2 hours), redirect to dashboard
+      if (loginTime && (currentTime - parseInt(loginTime)) < (2 * 60 * 60 * 1000)) {
+        // Environment detection for redirect
+        if (window.location.protocol === 'file:') {
+          window.location.href = 'dashboard.html';
+        } else {
+        window.location.href = '/dashboard/';            
+    }
+      } else {
+        // Clear expired session
+        sessionStorage.clear();
+      }
+    }
+  </script>
+</body>
+</html>
