@@ -88,6 +88,23 @@
     .input-field {
       position: relative;
     }
+
+    .age-multiple-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3টি সমান কলাম */
+  gap: 15px;
+  align-items: stretch;
+}
+
+.age-single-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.age-input-group {
+  display: flex;
+  flex-direction: column;
+}
     
     input, select {
       width: 100%;
@@ -262,16 +279,26 @@
     }
 
     /* Fixed Super Compact Slip - No Scroll, All Devices Friendly */
-    .confirmation-slip {
-        background: white;
-        border: 2px solid #2563eb;
-        border-radius: 10px;
-        padding: 15px;
-        margin: 10px 0;
-        text-align: center;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
-        max-width: 280px;
-    }
+       .confirmation-slip {
+    background: white;
+    border: 2px solid #2563eb;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 15px auto; /* 🔥 auto margin for centering */
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+    max-width: 300px;
+    width: 100%; /* 🔥 Full width of parent */
+    
+    /* 🔥 Center alignment */
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    
+    /* 🔥 Prevent overflow */
+    box-sizing: border-box;
+    overflow: hidden;
+}
 
     .slip-header {
         border-bottom: 1px solid #e5e7eb;
@@ -653,8 +680,8 @@
       <!-- Confirmation Slip for Download -->
       <div class="confirmation-slip" id="confirmationSlip" style="display: none;">
         <div class="slip-header">
-          <h3>🏥 ডাক্তার অ্যাপয়েন্টমেন্ট</h3>
-          <p>কনফার্মেশন স্লিপ</p>
+          <h3>🏥 ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h3>
+          <p>সিরিয়াল কনফার্মেশন স্লিপ</p>
         </div>
         <div class="slip-details">
           <div class="detail-item">
@@ -705,12 +732,12 @@
   <!-- Appointment Form -->
   <div class="container">
     <div class="header">
-      <h2>ডাক্তার অ্যাপয়েন্টমেন্ট ফর্ম</h2>
+      <h2> অ্যাপয়েন্টমেন্ট ফর্ম</h2>
     </div>
     
     <form id="appointmentForm" novalidate>
       <div class="form-group">
-        <label for="name">নাম</label>
+        <label for="name">রোগীর নাম</label>
         <div class="input-field">
           <input type="text" id="name" name="name" placeholder="আপনার পুরো নাম লিখুন" required
             pattern="[a-zA-Z\u0980-\u09FF\.\s]{3,50}" 
@@ -720,12 +747,49 @@
       </div>
 
       <div class="form-group">
-        <label for="age">বয়স</label>
-        <div class="input-field">
-          <input type="number" id="age" name="age" placeholder="আপনার বয়স লিখুন" required min="1" max="120">
-        </div>
-        <small id="ageError" class="error-msg">অনুগ্রহ করে সঠিক বয়স লিখুন (0-120)</small>
+  <label for="age">রোগীর বয়স</label>
+  
+  <div class="age-multiple-container">
+    
+    <div class="age-single-field">
+      <div class="age-input-group">
+        <input type="number" 
+               id="ageYears" 
+               name="ageYears" 
+               placeholder="বছর"
+               min="0"
+               max="120"
+               oninput="normalizeAgeInputs()">
       </div>
+    </div>
+    
+    <div class="age-single-field">
+      <div class="age-input-group">
+        <input type="number" 
+               id="ageMonths" 
+               name="ageMonths" 
+               placeholder="মাস"
+               min="0"
+               oninput="normalizeAgeInputs()">
+      </div>
+    </div>
+    
+    <div class="age-single-field">
+      <div class="age-input-group">
+        <input type="number" 
+               id="ageDays" 
+               name="ageDays" 
+               placeholder="দিন"
+               min="0"
+               oninput="normalizeAgeInputs()">
+      </div>
+    </div>
+    
+  </div>
+  
+  <small id="ageError" class="error-msg">অনুগ্রহ করে সঠিক বয়স লিখুন</small>
+  <small class="info-text">কমপক্ষে একটি ফিল্ড পূরণ করুন (বছর/মাস/দিন)</small>
+</div>
 
       <div class="form-group">
         <label for="phone">ফোন নম্বর</label>
@@ -871,6 +935,7 @@
     let currentUserSelection = null;
     let currentUserPendingId = null;
     let currentAppointmentData = null;
+    let skipNoAvailabilityPopup = false;
 
     // DOM Elements
     const daySelect = document.getElementById('day');
@@ -880,7 +945,9 @@
     const serialInput = document.getElementById('serialInput');
     const nameInput = document.getElementById('name');
     const nameError = document.getElementById('nameError');
-    const ageInput = document.getElementById('age');
+    const ageYearsInput = document.getElementById('ageYears');
+    const ageMonthsInput = document.getElementById('ageMonths');
+    const ageDaysInput = document.getElementById('ageDays');
     const ageError = document.getElementById('ageError');
     const phoneInput = document.getElementById('phone');
     const phoneError = document.getElementById('phoneError');
@@ -909,6 +976,138 @@
     const slipTime = document.getElementById('slipTime');
     const slipSerial = document.getElementById('slipSerial');
     const slipDateTime = document.getElementById('slipDateTime');
+
+    function normalizeAgeInputs() {
+  // মান নিন (ইউজারের আসল ইনপুট - UI পরিবর্তন করবে না)
+  let years = parseInt(ageYearsInput.value) || 0;
+  let months = parseInt(ageMonthsInput.value) || 0;
+  let days = parseInt(ageDaysInput.value) || 0;
+  
+  const original = { years, months, days };
+  console.log('User input (no UI change):', original);
+  
+  // ================================
+  // ১. ডাটাবেজের জন্য কনভার্টেড মান তৈরি
+  // ================================
+  let dbYears = years;
+  let dbMonths = months;
+  let dbDays = days;
+  
+  // মাস > 12 হলে বছরে কনভার্ট (শুধু ডাটাবেজের জন্য)
+  if (dbMonths >= 12) {
+    dbYears += Math.floor(dbMonths / 12);
+    dbMonths = dbMonths % 12;
+  }
+  
+  // দিন > 30 হলে মাসে কনভার্ট (শুধু ডাটাবেজের জন্য)
+  if (dbDays >= 30) {
+    dbMonths += Math.floor(dbDays / 30);
+    dbDays = dbDays % 30;
+    
+    // আবার চেক যদি মাস ১২ বা বেশি হয়
+    if (dbMonths >= 12) {
+      dbYears += Math.floor(dbMonths / 12);
+      dbMonths = dbMonths % 12;
+    }
+  }
+  
+  console.log('Converted for DB:', { dbYears, dbMonths, dbDays });
+  
+  // ================================
+  // ২. ভ্যালিডেশন চেক (কনভার্টেড মানে)
+  // ================================
+  const MAX_YEARS = 120;
+  let isValid = true;
+  let errorMessage = '';
+  
+  if (years < 0 || months < 0 || days < 0) {
+    isValid = false;
+    errorMessage = 'বয়স ঋণাত্মক হতে পারে না';
+  } else if (years === 0 && months === 0 && days === 0) {
+    isValid = false;
+    errorMessage = 'বয়স কমপক্ষে ১ দিন হতে হবে';
+  } else if (dbYears > MAX_YEARS) {
+    isValid = false;
+    errorMessage = 'বয়স ১২০ বছরের বেশি হতে পারে না';
+  }
+  
+  // ================================
+  // ৩. ভ্যালিডেশন মেসেজ দেখানো
+  // ================================
+  if (!isValid) {
+    ageError.style.display = 'block';
+    ageError.textContent = errorMessage;
+  } else {
+    ageError.style.display = 'none';
+  }
+  
+  const result = { 
+    // ইউজারের আসল ইনপুট
+    inputYears: years,
+    inputMonths: months,
+    inputDays: days,
+    
+    // ডাটাবেজের জন্য কনভার্টেড
+    dbYears: dbYears,
+    dbMonths: dbMonths,
+    dbDays: dbDays,
+    
+    isValid: isValid
+  };
+  
+  console.log('Normalize শেষ:', result);
+  return result;
+}
+
+function getAgeData() {
+  // প্রথমে normalize করুন
+  const normalized = normalizeAgeInputs();
+  
+  // ================================
+  // ১. ইউজারের আসল ইনপুট টেক্সট
+  // ================================
+  const inputParts = [];
+  if (normalized.inputYears > 0) inputParts.push(`${normalized.inputYears} বছর`);
+  if (normalized.inputMonths > 0) inputParts.push(`${normalized.inputMonths} মাস`);
+  if (normalized.inputDays > 0) inputParts.push(`${normalized.inputDays} দিন`);
+  
+  const inputText = inputParts.join(' ') || '০ বছর ০ মাস ০ দিন';
+  
+  // ================================
+  // ২. ডাটাবেজ/ডিসপ্লের জন্য কনভার্টেড টেক্সট
+  // ================================
+  const displayParts = [];
+  if (normalized.dbYears > 0) displayParts.push(`${normalized.dbYears} বছর`);
+  if (normalized.dbMonths > 0) displayParts.push(`${normalized.dbMonths} মাস`);
+  if (normalized.dbDays > 0) displayParts.push(`${normalized.dbDays} দিন`);
+  
+  const displayText = displayParts.join(' ') || '০ বছর ০ মাস ০ দিন';
+  
+  // ================================
+  // ৩. পুরাতন সিস্টেমের জন্য (মাসে কনভার্ট)
+  // ================================
+  const totalMonths = (normalized.dbYears * 12) + normalized.dbMonths + (normalized.dbDays / 30);
+  
+  return {
+    // ইউজারের আসল ইনপুট
+    inputYears: normalized.inputYears,
+    inputMonths: normalized.inputMonths,
+    inputDays: normalized.inputDays,
+    ageInputText: inputText, // "২০ মাস"
+    
+    // ডাটাবেজে যাবে (কনভার্টেড)
+    dbYears: normalized.dbYears,
+    dbMonths: normalized.dbMonths,
+    dbDays: normalized.dbDays,
+    ageDisplay: displayText, // "১ বছর ৮ মাস"
+    
+    // ভ্যালিডেশন
+    isValid: normalized.isValid,
+    
+    // পুরাতন সিস্টেমের জন্য
+    ageInMonths: parseFloat(totalMonths.toFixed(2))
+  };
+}
 
     // ==================== UNIFIED POPUP SYSTEM ====================
     function showPopup(type, title, message, options = {}) {
@@ -1026,14 +1225,29 @@
 
     // ==================== CONFIRMATION SLIP SYSTEM ====================
     function showConfirmationSlip(appointmentData) {
-      // Update slip content
-      slipName.textContent = appointmentData.name;
-      slipAge.textContent = appointmentData.age + ' বছর';
-      slipPhone.textContent = appointmentData.phone;
-      slipType.textContent = appointmentData.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
-      slipDay.textContent = appointmentData.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
-      slipTime.textContent = appointmentData.time + "\n" + "অনুগ্রহ করে নির্ধারিত/সম্ভাব্য সময়ে চেম্বারে উপস্থিত থাকবেন";
-      slipSerial.textContent = '#' + appointmentData.serial;
+  // Update slip content
+  slipName.textContent = appointmentData.name;
+  
+  // ✅ নতুন বয়স সিস্টেমের জন্য
+  if (appointmentData.ageDisplay) {
+    slipAge.textContent = appointmentData.ageDisplay;
+  } else if (appointmentData.ageYears || appointmentData.ageMonths || appointmentData.ageDays) {
+    // যদি নতুন ফিল্ড থাকে
+    const parts = [];
+    if (appointmentData.ageYears > 0) parts.push(`${appointmentData.ageYears} বছর`);
+    if (appointmentData.ageMonths > 0) parts.push(`${appointmentData.ageMonths} মাস`);
+    if (appointmentData.ageDays > 0) parts.push(`${appointmentData.ageDays} দিন`);
+    slipAge.textContent = parts.join(' ') || '০ বছর ০ মাস ০ দিন';
+  } else {
+    // পুরাতন সিস্টেমের জন্য
+    slipAge.textContent = appointmentData.age ? `${appointmentData.age} বছর` : '-';
+  }
+  
+  slipPhone.textContent = appointmentData.phone;
+  slipType.textContent = appointmentData.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+  slipDay.textContent = appointmentData.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
+  slipTime.textContent = appointmentData.time + "\n" + "অনুগ্রহ করে নির্ধারিত/সম্ভাব্য সময়ে চেম্বারে উপস্থিত থাকবেন";
+  slipSerial.textContent = '#' + appointmentData.serial;
       
       // Set current date and time
       const now = new Date();
@@ -1293,46 +1507,42 @@
     // ==================== PENDING SELECTIONS SYSTEM ====================
 
     // Add pending selection to Firebase
-    async function addPendingSelection(serialNumber) {
-      if (!db) {
-        console.error('❌ Database not initialized');
-        return null;
-      }
-      
-      const day = daySelect.value;
-      const time = timeSelect.value;
-      const type = typeSelect.value;
-      
-      if (!day || !time || !type) {
-        console.error('❌ Missing selection data');
-        return null;
-      }
+async function addPendingSelection(serialNumber) {
+  if (!db) {
+    console.error('❌ Database not initialized');
+    return null;
+  }
+  
+  const day = daySelect.value;
+  const time = timeSelect.value;
+  const type = typeSelect.value;
+  
+  if (!day || !time || !type) {
+    console.error('❌ Missing selection data');
+    return null;
+  }
 
-        // 🔥 NEW: Also store user data with pending selection
-  const userData = {
-    name: nameInput.value.trim(),
-    phone: phoneInput.value,
-    age: ageInput.value
-  };
-      try {
-        const pendingData = {
-          serial: serialNumber,
-          day: day,
-          time: time,
-          type: type,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes expiry
-          status: 'pending'
-        };
-        
-        const docRef = await db.collection('pendingSelections').add(pendingData);
-        console.log(`✅ Pending selection added for serial ${serialNumber}, ID: ${docRef.id}`);
-        return docRef.id;
-      } catch (error) {
-        console.error('❌ Error adding pending selection:', error);
-        return null;
-      }
-    }
+  try {
+    const pendingData = {
+      serial: serialNumber,
+      day: day,
+      time: time,
+      type: type,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes expiry
+      status: 'pending',
+      bookedBy: 'user',
+      userId: 'user_' + Date.now()
+    };
+    
+    const docRef = await db.collection('pendingSelections').add(pendingData);
+    console.log(`✅ Pending selection added for serial ${serialNumber}, ID: ${docRef.id}`);
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Error adding pending selection:', error);
+    return null;
+  }
+}
 
     // Remove pending selection from Firebase
     async function removePendingSelection(pendingId) {
@@ -1702,7 +1912,8 @@ function updateTimeOptions() {
 
         loadingMessage.style.display = 'none';
         
-        if (availableSlots === 0) {
+        // availableSlots 0 হলেও, যদি skipNoAvailabilityPopup টি true থাকে তবে পপ-আপ স্কিপ হবে।
+        if (availableSlots === 0 && !skipNoAvailabilityPopup) { // 🔥 পরিবর্তন এখানে
           showPopup('warning', 'কোনো সিরিয়াল উপলব্ধ নেই', 
             'এই সময়ের জন্য কোনো সিরিয়াল উপলব্ধ নেই। অনুগ্রহ করে সঠিক সময় নির্বাচন করুন।');
           console.log('⚠️ No available slots');
@@ -1712,8 +1923,12 @@ function updateTimeOptions() {
       } else {
         // কোনো সিরিয়াল স্লট নেই
         loadingMessage.style.display = 'none';
-        showPopup('warning', 'কোনো সিরিয়াল উপলব্ধ নেই', 
-          'এই সময়ের জন্য কোনো সিরিয়াল উপলব্ধ নেই। অনুগ্রহ করে সঠিক সময় নির্বাচন করুন।');
+        
+        // ডেটা লোড না হলেও, স্কিপ করার শর্ত যুক্ত করা হলো।
+        if (!skipNoAvailabilityPopup) { // 🔥 পরিবর্তন এখানে
+            showPopup('warning', 'কোনো সিরিয়াল উপলব্ধ নেই', 
+              'এই সময়ের জন্য কোনো সিরিয়াল উপলব্ধ নেই। অনুগ্রহ করে সঠিক সময় নির্বাচন করুন।');
+        }
         console.log('❌ No serial slots found for selected day, type, and time');
       }
     }
@@ -1728,15 +1943,14 @@ async function selectSerial(serialNumber) {
 
   // 🔥 NEW: Check if form has basic data before allowing selection
   const name = nameInput.value.trim();
-  const age = ageInput.value;
   const phone = phoneInput.value;
   
   let hasError = false;
   
   // Reset all error messages first
   nameError.style.display = 'none';
-  ageError.style.display = 'none';
   phoneError.style.display = 'none';
+  ageError.style.display = 'none';
   
   // Validate each field and show individual errors
   if (!name) {
@@ -1751,15 +1965,11 @@ async function selectSerial(serialNumber) {
     hasError = true;
   }
   
-  if (!age) {
-    ageError.style.display = 'block';
-    ageError.textContent = 'বয়স লিখতে হবে';
-    ageInput.setCustomValidity('invalid');
-    hasError = true;
-  } else if (age < 1 || age > 120) {
-    ageError.style.display = 'block';
-    ageError.textContent = 'অনুগ্রহ করে সঠিক বয়স লিখুন (1-120)';
-    ageInput.setCustomValidity('invalid');
+  // 🔥 বয়স ভ্যালিডেশন - নতুন ৩ ফিল্ড সিস্টেম
+  const ageData = getAgeData(); // প্রথমে বয়স ডাটা পান
+  
+  if (!ageData.isValid) {
+    // getAgeData() ইতিমধ্যে error message সেট করেছে
     hasError = true;
   }
   
@@ -1784,15 +1994,16 @@ async function selectSerial(serialNumber) {
     if (!name) {
       nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
       nameInput.focus();
-    } else if (!age) {
-      ageInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      ageInput.focus();
+    } else if (!ageData.isValid) {
+      ageYearsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      ageYearsInput.focus();
     } else if (!phone) {
       phoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
       phoneInput.focus();
     }
     return;
   }
+  
   // Quick client-side check
   const slot = document.querySelector(`.serial-slot[data-serial="${serialNumber}"]`);
   if (slot.classList.contains('pending') || slot.classList.contains('booked')) {
@@ -1882,16 +2093,11 @@ timeSelect.addEventListener('change', () => {
     });
 
     // Age validation
-    ageInput.addEventListener('input', () => {
-      const val = ageInput.value;
-      if(val < 1 || val > 120) {
-        ageError.style.display = 'block';
-        ageInput.setCustomValidity('invalid');
-      } else {
-        ageError.style.display = 'none';
-        ageInput.setCustomValidity('');
-      }
-    });
+    [ageYearsInput, ageMonthsInput, ageDaysInput].forEach(input => {
+  input.addEventListener('input', () => {
+    normalizeAgeInputs(); // প্রতিবার ইনপুট পরিবর্তন হলে normalize কল করুন
+  });
+});
 
     // Phone validation
     phoneInput.addEventListener('input', () => {
@@ -1907,136 +2113,183 @@ timeSelect.addEventListener('change', () => {
       }
     });
 
-    // Form submission
-    document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      if (!db) {
-        showPopup('error', 'ত্রুটি', 'ডেটাবেস সংযোগ সমস্যা। পৃষ্ঠাটি রিফ্রেশ করুন।');
-        return;
-      }
-      
-      // Validation
-      let isValid = true;
-      
-      if(!nameInput.value.trim()) {
-        nameError.style.display = 'block';
-        nameInput.setCustomValidity('invalid');
-        isValid = false;
-      }
-      
-      if(!ageInput.value || ageInput.value < 1 || ageInput.value > 120) {
-        ageError.style.display = 'block';
-        ageInput.setCustomValidity('invalid');
-        isValid = false;
-      }
-      
-      if(!/^01[0-9]{9}$/.test(phoneInput.value)) {
-        phoneError.style.display = 'block';
-        phoneInput.setCustomValidity('invalid');
-        isValid = false;
-      }
-      
-      if(!serialInput.value) {
-        serialError.style.display = 'block';
-        serialInput.setCustomValidity('invalid');
-        isValid = false;
-      }
-      
-      if(!isValid) {
-        showPopup('error', 'ফর্ম ত্রুটি', 'অনুগ্রহ করে ফর্মের সকল আবশ্যক তথ্য সঠিকভাবে পূরণ করুন।');
-        return false;
-      }
-      
-      const selectedPhone = phoneInput.value;
-      const selectedDay = daySelect.value;
-      const selectedSerial = parseInt(serialInput.value);
-      
-      // Check 1: Phone number should be unique in entire system
-      const hasExistingAppointment = await checkExistingAppointment(selectedPhone);
-      if(hasExistingAppointment) {
-        showPopup('error', 'ফোন নম্বর ডুপ্লিকেট', 
-          'এই ফোন নাম্বারটি ইতিমধ্যে একটি সিরিয়াল বুক করেছে। একটি ফোন নাম্বার দিয়ে শুধুমাত্র একটি সিরিয়াল বুক করা যায়।<br><br>অনুগ্রহ করে অন্য ফোন নাম্বার ব্যবহার করুন।');
-        return false;
-      }
-      
-      // Check 2: Serial number should be unique per day and type
-      const isSerialBookedForSameType = isSerialBookedForDayAndType(selectedSerial, selectedDay, typeSelect.value);
-      if(isSerialBookedForSameType) {
-        const dayText = selectedDay === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
-        const typeText = typeSelect.value === 'new' ? 'নতুন' : 'পুরাতন';
-        showPopup('error', 'সিরিয়াল ডুপ্লিকেট', 
-          `সিরিয়াল ${selectedSerial} ইতিমধ্যে ${dayText} এবং ${typeText} রোগীর জন্য বুক করা হয়েছে।`);
-        return false;
-      }
-      
-      const dayText = selectedDay === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
-      const typeText = typeSelect.value === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
-      
-      // Show confirmation popup
-      const confirmed = await showPopup('confirm', 'কনফার্মেশন', 
-        `আপনি কি নিশ্চিত যে আপনি সিরিয়াল বুক করতে চান?<br><br>
-        <strong>বিস্তারিত:</strong><br>
-        • দিন: ${dayText}<br>
-        • সময়: ${timeSelect.value}<br>
-        • সিরিয়াল: ${selectedSerial} নং<br>
-        • ধরন: ${typeText}<br>
-        • ফোন: ${selectedPhone}`, 
-        { showConfirm: true });
-      
-      if(!confirmed) {
-        console.log('❌ User cancelled the appointment');
-        return false;
-      }
+    // Form submission - এই অংশে পরিবর্তন
+document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  if (!db) {
+    showPopup('error', 'ত্রুটি', 'ডেটাবেস সংযোগ সমস্যা। পৃষ্ঠাটি রিফ্রেশ করুন।');
+    return;
+  }
+  
+  // Validation
+  let isValid = true;
+  
+  // নাম ভ্যালিডেশন
+  if(!nameInput.value.trim()) {
+    nameError.style.display = 'block';
+    nameInput.setCustomValidity('invalid');
+    isValid = false;
+  } else {
+    nameError.style.display = 'none';
+    nameInput.setCustomValidity('');
+  }
+  
+  // বয়স ভ্যালিডেশন - নতুন সিস্টেম
+  const ageValidationData = getAgeData(); // প্রথমে বয়স ডাটা পান
+  
+  if (!ageValidationData.isValid) {
+    // getAgeData() ইতিমধ্যে error message সেট করেছে
+    isValid = false;
+  }
+  
+  // ফোন ভ্যালিডেশন
+  if(!/^01[0-9]{9}$/.test(phoneInput.value)) {
+    phoneError.style.display = 'block';
+    phoneInput.setCustomValidity('invalid');
+    isValid = false;
+  } else {
+    phoneError.style.display = 'none';
+    phoneInput.setCustomValidity('');
+  }
+  
+  // সিরিয়াল ভ্যালিডেশন
+  if(!serialInput.value) {
+    serialError.style.display = 'block';
+    serialInput.setCustomValidity('invalid');
+    isValid = false;
+  } else {
+    serialError.style.display = 'none';
+    serialInput.setCustomValidity('');
+  }
+  
+  if(!isValid) {
+    showPopup('error', 'ফর্ম ত্রুটি', 'অনুগ্রহ করে ফর্মের সকল আবশ্যক তথ্য সঠিকভাবে পূরণ করুন।');
+    return false;
+  }
+  
+  const selectedPhone = phoneInput.value;
+  const selectedDay = daySelect.value;
+  const selectedSerial = parseInt(serialInput.value);
+  
+ 
+  
+  // Check 2: Serial number should be unique per day and type
+  const isSerialBookedForSameType = isSerialBookedForDayAndType(selectedSerial, selectedDay, typeSelect.value);
+  if(isSerialBookedForSameType) {
+    const dayText = selectedDay === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
+    const typeText = typeSelect.value === 'new' ? 'নতুন' : 'পুরাতন';
+    showPopup('error', 'সিরিয়াল ডুপ্লিকেট', 
+      `সিরিয়াল ${selectedSerial} ইতিমধ্যে ${dayText} এবং ${typeText} রোগীর জন্য বুক করা হয়েছে।`);
+    return false;
+  }
+  
+  const dayText = selectedDay === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
+  const typeText = typeSelect.value === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+  
+  // Show confirmation popup
+  const confirmed = await showPopup('confirm', 'কনফার্মেশন', 
+    `আপনি কি নিশ্চিত যে আপনি সিরিয়াল বুক করতে চান?<br><br>
+    <strong>বিস্তারিত:</strong><br>
+    • দিন: ${dayText}<br>
+    • সময়: ${timeSelect.value}<br>
+    • সিরিয়াল: ${selectedSerial} নং<br>
+    • ধরন: ${typeText}<br>
+    • ফোন: ${selectedPhone}`, 
+    { showConfirm: true });
+  
+  if(!confirmed) {
+    console.log('❌ User cancelled the appointment');
+    return false;
+  }
 
-      // Prepare data
-      const appointmentData = {
-        name: nameInput.value.trim(),
-        age: parseInt(ageInput.value),
-        phone: selectedPhone,
-        patientType: typeSelect.value,
-        day: selectedDay,
-        time: timeSelect.value,
-        serial: selectedSerial,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 'confirmed'
-      };
+  // ========================
+  // ✅ বয়স প্রসেসিং
+  // ========================
 
-      // Store for slip generation
-      currentAppointmentData = appointmentData;
+  // ১. বয়স ডাটা পান (ইতিমধ্যে validation-এর জন্য নেওয়া হয়েছে)
+  const finalAgeData = getAgeData();
+  
+  // ২. চূড়ান্ত ভ্যালিডেশন চেক
+  if (!finalAgeData.isValid) {
+    showPopup('error', 'বয়স ত্রুটি', 'অনুগ্রহ করে সঠিক বয়স লিখুন।');
+    return false;
+  }
+  
+  // ========================
+  // ✅ Prepare data - নতুন ৩ ফিল্ড বয়স সিস্টেম
+  // ========================
+  const appointmentData = {
+    // Personal information
+    name: nameInput.value.trim(),
+    phone: selectedPhone,
+    
+     // ✅ ডাটাবেজে: কনভার্টেড মান (১ বছর ৮ মাস)
+  ageYears: finalAgeData.dbYears,     // 1
+  ageMonths: finalAgeData.dbMonths,   // 8
+  ageDays: finalAgeData.dbDays,       // 0
+  
+  // ✅ ডাটাবেজে: কনভার্টেড টেক্সট
+  ageString: finalAgeData.ageDisplay,    // "১ বছর ৮ মাস"
+  
+  // ✅ ডিসপ্লেতে: একই টেক্সট
+  ageDisplay: finalAgeData.ageDisplay,   // "১ বছর ৮ মাস"
+  
+  // লগের জন্য ইউজারের আসল ইনপুট
+  originalInput: finalAgeData.ageInputText, // "২০ মাস"
+    
+    // Appointment information
+    patientType: typeSelect.value,
+    day: selectedDay,
+    time: timeSelect.value,
+    serial: selectedSerial,
+    
+    // System information
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    status: 'confirmed',
+    
+    // ✅ পুরাতন সিস্টেমের সাথে কম্পেটিবিলিটি
+    age: finalAgeData.ageInMonths
+  };
 
-      try {
-        // Show loading
-        submitBtn.classList.add('loading');
-        submitBtn.textContent = 'সাবমিট করা হচ্ছে...';
+  console.log('💾 Firebase ডাটা প্রস্তুত:', appointmentData);
+  console.log('📊 বয়স ডাটা:', finalAgeData);
 
-        // Remove pending selection when submitting
-        if (currentUserPendingId) {
-          await removePendingSelection(currentUserPendingId);
-          currentUserPendingId = null;
-        }
+  // Store for slip generation
+  currentAppointmentData = appointmentData;
 
-        console.log('💾 Saving appointment:', appointmentData);
-        
-        // Save to Firebase
-        await db.collection('appointments').add(appointmentData);
-        
-        // Show success popup with download options
-        showPopup('success', 'অ্যাপয়েন্টমেন্ট সফল হয়েছে!', 
-          'আপনার অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে!<br><br>আপনি চাইলে নিচের থেকে কনফার্মেশন স্লিপ ডাউনলোড করতে পারেন।',
-          { showSlip: true });
-        
-        console.log('✅ Appointment saved successfully');
-        
-        // ❌ DON'T reset form here - it will be reset when user clicks "ঠিক আছে"
-        
-      } catch (error) {
-        console.error('❌ Error saving appointment:', error);
-        showPopup('error', 'ত্রুটি', 'দুঃখিত, একটি ত্রুটি হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
-        submitBtn.classList.remove('loading');
-        submitBtn.textContent = 'সাবমিট করুন';
-      }
-    });
+  try {
+    // Show loading
+    submitBtn.classList.add('loading');
+    submitBtn.textContent = 'সাবমিট করা হচ্ছে...';
+
+    // Remove pending selection when submitting
+    if (currentUserPendingId) {
+      await removePendingSelection(currentUserPendingId);
+      currentUserPendingId = null;
+    }
+
+    console.log('💾 Saving appointment:', appointmentData);
+    
+    // Save to Firebase
+    await db.collection('appointments').add(appointmentData);
+
+     skipNoAvailabilityPopup = true;
+    
+    // Show success popup with download options
+    showPopup('success', 'অ্যাপয়েন্টমেন্ট সফল হয়েছে!', 
+      'আপনার অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে!<br><br>আপনি চাইলে নিচের থেকে কনফার্মেশন স্লিপ ডাউনলোড করতে পারেন।',
+      { showSlip: true });
+    
+    console.log('✅ Appointment saved successfully');
+    
+  } catch (error) {
+    console.error('❌ Error saving appointment:', error);
+    showPopup('error', 'ত্রুটি', 'দুঃখিত, একটি ত্রুটি হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
+    submitBtn.classList.remove('loading');
+    submitBtn.textContent = 'সাবমিট করুন';
+  }
+});
 
     // ==================== INITIALIZATION ====================
     document.addEventListener('DOMContentLoaded', function() {

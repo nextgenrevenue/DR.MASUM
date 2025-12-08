@@ -238,30 +238,38 @@
       font-weight: 600;
     }
     
-    .appointment-details {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 10px;
-      margin-bottom: 15px;
-    }
-    
-    .detail-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 5px 0;
-      border-bottom: 1px solid #f3f4f6;
-    }
-    
-    .detail-label {
-      font-weight: 600;
-      color: #374151;
-    }
-    
-    .detail-value {
-      color: #1f2937;
-      text-align: right;
-    }
-    
+   .appointment-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 15px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+  flex-wrap: wrap; /* ছোট স্ক্রিনে র‍্যাপ হবে */
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 14px;
+  min-width: 100px;
+  text-align: left;
+}
+
+.detail-value {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  flex: 1;
+}
     .download-btn {
       background: var(--success);
       color: white;
@@ -284,15 +292,25 @@
 
     /* Fixed Super Compact Slip - No Scroll, All Devices Friendly */
     .confirmation-slip {
-        background: white;
-        border: 2px solid #2563eb;
-        border-radius: 10px;
-        padding: 15px;
-        margin: 10px 0;
-        text-align: center;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
-        max-width: 280px;
-    }
+    background: white;
+    border: 2px solid #2563eb;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 15px auto; /* 🔥 auto margin for centering */
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+    max-width: 300px;
+    width: 100%; /* 🔥 Full width of parent */
+    
+    /* 🔥 Center alignment */
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    
+    /* 🔥 Prevent overflow */
+    box-sizing: border-box;
+    overflow: hidden;
+}
 
     .slip-header {
         border-bottom: 1px solid #e5e7eb;
@@ -585,8 +603,8 @@
       <!-- Confirmation Slip for Download -->
       <div class="confirmation-slip" id="confirmationSlip" style="display: none;">
         <div class="slip-header">
-          <h3>🏥 ডাক্তার অ্যাপয়েন্টমেন্ট</h3>
-          <p>কনফার্মেশন স্লিপ</p>
+          <h3>🏥 ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h3>
+          <p>সিরিয়াল কনফার্মেশন স্লিপ</p>
         </div>
         <div class="slip-details">
           <div class="detail-item">
@@ -724,7 +742,7 @@
     // Slip Elements
     const slipName = document.getElementById('slipName');
     const slipAge = document.getElementById('slipAge');
-    const slipPhone = document.getElementById('slipPhone');
+    const slipPhoneEl = document.getElementById('slipPhone');
     const slipType = document.getElementById('slipType');
     const slipDay = document.getElementById('slipDay');
     const slipTime = document.getElementById('slipTime');
@@ -744,7 +762,7 @@
       // 2. Reset slip visual data
       slipName.textContent = '-';
       slipAge.textContent = '-';
-      slipPhone.textContent = '-';
+      slipPhoneEl.textContent = '-';
       slipType.textContent = '-';
       slipDay.textContent = '-';
       slipTime.textContent = '-';
@@ -829,8 +847,26 @@
     function showConfirmationSlip(appointmentData) {
       // Update slip content
       slipName.textContent = appointmentData.name;
-      slipAge.textContent = appointmentData.age + ' বছর';
-      slipPhone.textContent = appointmentData.phone;
+      
+      // ✅ নতুন বয়স সিস্টেম - প্রথমে ডিসপ্লে ফিল্ড চেক করুন
+      if (appointmentData.ageDisplay) {
+        slipAge.textContent = appointmentData.ageDisplay;
+      } else if (appointmentData.ageString) {
+        // পুরাতন ডাটাবেজ রেকর্ডের জন্য
+        slipAge.textContent = appointmentData.ageString;
+      } else if (appointmentData.ageYears || appointmentData.ageMonths || appointmentData.ageDays) {
+        // যদি নতুন ফিল্ড থাকে
+        const parts = [];
+        if (appointmentData.ageYears > 0) parts.push(`${appointmentData.ageYears} বছর`);
+        if (appointmentData.ageMonths > 0) parts.push(`${appointmentData.ageMonths} মাস`);
+        if (appointmentData.ageDays > 0) parts.push(`${appointmentData.ageDays} দিন`);
+        slipAge.textContent = parts.join(' ') || '০ বছর ০ মাস ০ দিন';
+      } else {
+        // পুরাতন সিস্টেমের জন্য (fallback)
+        slipAge.textContent = appointmentData.age ? `${appointmentData.age} বছর` : '-';
+      }
+      
+      slipPhoneEl.textContent = appointmentData.phone;
       slipType.textContent = appointmentData.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
       slipDay.textContent = appointmentData.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
       slipTime.textContent = appointmentData.time + "\n" + "অনুগ্রহ করে নির্ধারিত/সম্ভাব্য সময়ে চেম্বারে উপস্থিত থাকবেন";
@@ -1090,6 +1126,36 @@
         const typeText = app.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
         const statusText = app.status === 'confirmed' ? 'কনফার্মড' : 'পেন্ডিং';
         
+        // ✅ নতুন বয়স সিস্টেম - বয়স সঠিকভাবে দেখানো
+        let ageDisplayText = '';
+        
+        if (app.ageDisplay) {
+          // নতুন সিস্টেম: ageDisplay ফিল্ড ব্যবহার
+          ageDisplayText = app.ageDisplay;
+        } else if (app.ageString) {
+          // পুরাতন রেকর্ড: ageString ফিল্ড ব্যবহার
+          ageDisplayText = app.ageString;
+        } else if (app.ageYears || app.ageMonths || app.ageDays) {
+          // নতুন ফিল্ড থেকে তৈরি
+          const parts = [];
+          if (app.ageYears > 0) parts.push(`${app.ageYears} বছর`);
+          if (app.ageMonths > 0) parts.push(`${app.ageMonths} মাস`);
+          if (app.ageDays > 0) parts.push(`${app.ageDays} দিন`);
+          ageDisplayText = parts.join(' ') || '০ বছর ০ মাস ০ দিন';
+        } else if (app.age) {
+          // পুরাতন সিস্টেম: মাসে কনভার্ট করা সংখ্যা
+          const years = Math.floor(app.age / 12);
+          const months = Math.round(app.age % 12);
+          if (years > 0) {
+            ageDisplayText = `${years} বছর`;
+            if (months > 0) ageDisplayText += ` ${months} মাস`;
+          } else {
+            ageDisplayText = `${months} মাস`;
+          }
+        } else {
+          ageDisplayText = 'বয়স তথ্য নেই';
+        }
+        
         html += `
           <div class="appointment-card">
             <div class="appointment-header">
@@ -1104,7 +1170,7 @@
               </div>
               <div class="detail-row">
                 <span class="detail-label">বয়স:</span>
-                <span class="detail-value">${app.age} বছর</span>
+                <span class="detail-value">${ageDisplayText}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">দিন:</span>
