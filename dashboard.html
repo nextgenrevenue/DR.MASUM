@@ -652,6 +652,12 @@
   display: none; /* PC তে隐藏 */
 }
 
+/* Center N/A text in phone column */
+#appointmentsTable td:nth-child(5),
+#appointmentsTable td:nth-child(4) {
+  text-align: center;
+}
+
   /* Responsive */
 /* Mobile Styles */
 @media (max-width: 768px) {
@@ -1069,12 +1075,29 @@
           <input type="text" id="quickName" required>
         </div>
         <div class="form-group">
-          <label for="quickAge">বয়স</label>
-          <input type="number" id="quickAge" min="1" max="120" required>
-        </div>
+  <label for="quickAge">বয়স</label>
+  <div style="display: flex; gap: 10px; align-items: center;">
+    <div style="flex: 1;">
+      <input type="number" id="quickAgeYears" min="0" max="120" placeholder="বছর" 
+             style="width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
+    </div>
+    <div style="flex: 1;">
+      <input type="number" id="quickAgeMonths" min="0" max="11" placeholder="মাস" 
+             style="width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
+    </div>
+    <div style="flex: 1;">
+      <input type="number" id="quickAgeDays" min="0" max="30" placeholder="দিন" 
+             style="width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
+    </div>
+  </div>
+  <input type="hidden" id="quickAge" value="">
+  <small style="color: var(--gray); font-size: 12px; display: block; margin-top: 5px;">
+    কমপক্ষে একটি ফিল্ড পূরণ করুন (বছর/মাস/দিন)
+  </small>
+</div>
         <div class="form-group">
-          <label for="quickPhone">ফোন নম্বর</label>
-          <input type="text" id="quickPhone" required>
+           <label for="quickPhone">ফোন নম্বর <small style="color: var(--gray);">(ঐচ্ছিক)</small></label>
+           <input type="text" id="quickPhone" placeholder="ঐচ্ছিক ">
         </div>
         <div class="form-actions">
           <button type="button" class="cancel-btn-modal" id="cancelQuickModal">বাতিল</button>
@@ -1085,55 +1108,91 @@
   </div>
 
   <!-- Edit Appointment Modal -->
-  <div class="modal" id="editAppointmentModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>অ্যাপয়েন্টমেন্ট এডিট করুন</h2>
-        <button class="close-btn" id="closeEditModal">&times;</button>
+<div class="modal" id="editAppointmentModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>অ্যাপয়েন্টমেন্ট এডিট করুন</h2>
+      <button class="close-btn" id="closeEditModal">&times;</button>
+    </div>
+    <form id="editAppointmentForm">
+      <input type="hidden" id="editAppointmentId">
+      
+      <div class="form-group">
+        <label for="editName">রোগীর নাম</label>
+        <input type="text" id="editName" required>
       </div>
-      <form id="editAppointmentForm">
-        <input type="hidden" id="editAppointmentId">
-        <div class="form-group">
-          <label for="editName">রোগীর নাম</label>
-          <input type="text" id="editName" required>
+      
+      <div class="form-group">
+        <label for="editAge">বয়স</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <div style="flex: 1;">
+            <input type="number" id="editAgeYears" min="0" max="120" placeholder="বছর" 
+                   style="width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
+          </div>
+          <div style="flex: 1;">
+            <input type="number" id="editAgeMonths" min="0" max="11" placeholder="মাস" 
+                   style="width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
+          </div>
+          <div style="flex: 1;">
+            <input type="number" id="editAgeDays" min="0" max="30" placeholder="দিন" 
+                   style="width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px;">
+          </div>
         </div>
-        <div class="form-group">
-          <label for="editAge">বয়স</label>
-          <input type="number" id="editAge" min="1" max="120" required>
-        </div>
-        <div class="form-group">
-          <label for="editPhone">ফোন নম্বর</label>
-          <input type="text" id="editPhone" required>
-        </div>
+        <input type="hidden" id="editAge" value="">
+      </div>
+      
+      <div class="form-group">
+        <label for="editPhone">ফোন নম্বর</label>
+        <input type="text" id="editPhone" required>
+      </div>
+      
+      <!-- দিন এবং ধরন (প্রথমে সিলেক্ট হবে) -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
         <div class="form-group">
           <label for="editDay">দিন</label>
-          <select id="editDay" required>
+          <select id="editDay" required onchange="updateEditTimeOptions()">
+            <option value="">-- নির্বাচন করুন --</option>
             <option value="Thursday">বৃহস্পতিবার</option>
             <option value="Friday">শুক্রবার</option>
           </select>
         </div>
-        <div class="form-group">
-          <label for="editTime">সময়</label>
-          <input type="text" id="editTime" required>
-        </div>
+        
         <div class="form-group">
           <label for="editType">ধরন</label>
-          <select id="editType" required>
+          <select id="editType" required onchange="updateEditTimeOptions()">
+            <option value="">-- নির্বাচন করুন --</option>
             <option value="new">নতুন রোগী</option>
             <option value="old">পুরাতন রোগী</option>
           </select>
         </div>
-        <div class="form-group">
-          <label for="editSerial">সিরিয়াল</label>
-          <input type="number" id="editSerial" min="1" required>
+      </div>
+      
+      <!-- টাইম স্লট (দিন এবং ধরন অনুযায়ী) -->
+      <div class="form-group">
+        <label for="editTime">সময়</label>
+        <select id="editTime" required onchange="updateEditSerialGrid()">
+          <option value="">-- প্রথমে দিন ও ধরন নির্বাচন করুন --</option>
+        </select>
+      </div>
+      
+      <!-- সিরিয়াল গ্রিড -->
+      <div class="form-group">
+        <label for="editSerial">সিরিয়াল নির্বাচন করুন</label>
+        <div class="serial-grid" id="editSerialGrid" style="max-height: 200px;">
+          <div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--gray);">
+            দিন, ধরন এবং সময় নির্বাচন করুন
+          </div>
         </div>
-        <div class="form-actions">
-          <button type="button" class="cancel-btn-modal" id="cancelEditModal">বাতিল</button>
-          <button type="submit" class="submit-btn" id="submitEditBtn">আপডেট করুন</button>
-        </div>
-      </form>
-    </div>
+        <input type="hidden" id="editSerial" value="">
+      </div>
+      
+      <div class="form-actions">
+        <button type="button" class="cancel-btn-modal" id="cancelEditModal">বাতিল</button>
+        <button type="submit" class="submit-btn" id="submitEditBtn">আপডেট করুন</button>
+      </div>
+    </form>
   </div>
+</div>
 
   <!-- Export Modal -->
   <div class="modal" id="exportModal">
@@ -1187,6 +1246,8 @@
     let searchTimer;
     let currentAdminPendingId = null;
     let allPendingSelections = {};
+    let adminPendingSelections = {};
+    let currentAdminSessionId = null; // ✅ নতুন ভেরিয়েবল যোগ করুন
 
     // ==================== INITIALIZATION ====================
     function initializeFirebase() {
@@ -1202,6 +1263,17 @@
         showAlert('Firebase initialization failed: ' + error.message, 'error');
         return false;
       }
+    }
+
+    // ✅ সেশন আইডি ইনিশিয়ালাইজেশন
+    function initializeAdminSession() {
+      if (!sessionStorage.getItem('adminSessionId')) {
+        const sessionId = 'admin_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        sessionStorage.setItem('adminSessionId', sessionId);
+        console.log('✅ New Admin Session ID created:', sessionId);
+      }
+      currentAdminSessionId = sessionStorage.getItem('adminSessionId');
+      console.log('✅ Current Admin Session ID:', currentAdminSessionId);
     }
 
     async function initializeFirebaseData() {
@@ -1310,52 +1382,60 @@
       return /^(?:\+88|01)[3-9]\d{8}$/.test(phone.replace(/\s/g, ''));
     }
 
+    function formatAge(years, months, days) {
+      let ageString = '';
+      if (years > 0) ageString += `${years} বছর`;
+      if (months > 0) ageString += `${ageString ? ', ' : ''}${months} মাস`;
+      if (days > 0) ageString += `${ageString ? ', ' : ''}${days} দিন`;
+      return ageString || 'N/A';
+    }
+
     // ==================== AUTHENTICATION CHECK ====================
-function checkAuthentication() {
-    console.log('🔐 Checking authentication...');
-    
-    const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
-    const loginTime = sessionStorage.getItem('loginTime');
-    
-    console.log('Login status:', isLoggedIn);
-    console.log('Login time:', loginTime);
-    
-    if (!isLoggedIn) {
+    function checkAuthentication() {
+      console.log('🔐 Checking authentication...');
+      
+      const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
+      const loginTime = sessionStorage.getItem('loginTime');
+      
+      console.log('Login status:', isLoggedIn);
+      console.log('Login time:', loginTime);
+      
+      if (!isLoggedIn) {
         console.log('❌ User not logged in, redirecting to login...');
         alert('Please login first!');
         window.location.href = '/login';
         return false;
-    }
-    
-    // Check if session is expired (2 hours)
-    const currentTime = new Date().getTime();
-    const sessionDuration = 2 * 60 * 60 * 1000; // 2 hours
-    
-    if (currentTime - parseInt(loginTime) > sessionDuration) {
+      }
+      
+      // Check if session is expired (2 hours)
+      const currentTime = new Date().getTime();
+      const sessionDuration = 2 * 60 * 60 * 1000; // 2 hours
+      
+      if (currentTime - parseInt(loginTime) > sessionDuration) {
         console.log('❌ Session expired, redirecting to login...');
         sessionStorage.clear();
         alert('Session expired! Please login again.');
         window.location.href = '/login';
         return false;
+      }
+      
+      console.log('✅ Authentication successful!');
+      return true;
     }
-    
-    console.log('✅ Authentication successful!');
-    return true;
-}
 
-// ==================== LOGOUT FUNCTION ====================
-function handleLogout() {
-    console.log('🚪 Logout initiated...');
-    
-    if (confirm('Are you sure you want to logout?')) {
+    // ==================== LOGOUT FUNCTION ====================
+    function handleLogout() {
+      console.log('🚪 Logout initiated...');
+      
+      if (confirm('Are you sure you want to logout?')) {
         // Stop all Firebase listeners
         if (realtimeListeners && realtimeListeners.length > 0) {
-            console.log('Stopping Firebase listeners...');
-            realtimeListeners.forEach(unsubscribe => {
-                if (unsubscribe && typeof unsubscribe === 'function') {
-                    unsubscribe();
-                }
-            });
+          console.log('Stopping Firebase listeners...');
+          realtimeListeners.forEach(unsubscribe => {
+            if (unsubscribe && typeof unsubscribe === 'function') {
+              unsubscribe();
+            }
+          });
         }
         
         // Clear session
@@ -1368,8 +1448,8 @@ function handleLogout() {
         // Redirect to login page
         console.log('Redirecting to login page...');
         window.location.href = '/login';
+      }
     }
-}
 
     // ==================== FIREBASE FUNCTIONS ====================
     async function loadSerialRanges() {
@@ -1449,6 +1529,9 @@ function handleLogout() {
       
       console.log('🚀 Starting dashboard initialization...');
       
+      // ✅ সেশন ইনিশিয়ালাইজেশন যোগ করুন
+      initializeAdminSession();
+      
       initializeFirebaseData().then(() => {
         console.log('✅ Firebase data initialized');
         loadSerialRanges();
@@ -1513,31 +1596,34 @@ function handleLogout() {
           }
         }
       }
+       // Calculate available serials  
+  const totalBookedApps = appointments.length; // সব অ্যাপয়েন্টমেন্ট
+  
+  // ✅ CORRECT: Calculate total pending (USER + ADMIN)
+  let totalPendingCount = 0;
+  
+  // 1. Count user pending
+  for (const key in allPendingSelections) {
+    if (allPendingSelections[key]) {
+      totalPendingCount += allPendingSelections[key].size;
+    }
+  }
+  
+  // 2. Count admin pending - ADD THIS PART
+  for (const key in adminPendingSelections) {
+    if (adminPendingSelections[key]) {
+      totalPendingCount += Object.keys(adminPendingSelections[key]).length;
+    }
+  }
 
-      // Calculate available serials  
-      const totalBookedApps = appointments.length; // সব অ্যাপয়েন্টমেন্ট
-      const availableSerials = totalSerialsCount - totalBookedApps;
-
+  const availableSerials = totalSerialsCount - totalBookedApps - totalPendingCount;
       // Update UI - নতুন স্ট্রাকচার অনুযায়ী
       document.getElementById('thursdayAppointments').textContent = thursdayApps.length;
       document.getElementById('fridayAppointments').textContent = fridayApps.length;
       document.getElementById('totalAppointments').textContent = totalApps;
       document.getElementById('availableSerials').textContent = availableSerials;
       document.getElementById('totalSerials').textContent = totalSerialsCount;
-    }
-
-    // ==================== PENDING COUNT FOR DASHBOARD ====================
-    function updatePendingCountInDashboard() {
-      let totalPendingCount = 0;
-      
-      // Calculate total pending count from all slots
-      for (const key in allPendingSelections) {
-        totalPendingCount += allPendingSelections[key].size;
-      }
-      
-      // Update dashboard card
       document.getElementById('pendingSerials').textContent = totalPendingCount;
-      console.log(`📊 Dashboard: Total pending serials = ${totalPendingCount}`);
     }
 
     // ==================== APPOINTMENT MANAGEMENT ====================
@@ -1598,7 +1684,37 @@ function handleLogout() {
       filteredAppointments.forEach(app => {
         const typeText = (app.patientType || app.type) === 'new' ? 'নতুন' : 'পুরাতন';
         const dayText = app.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
-        const age = app.age || 'N/A';
+        
+        // ✅ বয়স সঠিকভাবে পড়ুন
+        let ageDisplay = 'N/A';
+        
+        // প্রথমে ফরমেট করা বয়স চেক করুন
+        if (app.age && typeof app.age === 'string') {
+          ageDisplay = app.age;
+        } 
+        // তারপর আলাদা ফিল্ডগুলো চেক করুন
+        else if (app.ageYears !== undefined || app.ageMonths !== undefined || app.ageDays !== undefined) {
+          const years = Number(app.ageYears) || 0;
+          const months = Number(app.ageMonths) || 0;
+          const days = Number(app.ageDays) || 0;
+          
+          let tempAge = '';
+          if (years > 0) tempAge += `${years} বছর`;
+          if (months > 0) {
+            if (tempAge) tempAge += ', ';
+            tempAge += `${months} মাস`;
+          }
+          if (days > 0) {
+            if (tempAge) tempAge += ', ';
+            tempAge += `${days} দিন`;
+          }
+          
+          ageDisplay = tempAge || 'N/A';
+        }
+        // পুরানো বয়স ফরম্যাট (যদি থাকে)
+        else if (typeof app.age === 'number') {
+          ageDisplay = `${app.age} বছর`;
+        }
 
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -1607,8 +1723,8 @@ function handleLogout() {
           </td>
           <td>${app.serial}</td>
           <td>${app.name}</td>
-          <td>${age} বছর</td>
-          <td>${app.phone}</td>
+          <td>${ageDisplay}</td>
+          <td>${app.phone || 'নাই'}</td>
           <td>${dayText}</td>
           <td>${app.time}</td>
           <td>${typeText}</td>
@@ -1618,7 +1734,7 @@ function handleLogout() {
           </td>
         `;
         elements.appointmentsTable.appendChild(row);
-      });
+      });   
       
       // Add event listeners
       document.querySelectorAll('.appointment-checkbox').forEach(checkbox => {
@@ -1643,6 +1759,7 @@ function handleLogout() {
       
       document.querySelectorAll('#appointmentsTable .edit-btn').forEach(btn => {
         btn.addEventListener('click', function() {
+          console.log('Edit button clicked, data-id:', this.getAttribute('data-id'));
           const id = this.getAttribute('data-id');
           editAppointment(id);
         });
@@ -1694,20 +1811,286 @@ function handleLogout() {
       }
     }
 
+    // ==================== EDIT APPOINTMENT FUNCTIONS ====================
     function editAppointment(id) {
+      console.log('Edit appointment called with ID:', id);
+      
       const appointment = appointments.find(app => app.id === id);
-      if (!appointment) return;
       
+      if (!appointment) {
+        console.error('Appointment not found for ID:', id);
+        showAlert('অ্যাপয়েন্টমেন্ট খুঁজে পাওয়া যায়নি', 'error');
+        return;
+      }
+      
+      console.log('Found appointment:', appointment);
+      
+      // Basic fields
       document.getElementById('editAppointmentId').value = id;
-      document.getElementById('editName').value = appointment.name;
-      document.getElementById('editAge').value = appointment.age || '';
-      document.getElementById('editPhone').value = appointment.phone;
-      document.getElementById('editDay').value = appointment.day;
-      document.getElementById('editTime').value = appointment.time;
-      document.getElementById('editType').value = appointment.patientType || appointment.type;
-      document.getElementById('editSerial').value = appointment.serial;
+      document.getElementById('editName').value = appointment.name || '';
+      document.getElementById('editPhone').value = appointment.phone || '';
       
+      // Age fields - সঠিকভাবে সেট করুন
+      console.log('Age data:', {
+        age: appointment.age,
+        ageYears: appointment.ageYears,
+        ageMonths: appointment.ageMonths,
+        ageDays: appointment.ageDays
+      });
+      
+      // Method 1: যদি আলাদা ageYears, ageMonths, ageDays ফিল্ড থাকে
+      if (appointment.ageYears !== undefined || appointment.ageMonths !== undefined || appointment.ageDays !== undefined) {
+        document.getElementById('editAgeYears').value = appointment.ageYears || 0;
+        document.getElementById('editAgeMonths').value = appointment.ageMonths || 0;
+        document.getElementById('editAgeDays').value = appointment.ageDays || 0;
+      } 
+      // Method 2: যদি age স্ট্রিং থাকে (পুরানো ফরম্যাট)
+      else if (appointment.age && typeof appointment.age === 'string') {
+        // স্ট্রিং থেকে সংখ্যা বের করুন
+        const ageStr = appointment.age;
+        let years = 0, months = 0, days = 0;
+        
+        if (ageStr.includes('বছর')) {
+          const match = ageStr.match(/(\d+)\s*বছর/);
+          years = match ? parseInt(match[1]) : 0;
+        }
+        if (ageStr.includes('মাস')) {
+          const match = ageStr.match(/(\d+)\s*মাস/);
+          months = match ? parseInt(match[1]) : 0;
+        }
+        if (ageStr.includes('দিন')) {
+          const match = ageStr.match(/(\d+)\s*দিন/);
+          days = match ? parseInt(match[1]) : 0;
+        }
+        
+        document.getElementById('editAgeYears').value = years;
+        document.getElementById('editAgeMonths').value = months;
+        document.getElementById('editAgeDays').value = days;
+      }
+      // Method 3: যদি age সংখ্যা হিসেবে থাকে (পুরাতন সিস্টেম)
+      else if (appointment.age && typeof appointment.age === 'number') {
+        document.getElementById('editAgeYears').value = appointment.age;
+        document.getElementById('editAgeMonths').value = 0;
+        document.getElementById('editAgeDays').value = 0;
+      }
+      // Method 4: ডিফল্ট
+      else {
+        document.getElementById('editAgeYears').value = '';
+        document.getElementById('editAgeMonths').value = '';
+        document.getElementById('editAgeDays').value = '';
+      }
+      
+      // ✅ দিন এবং ধরন সেট করুন (টাইম স্লট ফিল্টারের জন্য)
+      document.getElementById('editDay').value = appointment.day || '';
+      document.getElementById('editType').value = appointment.patientType || appointment.type || '';
+      
+      // টাইম অপশন আপডেট করুন
+      updateEditTimeOptions();
+      
+      // Time সেট করুন (কিছুক্ষণ পরে যেন অপশন লোড হয়)
+      setTimeout(() => {
+        document.getElementById('editTime').value = appointment.time || '';
+        
+        // সিরিয়াল সেট করুন
+        document.getElementById('editSerial').value = appointment.serial || '';
+        
+        // সিরিয়াল গ্রিড আপডেট করুন
+        updateEditSerialGrid();
+        
+        // বর্তমান সিরিয়াল সিলেক্ট করুন
+        if (appointment.serial) {
+          setTimeout(() => {
+            const currentSerial = appointment.serial;
+            const day = appointment.day;
+            const type = appointment.patientType || appointment.type;
+            const time = appointment.time;
+            
+            // সিলেক্টেড সিরিয়াল হাইলাইট করুন
+            highlightEditSerial(currentSerial);
+          }, 300);
+        }
+      }, 100);
+      
+      // মডাল শো করুন
       elements.editAppointmentModal.style.display = 'flex';
+      console.log('Edit modal should be visible now');
+    }
+
+    // ✅ এডিট মডালের টাইম স্লট আপডেট
+    function updateEditTimeOptions() {
+      const day = document.getElementById('editDay').value;
+      const type = document.getElementById('editType').value;
+      const timeSelect = document.getElementById('editTime');
+      
+      timeSelect.innerHTML = '<option value="">-- সময় নির্বাচন করুন --</option>';
+      
+      if (!day || !type) {
+        return;
+      }
+      
+      // ডেটাবেজ থেকে টাইম স্লট লোড করুন
+      const times = [];
+      
+      if (serialRanges[day] && serialRanges[day][type]) {
+        for (const time in serialRanges[day][type]) {
+          times.push(time);
+        }
+      }
+      
+      // টাইম সাজানো
+      times.sort((a, b) => {
+        const timeA = a.toUpperCase();
+        const timeB = b.toUpperCase();
+        const isAM_A = timeA.includes('AM');
+        const isAM_B = timeB.includes('AM');
+        
+        if (isAM_A && !isAM_B) return -1;
+        if (!isAM_A && isAM_B) return 1;
+        
+        const numA = extractTimeNumber(timeA);
+        const numB = extractTimeNumber(timeB);
+        return numA - numB;
+      });
+      
+      // অপশন যোগ করুন
+      times.forEach(time => {
+        const option = document.createElement('option');
+        option.value = time;
+        option.textContent = time;
+        timeSelect.appendChild(option);
+      });
+    }
+
+    // ✅ এডিট মডালের সিরিয়াল গ্রিড আপডেট
+    function updateEditSerialGrid() {
+      const day = document.getElementById('editDay').value;
+      const type = document.getElementById('editType').value;
+      const time = document.getElementById('editTime').value;
+      const serialGrid = document.getElementById('editSerialGrid');
+      
+      serialGrid.innerHTML = '';
+      
+      if (!day || !type || !time) {
+        serialGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--gray);">দিন, ধরন এবং সময় নির্বাচন করুন</div>';
+        return;
+      }
+      
+      const serialRange = serialRanges[day] && serialRanges[day][type] && serialRanges[day][type][time];
+      
+      if (!serialRange) {
+        serialGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--gray);">এই স্লটে কোনো সিরিয়াল নেই</div>';
+        return;
+      }
+      
+      const [start, end] = serialRange;
+      
+      // বুকড সিরিয়াল বের করুন
+      const bookedSerials = appointments.filter(app => {
+        const patientType = app.patientType || app.type;
+        return app.day === day && 
+               app.time === time && 
+               patientType === type;
+      }).map(app => app.serial);
+      
+      // পেন্ডিং সিরিয়াল বের করুন (ইউজার এবং এডমিন)
+      const currentKey = `${day}_${time}_${type}`;
+      const userPendingSerials = allPendingSelections[currentKey] || new Set();
+      const adminPendingSerials = adminPendingSelections[currentKey] || {};
+      
+      // বর্তমান সিলেক্ট করা সিরিয়াল (যদি থাকে)
+      const currentSerial = parseInt(document.getElementById('editSerial').value) || 0;
+      
+      // সিরিয়াল আইটেম তৈরি করুন
+      for (let serial = start; serial <= end; serial++) {
+        const serialItem = document.createElement('div');
+        serialItem.className = 'serial-item';
+        serialItem.textContent = serial;
+        serialItem.setAttribute('data-serial', serial);
+        
+        // বর্তমান সিরিয়াল চেক করুন
+        const isCurrentSerial = (serial === currentSerial);
+        
+        // স্ট্যাটাস নির্ধারণ (4-color system)
+        if (bookedSerials.includes(serial) && !isCurrentSerial) {
+          // অন্য কেউ বুক করেছে - Red
+          serialItem.classList.add('booked');
+          serialItem.style.cursor = 'not-allowed';
+          serialItem.title = 'এই সিরিয়ালটি ইতিমধ্যে বুক করা হয়েছে';
+        } else if (userPendingSerials.has(serial) && !isCurrentSerial) {
+          // ইউজার পেন্ডিং - Blue
+          serialItem.classList.add('pending');
+          serialItem.style.cursor = 'not-allowed';
+          serialItem.title = 'এই সিরিয়ালটি ইউজার সিলেক্ট করেছেন';
+        } else if (adminPendingSerials[serial]) {
+          const adminData = adminPendingSerials[serial];
+          
+          if (adminData.isCurrentAdmin && !isCurrentSerial) {
+            // অন্য এডমিনের পেন্ডিং - Blue
+            serialItem.classList.add('pending');
+            serialItem.title = 'এই সিরিয়ালটি অন্য এডমিন সিলেক্ট করেছেন';
+            serialItem.style.cursor = 'not-allowed';
+          } else if (adminData.isCurrentAdmin && isCurrentSerial) {
+            // বর্তমান এডমিনের নিজের পেন্ডিং - Yellow
+            serialItem.classList.add('selected');
+            serialItem.title = 'আপনার নির্বাচিত সিরিয়াল';
+            serialItem.style.cursor = 'pointer';
+            serialItem.addEventListener('click', () => {
+              selectEditSerial(serial, day, time, type);
+            });
+          }
+        } else if (isCurrentSerial) {
+          // বর্তমান অ্যাপয়েন্টমেন্টের সিরিয়াল - Yellow
+          serialItem.classList.add('selected');
+          serialItem.title = 'বর্তমান সিরিয়াল';
+          serialItem.style.cursor = 'pointer';
+          serialItem.addEventListener('click', () => {
+            selectEditSerial(serial, day, time, type);
+          });
+        } else {
+          // খালি সিরিয়াল - Green
+          serialItem.classList.add('available');
+          serialItem.style.cursor = 'pointer';
+          serialItem.title = 'খালি সিরিয়াল - ক্লিক করে নির্বাচন করুন';
+          serialItem.addEventListener('click', () => {
+            selectEditSerial(serial, day, time, type);
+          });
+        }
+        
+        serialGrid.appendChild(serialItem);
+      }
+      
+      // মোবাইল ভিউ এর জন্য কলাম সংখ্যা কমিয়ে আনা
+      if (window.innerWidth <= 768) {
+        serialGrid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+      }
+    }
+
+    // ✅ এডিট মডালে সিরিয়াল হাইলাইট করুন
+    function highlightEditSerial(serial) {
+      document.querySelectorAll('#editSerialGrid .serial-item.selected').forEach(item => {
+        item.classList.remove('selected');
+      });
+      
+      const serialItem = document.querySelector(`#editSerialGrid .serial-item[data-serial="${serial}"]`);
+      if (serialItem) {
+        serialItem.classList.add('selected');
+      }
+    }
+
+    // ✅ এডিট মডালে সিরিয়াল সিলেক্ট করা
+    function selectEditSerial(serial, day, time, type) {
+      // আগের সিলেকশন ক্লিয়ার করুন
+      document.querySelectorAll('#editSerialGrid .serial-item.selected').forEach(item => {
+        item.classList.remove('selected');
+      });
+      
+      // নতুন সিলেকশন সেট করুন
+      const clickedItem = document.querySelector(`#editSerialGrid .serial-item[data-serial="${serial}"]`);
+      if (clickedItem) {
+        clickedItem.classList.remove('available', 'pending', 'booked');
+        clickedItem.classList.add('selected');
+        document.getElementById('editSerial').value = serial;
+      }
     }
 
     async function updateAppointment(e) {
@@ -1716,25 +2099,97 @@ function handleLogout() {
       if (!checkDatabase()) return;
       
       const id = document.getElementById('editAppointmentId').value;
+      const serial = parseInt(document.getElementById('editSerial').value);
+      const day = document.getElementById('editDay').value;
+      const time = document.getElementById('editTime').value;
+      const type = document.getElementById('editType').value;
+      
+      // ভ্যালিডেশন
+      if (!serial) {
+        showAlert('অনুগ্রহ করে একটি সিরিয়াল নির্বাচন করুন', 'error');
+        return;
+      }
+      
+      if (!day || !time || !type) {
+        showAlert('অনুগ্রহ করে দিন, সময় এবং ধরন নির্বাচন করুন', 'error');
+        return;
+      }
+      
+      // বয়স ফিল্ড পড়ুন
+      const years = parseInt(document.getElementById('editAgeYears').value) || 0;
+      const months = parseInt(document.getElementById('editAgeMonths').value) || 0;
+      const days = parseInt(document.getElementById('editAgeDays').value) || 0;
+      
+      // বয়স ভ্যালিডেশন
+      if (years === 0 && months === 0 && days === 0) {
+        showAlert('অনুগ্রহ করে কমপক্ষে একটি বয়স ফিল্ড পূরণ করুন (বছর/মাস/দিন)', 'error');
+        return;
+      }
+      
+      // বয়স স্ট্রিং তৈরি
+      let ageString = '';
+      if (years > 0) ageString += `${years} বছর`;
+      if (months > 0) {
+        if (ageString) ageString += ', ';
+        ageString += `${months} মাস`;
+      }
+      if (days > 0) {
+        if (ageString) ageString += ', ';
+        ageString += `${days} দিন`;
+      }
+      
+      // চেক করুন নতুন সিরিয়াল খালি কিনা
+      const isAvailable = await checkEditSerialAvailability(id, serial, day, time, type);
+      if (!isAvailable) {
+        showAlert('এই সিরিয়ালটি ইতিমধ্যে বুকড! অন্য সিরিয়াল নির্বাচন করুন।', 'error');
+        return;
+      }
+      
       const updatedData = {
         name: document.getElementById('editName').value,
-        age: parseInt(document.getElementById('editAge').value),
+        age: ageString,
+        ageYears: years,
+        ageMonths: months,
+        ageDays: days,
         phone: document.getElementById('editPhone').value,
-        day: document.getElementById('editDay').value,
-        time: document.getElementById('editTime').value,
-        patientType: document.getElementById('editType').value,
-        serial: parseInt(document.getElementById('editSerial').value),
+        day: day,
+        time: time,
+        patientType: type,
+        serial: serial,
         updatedAt: new Date()
       };
 
+      console.log('Updating appointment with data:', updatedData);
+
       try {
+        // লোডিং স্টেট
+        document.getElementById('submitEditBtn').innerHTML = '<div class="loading"></div>';
+        document.getElementById('submitEditBtn').disabled = true;
+        
         await db.collection('appointments').doc(id).update(updatedData);
         elements.editAppointmentModal.style.display = 'none';
         showAlert('অ্যাপয়েন্টমেন্ট আপডেট করা হয়েছে', 'success');
       } catch (error) {
         console.error('❌ Error updating appointment:', error);
         showAlert('অ্যাপয়েন্টমেন্ট আপডেট করতে সমস্যা হয়েছে', 'error');
+      } finally {
+        document.getElementById('submitEditBtn').innerHTML = 'আপডেট করুন';
+        document.getElementById('submitEditBtn').disabled = false;
       }
+    }
+
+    // ✅ এডিটের জন্য সিরিয়াল Availability চেক
+    async function checkEditSerialAvailability(currentId, newSerial, day, time, type) {
+      // বর্তমান অ্যাপয়েন্টমেন্টটি বাদ দিন
+      const otherBookings = appointments.filter(app => 
+        app.id !== currentId && 
+        app.day === day && 
+        app.time === time && 
+        (app.patientType || app.type) === type &&
+        app.serial === newSerial
+      );
+      
+      return otherBookings.length === 0;
     }
 
     // ==================== SERIAL MANAGEMENT ====================
@@ -1886,8 +2341,9 @@ function handleLogout() {
         
         // Count pending serials for this slot
         const currentKey = `${dayKey}_${time}_${type}`;
-        const pendingSerials = allPendingSelections[currentKey] || new Set();
-        const pendingCount = pendingSerials.size;
+        const userPendingSerials = allPendingSelections[currentKey] || new Set();
+        const adminPendingData = adminPendingSelections[currentKey] || {};
+        const pendingCount = userPendingSerials.size + Object.keys(adminPendingData).length;
         
         const total = end - start + 1;
         const available = total - bookedCount - pendingCount;
@@ -2133,54 +2589,58 @@ function handleLogout() {
         .where('expiresAt', '>', new Date())
         .onSnapshot(snapshot => {
           allPendingSelections = {};
-          let adminPendingFound = false;
+          adminPendingSelections = {};
           
           snapshot.forEach(doc => {
             const data = doc.data();
             const key = `${data.day}_${data.time}_${data.type}`;
             
-            if (!allPendingSelections[key]) {
-              allPendingSelections[key] = new Set();
-            }
-            allPendingSelections[key].add(data.serial);
-            
-            // Check if this is current admin's pending selection
-            if (data.bookedBy === 'admin' && doc.id === currentAdminPendingId) {
-              adminPendingFound = true;
+            if (data.bookedBy === 'user') {
+              // ইউজার পেন্ডিং
+              if (!allPendingSelections[key]) {
+                allPendingSelections[key] = new Set();
+              }
+              allPendingSelections[key].add(data.serial);
+            } else if (data.bookedBy === 'admin') {
+              // এডমিন পেন্ডিং
+              if (!adminPendingSelections[key]) {
+                adminPendingSelections[key] = {};
+              }
+              
+              // ✅ সঠিকভাবে সেশন আইডি চেক করুন
+              const isCurrentAdmin = (data.sessionId === currentAdminSessionId);
+              
+              adminPendingSelections[key][data.serial] = {
+                id: doc.id,
+                isCurrentAdmin: isCurrentAdmin,
+                sessionId: data.sessionId
+              };
+              
+              // যদি বর্তমান এডমিনের সিলেকশন হয়
+              if (isCurrentAdmin) {
+                currentAdminPendingId = doc.id;
+              }
             }
           });
           
-          console.log('✅ Admin Dashboard: Pending selections loaded', allPendingSelections);
+          console.log('User pending:', allPendingSelections);
+          console.log('Admin pending:', adminPendingSelections);
+          console.log('Current admin session ID:', currentAdminSessionId);
           
-          // ✅ Update pending count in dashboard
-          updatePendingCountInDashboard();
-          
-          // If admin's pending selection was deleted by someone else, reset
-          if (currentAdminPendingId && !adminPendingFound) {
-            console.log('🔄 Admin pending selection was cleared by another user');
-            currentAdminPendingId = null;
-            document.getElementById('selectedSerialNumber').value = '';
-            
-            // Clear visual selection
-            document.querySelectorAll('.serial-item.selected').forEach(item => {
-              item.classList.remove('selected');
-              if (!item.classList.contains('booked') && !item.classList.contains('pending')) {
-                item.classList.add('available');
-              }
-            });
-          }
-          
-          // Update serial table with pending selections
+          updateStats(); // পেন্ডিং কাউন্ট আপডেট
           loadSerials();
           
-          // Update quick serial modal if open
+          // কুইক সিরিয়াল মডাল ওপেন থাকলে আপডেট করুন
           if (document.getElementById('quickSerialModal').style.display === 'flex') {
             updateSerialGrid();
           }
-        }, error => {
-          console.error('❌ Admin Dashboard: Error loading pending selections:', error);
+          
+          // এডিট মডাল ওপেন থাকলে আপডেট করুন
+          if (document.getElementById('editAppointmentModal').style.display === 'flex') {
+            updateEditSerialGrid();
+          }
         });
-
+      
       realtimeListeners.push(pendingSelectionsListener);
     }
 
@@ -2218,21 +2678,8 @@ function handleLogout() {
 
       // Get pending serials for this slot
       const currentKey = `${day}_${time}_${patientType}`;
-      const pendingSerials = allPendingSelections[currentKey] || new Set();
-
-      // ✅ Get current admin's pending selection
-      let adminPendingSerial = null;
-      if (currentAdminPendingId) {
-        // Find which serial is currently selected by admin
-        for (const [key, serials] of Object.entries(allPendingSelections)) {
-          if (key === currentKey) {
-            serials.forEach(serial => {
-              // We'll assume admin's selection is in this slot
-              adminPendingSerial = serial;
-            });
-          }
-        }
-      }
+      const userPendingSerials = allPendingSelections[currentKey] || new Set();
+      const adminPendingSerials = adminPendingSelections[currentKey] || {};
 
       // Create serial grid items
       for (let serial = start; serial <= end; serial++) {
@@ -2247,19 +2694,26 @@ function handleLogout() {
           serialItem.classList.add('booked');
           serialItem.style.cursor = 'not-allowed';
           serialItem.title = 'এই সিরিয়ালটি ইতিমধ্যে বুক করা হয়েছে';
-        } else if (pendingSerials.has(serial)) {
-          // Pending - Blue (Selected by users or admin)
+        } else if (userPendingSerials.has(serial)) {
+          // User Pending - Blue
           serialItem.classList.add('pending');
           serialItem.style.cursor = 'not-allowed';
+          serialItem.title = 'এই সিরিয়ালটি ইউজার সিলেক্ট করেছেন';
+        } else if (adminPendingSerials[serial]) {
+          // Admin Pending
+          const adminData = adminPendingSerials[serial];
           
-          // Check if this is admin's own selection
-          if (serial === adminPendingSerial) {
-            serialItem.classList.remove('pending');
+          if (adminData.isCurrentAdmin) {
+            // Current Admin's own selection - Yellow
             serialItem.classList.add('selected');
             serialItem.title = 'আপনার নির্বাচিত সিরিয়াল';
             serialItem.style.cursor = 'pointer';
+            document.getElementById('selectedSerialNumber').value = serial;
           } else {
-            serialItem.title = 'এই সিরিয়ালটি অন্য কেউ সিলেক্ট করেছেন';
+            // Other Admin's selection - Blue (pending)
+            serialItem.classList.add('pending');
+            serialItem.title = 'এই সিরিয়ালটি অন্য এডমিন সিলেক্ট করেছেন';
+            serialItem.style.cursor = 'not-allowed';
           }
         } else {
           // Available - Green
@@ -2291,15 +2745,28 @@ function handleLogout() {
         document.querySelectorAll('.serial-item.selected').forEach(item => {
           item.classList.remove('selected');
           const itemSerial = parseInt(item.getAttribute('data-serial'));
-          if (!item.classList.contains('booked') && !item.classList.contains('pending')) {
-            item.classList.add('available');
+          
+          // ✅ পূর্বের সিলেক্টেড আইটেমকে সঠিক অবস্থায় ফিরিয়ে আনুন
+          if (!item.classList.contains('booked')) {
+            // চেক করুন এটি ইউজার বা অন্য এডমিনের পেন্ডিং কিনা
+            const currentKey = `${day}_${time}_${type}`;
+            const userPending = allPendingSelections[currentKey] || new Set();
+            const adminPending = adminPendingSelections[currentKey] || {};
+            
+            if (userPending.has(itemSerial) || adminPending[itemSerial]) {
+              // যদি পেন্ডিং থাকে
+              item.classList.add('pending');
+            } else {
+              // সম্পূর্ণ ফ্রি হলে
+              item.classList.add('available');
+            }
           }
         });
         
         // Add selection to clicked item
         const clickedItem = document.querySelector(`.serial-item[data-serial="${serial}"]`);
         if (clickedItem) {
-          clickedItem.classList.remove('available');
+          clickedItem.classList.remove('available', 'pending');
           clickedItem.classList.add('selected');
           document.getElementById('selectedSerialNumber').value = serial;
           
@@ -2329,11 +2796,19 @@ function handleLogout() {
           timestamp: firebase.firestore.FieldValue.serverTimestamp(),
           expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
           status: 'pending',
-          bookedBy: 'admin'
+          bookedBy: 'admin',
+          adminId: 'admin_' + Math.random().toString(36).substr(2, 9), // র‍্যান্ডম এডমিন আইডি
+          sessionId: currentAdminSessionId, // ✅ সঠিক সেশন আইডি ব্যবহার
+          browserId: navigator.userAgent.replace(/\s+/g, '_').substring(0, 50) // ব্রাউজার আইডি
         };
         
         const docRef = await db.collection('pendingSelections').add(pendingData);
         console.log(`✅ Admin pending selection added: ${docRef.id}`);
+        console.log('Admin session ID:', currentAdminSessionId);
+        
+        // বর্তমান এডমিনের পেন্ডিং আইডি স্টোর করুন
+        currentAdminPendingId = docRef.id;
+        
         return docRef.id;
       } catch (error) {
         console.error('❌ Error adding admin pending selection:', error);
@@ -2353,79 +2828,127 @@ function handleLogout() {
       }
     }
 
-    async function addQuickSerial() {
-      if (!checkDatabase()) return;
+    // ==================== QUICK SERIAL FUNCTIONS ====================
+    // addQuickSerial ফাংশন এডিট করুন
+async function addQuickSerial() {
+  if (!checkDatabase()) return;
 
-      const day = document.getElementById('quickDay').value;
-      const time = document.getElementById('quickTime').value;
-      const serial = parseInt(document.getElementById('selectedSerialNumber').value);
-      const patientType = document.getElementById('selectedPatientType').value;
-      const name = document.getElementById('quickName').value;
-      const age = parseInt(document.getElementById('quickAge').value);
-      const phone = document.getElementById('quickPhone').value;
+  const day = document.getElementById('quickDay').value;
+  const time = document.getElementById('quickTime').value;
+  const serial = parseInt(document.getElementById('selectedSerialNumber').value);
+  const patientType = document.getElementById('selectedPatientType').value;
+  const name = document.getElementById('quickName').value;
+  
+  // ✅ বয়স ফিল্ড
+  const years = parseInt(document.getElementById('quickAgeYears').value) || 0;
+  const months = parseInt(document.getElementById('quickAgeMonths').value) || 0;
+  const days = parseInt(document.getElementById('quickAgeDays').value) || 0;
+  
+  let phone = document.getElementById('quickPhone').value.trim(); // ✅ trim করা
 
-      // Validation
-      if (!serial) {
-        showAlert('দয়া করে একটি সিরিয়াল নির্বাচন করুন', 'error');
-        return;
-      }
+  console.log("ফোন ভ্যালু:", phone); // ✅ ডিবাগিং
 
-      if (!name || !age || !phone) {
-        showAlert('অনুগ্রহ করে সকল তথ্য পূরণ করুন', 'error');
-        return;
-      }
+  // Validation
+  if (!serial) {
+    showAlert('দয়া করে একটি সিরিয়াল নির্বাচন করুন', 'error');
+    return;
+  }
 
-      if (!validateBangladeshiPhone(phone)) {
-        showAlert('সঠিক ফোন নম্বর দিন (01XXXXXXXXX)', 'error');
-        return;
-      }
+  if (!name || name.trim() === '') {
+    showAlert('অনুগ্রহ করে রোগীর নাম পূরণ করুন', 'error');
+    return;
+  }
 
-      // Check if serial is available
-      const isAvailable = await checkSerialAvailability(day, time, serial, patientType);
-      if (!isAvailable) {
-        showAlert('এই সিরিয়ালটি ইতিমধ্যে বুকড!', 'error');
-        return;
-      }
+  // বয়স ভ্যালিডেশন
+  if (years === 0 && months === 0 && days === 0) {
+    showAlert('অনুগ্রহ করে কমপক্ষে একটি বয়স ফিল্ড পূরণ করুন (বছর/মাস/দিন)', 'error');
+    return;
+  }
 
-      try {
-        const appointmentData = {
-          name: name,
-          age: age,
-          phone: phone,
-          day: day,
-          time: time,
-          patientType: patientType,
-          serial: serial,
-          timestamp: new Date(),
-          bookedBy: 'admin'
-        };
-
-        await db.collection('appointments').add(appointmentData);
-        
-        // ✅ Remove pending selection after successful booking
-        if (currentAdminPendingId) {
-          await removeAdminPendingSelection(currentAdminPendingId);
-          currentAdminPendingId = null;
-        }
-        
-        // Reset form and close modal
-        document.getElementById('quickSerialForm').reset();
-        document.getElementById('quickSerialModal').style.display = 'none';
-        
-        // Clear visual selection
-        document.querySelectorAll('.serial-item.selected').forEach(item => {
-          item.classList.remove('selected');
-        });
-        
-        document.getElementById('selectedSerialNumber').value = '';
-        
-        showAlert('সিরিয়াল সফলভাবে যুক্ত হয়েছে!', 'success');
-      } catch (error) {
-        console.error('❌ Error adding quick serial:', error);
-        showAlert('সিরিয়াল যুক্ত করতে সমস্যা হয়েছে', 'error');
-      }
+  // ✅ IMPORTANT: ফোন নাম্বার হ্যান্ডলিং
+  if (phone === "" || phone === null || phone === undefined) {
+    phone = "N/A"; // ফাঁকা থাকলে N/A
+    console.log("ফোন ফাঁকা, N/A সেট করা হলো");
+  } else {
+    // ফোন নাম্বার থাকলে ভ্যালিডেশন
+    const cleanedPhone = phone.replace(/\s/g, ''); // স্পেস রিমুভ
+    if (!validateBangladeshiPhone(cleanedPhone)) {
+      showAlert('সঠিক ফোন নম্বর দিন (01XXXXXXXXX)', 'error');
+      return;
     }
+    phone = cleanedPhone; // ক্লিনড ফোন সেট করুন
+  }
 
+  // Check if serial is available
+  const isAvailable = await checkSerialAvailability(day, time, serial, patientType);
+  if (!isAvailable) {
+    showAlert('এই সিরিয়ালটি ইতিমধ্যে বুকড!', 'error');
+    return;
+  }
+
+  try {
+    // ✅ বয়স সঠিকভাবে ফরমেট করুন
+    let ageString = '';
+    if (years > 0) ageString += `${years} বছর`;
+    if (months > 0) {
+      if (ageString) ageString += ', ';
+      ageString += `${months} মাস`;
+    }
+    if (days > 0) {
+      if (ageString) ageString += ', ';
+      ageString += `${days} দিন`;
+    }
+    
+    console.log('বুকিং ডাটা:', { 
+      name, 
+      years, months, days, ageString,
+      phone, // ✅ ফোন ভ্যালু চেক করুন
+      day, time, serial, patientType 
+    });
+
+    const appointmentData = {
+      name: name.trim(),
+      age: ageString,
+      ageYears: Number(years),
+      ageMonths: Number(months),
+      ageDays: Number(days),
+      phone: phone, // ✅ এখানে phone ভ্যারিয়েবল
+      day: day,
+      time: time,
+      patientType: patientType,
+      serial: serial,
+      timestamp: new Date(),
+      bookedBy: 'admin'
+    };
+
+    console.log('Firebase এ পাঠানোর ডাটা:', appointmentData); // ✅ ডিবাগ
+
+    const result = await db.collection('appointments').add(appointmentData);
+    console.log('✅ ডকুমেন্ট ID:', result.id, 'ডাটা:', appointmentData);
+    
+    // ✅ Remove pending selection
+    if (currentAdminPendingId) {
+      await removeAdminPendingSelection(currentAdminPendingId);
+      currentAdminPendingId = null;
+    }
+    
+    // Reset form and close modal
+    document.getElementById('quickSerialForm').reset();
+    elements.quickSerialModal.style.display = 'none';
+    
+    // Clear visual selection
+    document.querySelectorAll('.serial-item.selected').forEach(item => {
+      item.classList.remove('selected');
+    });
+    
+    document.getElementById('selectedSerialNumber').value = '';
+    
+    showAlert('সিরিয়াল সফলভাবে যুক্ত হয়েছে!', 'success');
+  } catch (error) {
+    console.error('❌ Error adding quick serial:', error);
+    showAlert('সিরিয়াল যুক্ত করতে সমস্যা হয়েছে: ' + error.message, 'error');
+  }
+}
     async function checkSerialAvailability(day, time, serial, type) {
       // Check if serial is booked
       const isBooked = appointments.some(app => 
@@ -2529,461 +3052,505 @@ function handleLogout() {
       });
     }
 
-   // ==================== EXPORT FUNCTIONS ====================
-function setupExportFunctionality() {
-  // Export button click
-  elements.exportAppointmentsBtn.addEventListener('click', () => {
-    elements.exportModal.style.display = 'flex';
-  });
+    // ==================== EXPORT FUNCTIONS ====================
+    function setupExportFunctionality() {
+      // Export button click
+      elements.exportAppointmentsBtn.addEventListener('click', () => {
+        elements.exportModal.style.display = 'flex';
+      });
 
-  // Export option selection
-  document.querySelectorAll('.export-option').forEach(option => {
-    option.addEventListener('click', function() {
-      const format = this.getAttribute('data-format');
-      exportData(format);
-    });
-  });
+      // Export option selection
+      document.querySelectorAll('.export-option').forEach(option => {
+        option.addEventListener('click', function() {
+          const format = this.getAttribute('data-format');
+          exportData(format);
+        });
+      });
 
-  // Close export modal
-  elements.closeExportModal.addEventListener('click', () => {
-    elements.exportModal.style.display = 'none';
-  });
-}
-
-// ==================== EXPORT HELPER FUNCTIONS ====================
-function getFilteredAppointmentsForExport() {
-  const dayFilter = elements.dayFilterAppointments.value;
-  const typeFilter = elements.typeFilterAppointments.value;
-  const timeFilter = elements.timeFilterAppointments.value;
-  const searchTerm = elements.searchAppointments.value.toLowerCase().trim();
-
-  return appointments.filter(app => {
-    if (searchTerm && !(
-      app.name.toLowerCase().includes(searchTerm) ||
-      app.phone.includes(searchTerm) ||
-      app.serial.toString().includes(searchTerm)
-    )) {
-      return false;
+      // Close export modal
+      elements.closeExportModal.addEventListener('click', () => {
+        elements.exportModal.style.display = 'none';
+      });
     }
 
-    if (dayFilter !== 'all' && app.day !== dayFilter) {
-      return false;
+    // ==================== EXPORT HELPER FUNCTIONS ====================
+    function getFilteredAppointmentsForExport() {
+      const dayFilter = elements.dayFilterAppointments.value;
+      const typeFilter = elements.typeFilterAppointments.value;
+      const timeFilter = elements.timeFilterAppointments.value;
+      const searchTerm = elements.searchAppointments.value.toLowerCase().trim();
+
+      return appointments.filter(app => {
+        if (searchTerm && !(
+          app.name.toLowerCase().includes(searchTerm) ||
+          app.phone.includes(searchTerm) ||
+          app.serial.toString().includes(searchTerm) ||
+          (app.age && app.age.toLowerCase().includes(searchTerm)) ||
+          (app.ageYears && app.ageYears.toString().includes(searchTerm)) ||
+          (app.ageMonths && app.ageMonths.toString().includes(searchTerm)) ||
+          (app.ageDays && app.ageDays.toString().includes(searchTerm))
+        )) {
+          return false;
+        }
+
+        if (dayFilter !== 'all' && app.day !== dayFilter) {
+          return false;
+        }
+
+        if (typeFilter !== 'all') {
+          const patientType = app.patientType || app.type;
+          if (patientType !== typeFilter) {
+            return false;
+          }
+        }
+
+        if (timeFilter !== 'all' && app.time !== timeFilter) {
+          return false;
+        }
+
+        return true;
+      });
     }
 
-    if (typeFilter !== 'all') {
-      const patientType = app.patientType || app.type;
-      if (patientType !== typeFilter) {
-        return false;
+    // ফিল্টার টেক্সট ফাংশন
+    function getDayFilterText() {
+      const dayFilter = elements.dayFilterAppointments.value;
+      return dayFilter === 'all' ? 'সকল দিন' : 
+             (dayFilter === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার');
+    }
+
+    function getTypeFilterText() {
+      const typeFilter = elements.typeFilterAppointments.value;
+      return typeFilter === 'all' ? 'সকল ধরন' : 
+             (typeFilter === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী');
+    }
+
+    function getTimeFilterText() {
+      const timeFilter = elements.timeFilterAppointments.value;
+      return timeFilter === 'all' ? 'সকল সময়' : timeFilter;
+    }
+
+    // English ফিল্টার টেক্সট ফাংশন
+    function getDayFilterTextEnglish() {
+      const dayFilter = elements.dayFilterAppointments.value;
+      return dayFilter === 'all' ? 'All Days' : dayFilter;
+    }
+
+    function getTypeFilterTextEnglish() {
+      const typeFilter = elements.typeFilterAppointments.value;
+      return typeFilter === 'all' ? 'All Types' : 
+             (typeFilter === 'new' ? 'New Patient' : 'Old Patient');
+    }
+
+    function getTimeFilterTextEnglish() {
+      const timeFilter = elements.timeFilterAppointments.value;
+      return timeFilter === 'all' ? 'All Times' : timeFilter;
+    }
+
+    // ==================== ADVANCED EXPORT FUNCTIONS ====================
+    function exportData(format) {
+      const filteredAppointments = getFilteredAppointmentsForExport();
+
+      if (filteredAppointments.length === 0) {
+        showAlert('এক্সপোর্ট করার জন্য কোনো ডাটা নেই', 'error');
+        elements.exportModal.style.display = 'none';
+        return;
+      }
+
+      console.log(`📊 Exporting ${filteredAppointments.length} appointments in ${format} format`);
+
+      switch (format) {
+        case 'pdf':
+          exportToPDF(filteredAppointments);
+          break;
+        
+        case 'excel':
+          exportToExcel(filteredAppointments);
+          break;
+        
+        case 'word':
+          exportToWord(filteredAppointments);
+          break;
+
+        case 'docs':
+          // Use HTML format for best Google Docs compatibility
+          exportToHTMLDocs(filteredAppointments);
+          break;
+      }
+      
+      elements.exportModal.style.display = 'none';
+    }
+
+    // PDF এক্সপোর্ট - English for better compatibility
+    function exportToPDF(appointments) {
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // সিরিয়াল অনুযায়ী সর্ট করুন
+        const sortedAppointments = [...appointments].sort((a, b) => a.serial - b.serial);
+        
+        // টাইটেল - English
+        doc.setFontSize(16);
+        doc.setTextColor(40, 40, 150);
+        doc.text('Doctor Appointment Report', 105, 20, { align: 'center' });
+        
+        // তারিখ এবং সময়
+        doc.setFontSize(10);
+        doc.setTextColor(80, 80, 80);
+        doc.text(`Generated Date: ${new Date().toLocaleDateString('en-BD')} | Time: ${new Date().toLocaleTimeString('en-BD')}`, 14, 30);
+        
+        // সারাংশ - English
+        doc.setFontSize(10);
+        const summaryLines = [
+          `• Total Appointments: ${sortedAppointments.length}`,
+          `• Day: ${getDayFilterTextEnglish()}`,
+          `• Type: ${getTypeFilterTextEnglish()}`,
+          `• Filtered Time: ${getTimeFilterTextEnglish()}`
+        ];
+        
+        let yPosition = 40;
+        summaryLines.forEach((text, index) => {
+          doc.text(text, 14, yPosition);
+          yPosition += 6;
+        });
+        
+        // টেবিল হেডার - English
+        const headers = [['Serial', 'Patient Name', 'Age', 'Phone', 'Time', 'Booking Date']];
+        
+        // টেবিল ডাটা
+        const data = sortedAppointments.map(app => [
+          app.serial.toString(),
+          app.name,
+          app.age ? app.age.toString() + ' Years' : 'N/A',
+          app.phone,
+          app.time,
+          app.timestamp ? 
+            new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
+            new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : 'N/A'
+        ]);
+        
+        // টেবিল তৈরি
+        doc.autoTable({
+          head: headers,
+          body: data,
+          startY: 65,
+          styles: { 
+            font: 'helvetica',
+            fontSize: 9,
+            cellPadding: 3
+          },
+          headStyles: { 
+            fillColor: [41, 128, 185],
+            textColor: 255,
+            fontStyle: 'bold'
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245]
+          }
+        });
+        
+        // ফুটার
+        const pageCount = doc.internal.getNumberOfPages();
+        for(let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          doc.setFontSize(8);
+          doc.setTextColor(150, 150, 150);
+          doc.text(`Page ${i} / ${pageCount}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+        }
+        
+        // ফাইল সেভ
+        const fileName = `appointments_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+        showAlert(`${sortedAppointments.length}টি অ্যাপয়েন্টমেন্ট PDF ফরম্যাটে ডাউনলোড করা হয়েছে`, 'success');
+        
+      } catch (error) {
+        console.error('PDF export error:', error);
+        showAlert('PDF এক্সপোর্ট করতে সমস্যা হয়েছে', 'error');
       }
     }
 
-    if (timeFilter !== 'all' && app.time !== timeFilter) {
-      return false;
-    }
-
-    return true;
-  });
-}
-
-// ফিল্টার টেক্সট ফাংশন
-function getDayFilterText() {
-  const dayFilter = elements.dayFilterAppointments.value;
-  return dayFilter === 'all' ? 'সকল দিন' : 
-         (dayFilter === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার');
-}
-
-function getTypeFilterText() {
-  const typeFilter = elements.typeFilterAppointments.value;
-  return typeFilter === 'all' ? 'সকল ধরন' : 
-         (typeFilter === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী');
-}
-
-function getTimeFilterText() {
-  const timeFilter = elements.timeFilterAppointments.value;
-  return timeFilter === 'all' ? 'সকল সময়' : timeFilter;
-}
-
-// English ফিল্টার টেক্সট ফাংশন
-function getDayFilterTextEnglish() {
-  const dayFilter = elements.dayFilterAppointments.value;
-  return dayFilter === 'all' ? 'All Days' : dayFilter;
-}
-
-function getTypeFilterTextEnglish() {
-  const typeFilter = elements.typeFilterAppointments.value;
-  return typeFilter === 'all' ? 'All Types' : 
-         (typeFilter === 'new' ? 'New Patient' : 'Old Patient');
-}
-
-function getTimeFilterTextEnglish() {
-  const timeFilter = elements.timeFilterAppointments.value;
-  return timeFilter === 'all' ? 'All Times' : timeFilter;
-}
-
-// ==================== ADVANCED EXPORT FUNCTIONS ====================
-function exportData(format) {
-  const filteredAppointments = getFilteredAppointmentsForExport();
-
-  if (filteredAppointments.length === 0) {
-    showAlert('এক্সপোর্ট করার জন্য কোনো ডাটা নেই', 'error');
-    elements.exportModal.style.display = 'none';
-    return;
-  }
-
-  console.log(`📊 Exporting ${filteredAppointments.length} appointments in ${format} format`);
-
-  switch (format) {
-    case 'pdf':
-      exportToPDF(filteredAppointments);
-      break;
-    
-    case 'excel':
-      exportToExcel(filteredAppointments);
-      break;
-    
-    case 'word':
-      exportToWord(filteredAppointments);
-      break;
-
-    case 'docs':
-      // Use HTML format for best Google Docs compatibility
-      exportToHTMLDocs(filteredAppointments);
-      break;
-  }
-  
-  elements.exportModal.style.display = 'none';
-}
-
-// PDF এক্সপোর্ট - English for better compatibility
-function exportToPDF(appointments) {
-  try {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // সিরিয়াল অনুযায়ী সর্ট করুন
-    const sortedAppointments = [...appointments].sort((a, b) => a.serial - b.serial);
-    
-    // টাইটেল - English
-    doc.setFontSize(16);
-    doc.setTextColor(40, 40, 150);
-    doc.text('Doctor Appointment Report', 105, 20, { align: 'center' });
-    
-    // তারিখ এবং সময়
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    doc.text(`Generated Date: ${new Date().toLocaleDateString('en-BD')} | Time: ${new Date().toLocaleTimeString('en-BD')}`, 14, 30);
-    
-    // সারাংশ - English
-    doc.setFontSize(10);
-    const summaryLines = [
-      `• Total Appointments: ${sortedAppointments.length}`,
-      `• Day: ${getDayFilterTextEnglish()}`,
-      `• Type: ${getTypeFilterTextEnglish()}`,
-      `• Filtered Time: ${getTimeFilterTextEnglish()}`
-    ];
-    
-    let yPosition = 40;
-    summaryLines.forEach((text, index) => {
-      doc.text(text, 14, yPosition);
-      yPosition += 6;
-    });
-    
-    // টেবিল হেডার - English
-    const headers = [['Serial', 'Patient Name', 'Age', 'Phone', 'Time', 'Booking Date']];
-    
-    // টেবিল ডাটা
-    const data = sortedAppointments.map(app => [
-      app.serial.toString(),
-      app.name,
-      app.age ? app.age.toString() + ' Years' : 'N/A',
-      app.phone,
-      app.time,
-      app.timestamp ? 
-        new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
-        new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : 'N/A'
-    ]);
-    
-    // টেবিল তৈরি
-    doc.autoTable({
-      head: headers,
-      body: data,
-      startY: 65,
-      styles: { 
-        font: 'helvetica',
-        fontSize: 9,
-        cellPadding: 3
-      },
-      headStyles: { 
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245]
+    // Excel এক্সপোর্ট - Real Excel (.xlsx) with English
+    function exportToExcel(appointments) {
+      try {
+        // সিরিয়াল অনুযায়ী সর্ট করুন
+        const sortedAppointments = [...appointments].sort((a, b) => a.serial - b.serial);
+        
+        // ডাটা প্রস্তুত - English হেডার সহ
+        const data = sortedAppointments.map(app => ({
+          'Serial No': app.serial,
+          'Patient Name': app.name,
+          'Age': app.age || 'N/A',
+          'Phone Number': app.phone || 'N/A',
+          'Time': app.time,
+          'Booking Date': app.timestamp ? 
+            new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
+            new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : 'N/A'
+        }));
+        
+        // ওয়ার্কশিট তৈরি
+        const ws = XLSX.utils.json_to_sheet(data);
+        
+        // কলামের width সেট করা
+        const colWidths = [
+          { wch: 10 }, // Serial
+          { wch: 20 }, // Name
+          { wch: 8 },  // Age
+          { wch: 15 }, // Phone
+          { wch: 12 }, // Time
+          { wch: 20 }  // Booking Date
+        ];
+        ws['!cols'] = colWidths;
+        
+        // ওয়ার্কবুক তৈরি
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Appointments');
+        
+        // এক্সেল ফাইল তৈরি এবং ডাউনলোড
+        const fileName = `appointments_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        showAlert(`${sortedAppointments.length}টি অ্যাপয়েন্টমেন্ট Excel ফরম্যাটে ডাউনলোড করা হয়েছে`, 'success');
+        
+      } catch (error) {
+        console.error('Excel export error:', error);
+        showAlert('Excel এক্সপোর্ট করতে সমস্যা হয়েছে', 'error');
       }
-    });
-    
-    // ফুটার
-    const pageCount = doc.internal.getNumberOfPages();
-    for(let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`Page ${i} / ${pageCount}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
     }
-    
-    // ফাইল সেভ
-    const fileName = `appointments_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(fileName);
-    showAlert(`${sortedAppointments.length}টি অ্যাপয়েন্টমেন্ট PDF ফরম্যাটে ডাউনলোড করা হয়েছে`, 'success');
-    
-  } catch (error) {
-    console.error('PDF export error:', error);
-    showAlert('PDF এক্সপোর্ট করতে সমস্যা হয়েছে', 'error');
-  }
-}
 
-// Excel এক্সপোর্ট - Real Excel (.xlsx) with English
-function exportToExcel(appointments) {
-  try {
-    // সিরিয়াল অনুযায়ী সর্ট করুন
-    const sortedAppointments = [...appointments].sort((a, b) => a.serial - b.serial);
-    
-    // ডাটা প্রস্তুত - English হেডার সহ
-    const data = sortedAppointments.map(app => ({
-      'Serial No': app.serial,
-      'Patient Name': app.name,
-      'Age': app.age || 'N/A',
-      'Phone Number': app.phone,
-      'Time': app.time,
-      'Booking Date': app.timestamp ? 
-        new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
-        new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : 'N/A'
-    }));
-    
-    // ওয়ার্কশিট তৈরি
-    const ws = XLSX.utils.json_to_sheet(data);
-    
-    // কলামের width সেট করা
-    const colWidths = [
-      { wch: 10 }, // Serial
-      { wch: 20 }, // Name
-      { wch: 8 },  // Age
-      { wch: 15 }, // Phone
-      { wch: 12 }, // Time
-      { wch: 20 }  // Booking Date
-    ];
-    ws['!cols'] = colWidths;
-    
-    // ওয়ার্কবুক তৈরি
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Appointments');
-    
-    // এক্সেল ফাইল তৈরি এবং ডাউনলোড
-    const fileName = `appointments_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    showAlert(`${sortedAppointments.length}টি অ্যাপয়েন্টমেন্ট Excel ফরম্যাটে ডাউনলোড করা হয়েছে`, 'success');
-    
-  } catch (error) {
-    console.error('Excel export error:', error);
-    showAlert('Excel এক্সপোর্ট করতে সমস্যা হয়েছে', 'error');
-  }
-}
+    // Word/Docs এক্সপোর্ট - Compatible with Google Docs
+    function exportToWord(appointments) {
+      try {
+        // সিরিয়াল অনুযায়ী সর্ট করুন
+        const sortedAppointments = [...appointments].sort((a, b) => a.serial - b.serial);
 
-// Word/Docs এক্সপোর্ট - Compatible with Google Docs
-function exportToWord(appointments) {
-  try {
-    // সিরিয়াল অনুযায়ী সর্ট করুন
-    const sortedAppointments = [...appointments].sort((a, b) => a.serial - b.serial);
-
-    let wordContent = `
-<meta charset="UTF-8">
-<html>
-<body>
-  <h1 style="text-align: center; color: #2563eb; margin-bottom: 10px;">Doctor Appointment Report</h1>
-  
-  <!-- তারিখ এবং সময় -->
-  <p style="text-align: center; color: #666; margin-bottom: 15px;">
-    <strong>Generated Date:</strong> ${new Date().toLocaleDateString('en-BD')} | 
-    <strong>Time:</strong> ${new Date().toLocaleTimeString('en-BD')}
-  </p>
-  
-  <!-- সারাংশ - আগের মতো -->
-  <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2563eb;">
-    <strong>Summary:</strong><br>
-    • Total Appointments: ${sortedAppointments.length}<br>
-    • Day: ${getDayFilterTextEnglish()}<br>
-    • Type: ${getTypeFilterTextEnglish()}<br>
-    • Filtered Time: ${getTimeFilterTextEnglish()}
-  </div>
-
-  <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; font-size: 12px;">
-    <tr style="background-color: #2563eb; color: white; font-weight: bold;">
-      <th>Serial</th>
-      <th>Patient Name</th>
-      <th>Age</th>
-      <th>Phone</th>
-      <th>Time</th>
-      <th>Booking Date</th>
-    </tr>
-    ${sortedAppointments.map(app => {
-      const age = app.age ? app.age + ' Years' : 'N/A';
-      const bookingDate = app.timestamp ? 
-        new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
-        new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : 'N/A';
+        let wordContent = `
+    <meta charset="UTF-8">
+    <html>
+    <body>
+      <h1 style="text-align: center; color: #2563eb; margin-bottom: 10px;">Doctor Appointment Report</h1>
       
-      return `
-    <tr>
-      <td>${app.serial}</td>
-      <td>${app.name}</td>
-      <td>${age}</td>
-      <td>${app.phone}</td>
-      <td>${app.time}</td>
-      <td>${bookingDate}</td>
-    </tr>`;
-    }).join('')}
-  </table>
-  
-  <p style="margin-top: 20px; color: #666; font-size: 11px; text-align: center;">
-    Generated by Admin Dashboard | ${new Date().getFullYear()}
-  </p>
-</body>
-</html>`;
-
-    const blob = new Blob([wordContent], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `appointments_${new Date().toISOString().split('T')[0]}.doc`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    showAlert(`${sortedAppointments.length}টি অ্যাপয়েন্টমেন্ট Word ফরম্যাটে ডাউনলোড করা হয়েছে`, 'success');
-    
-  } catch (error) {
-    console.error('Word export error:', error);
-    showAlert('Word এক্সপোর্ট করতে সমস্যা হয়েছে', 'error');
-  }
-}
-
-// ==================== REAL DOCX EXPORT ====================
-function exportToHTMLDocs(appointments) {
-  try {
-    const sortedAppointments = [...appointments].sort((a, b) => a.serial - b.serial);
-    
-    const htmlContent = `
-<meta charset="UTF-8">
-<html>
-<head>
-  <style>
-    @page {
-      size: A4;
-      margin: 1cm;
-    }
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      width: 210mm;
-      height: 297mm;
-      box-sizing: border-box;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11px;
-      table-layout: fixed;
-    }
-    th, td {
-      border: 1px solid #000;
-      padding: 6px;
-      word-wrap: break-word;
-    }
-  </style>
-</head>
-<body>
-  <h1 style="text-align: center; color: #2563eb; margin-bottom: 10px; font-size: 16px;">Doctor Appointment Report</h1>
-  
-  <p style="text-align: center; color: #666; margin-bottom: 15px; font-size: 12px;">
-    <strong>Generated Date:</strong> ${new Date().toLocaleDateString('en-BD')} | 
-    <strong>Time:</strong> ${new Date().toLocaleTimeString('en-BD')}
-  </p>
-  
-  <div style="background: #f8fafc; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #2563eb; font-size: 11px;">
-    <strong>Summary:</strong><br>
-    • Total Appointments: ${sortedAppointments.length}<br>
-    • Day: ${getDayFilterTextEnglish()}<br>
-    • Type: ${getTypeFilterTextEnglish()}<br>
-    • Filtered Time: ${getTimeFilterTextEnglish()}
-  </div>
-
-  <table>
-    <tr style="background-color: #2563eb; color: white; font-weight: bold;">
-      <th style="width: 8%">Serial</th>
-      <th style="width: 30%">Patient Name</th>
-      <th style="width: 12%">Age</th>
-      <th style="width: 15%">Phone</th>
-      <th style="width: 12%">Time</th>
-      <th style="width: 23%">Booking Date</th>
-    </tr>
-    ${sortedAppointments.map(app => {
-      const age = app.age ? app.age + ' Years' : 'N/A';
-      const bookingDate = app.timestamp ? 
-        new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
-        new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit'}) : 'N/A';
+      <!-- তারিখ এবং সময় -->
+      <p style="text-align: center; color: #666; margin-bottom: 15px;">
+        <strong>Generated Date:</strong> ${new Date().toLocaleDateString('en-BD')} | 
+        <strong>Time:</strong> ${new Date().toLocaleTimeString('en-BD')}
+      </p>
       
-      return `
-    <tr>
-      <td style="width: 8%">${app.serial}</td>
-      <td style="width: 30%">${app.name}</td>
-      <td style="width: 12%">${age}</td>
-      <td style="width: 15%">${app.phone}</td>
-      <td style="width: 12%">${app.time}</td>
-      <td style="width: 23%">${bookingDate}</td>
-    </tr>`;
-    }).join('')}
-  </table>
-  
-  <p style="margin-top: 15px; color: #666; font-size: 10px; text-align: center;">
-    Generated by Admin Dashboard | ${new Date().getFullYear()}
-  </p>
-</body>
-</html>`;
-
-    // Create HTML file
-    const blob = new Blob([htmlContent], { 
-      type: 'text/html; charset=utf-8'
-    });
-    
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `appointments_${new Date().toISOString().split('T')[0]}.html`;
-    
-    link.click();
-    
-    showAlert(`
-      <div style="text-align: left;">
-        <strong>✅ ডক্স রিপোর্ট ডাউনলোড হয়েছে!</strong><br><br>
-        <strong>Google Docs এ ওপেন করতে:</strong><br>
-        1. Google Docs ওপেন করুন<br>
-        2. File → Import → Upload<br>
-        3. এই HTML ফাইল সিলেক্ট করুন<br>
-        4. Insert ক্লিক করুন
+      <!-- সারাংশ - আগের মতো -->
+      <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2563eb;">
+        <strong>Summary:</strong><br>
+        • Total Appointments: ${sortedAppointments.length}<br>
+        • Day: ${getDayFilterTextEnglish()}<br>
+        • Type: ${getTypeFilterTextEnglish()}<br>
+        • Filtered Time: ${getTimeFilterTextEnglish()}
       </div>
-    `, 'success', 8000);
-    
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    
-  } catch (error) {
-    console.error('Docs export error:', error);
-    showAlert('ডক্স এক্সপোর্ট করতে সমস্যা হয়েছে', 'error');
-  }
-}
 
-     // ==================== EVENT LISTENERS ====================
+      <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+        <tr style="background-color: #2563eb; color: white; font-weight: bold;">
+          <th>Serial</th>
+          <th>Patient Name</th>
+          <th>Age</th>
+          <th>Phone</th>
+          <th>Time</th>
+          <th>Booking Date</th>
+        </tr>
+        ${sortedAppointments.map(app => {
+          const age = app.age ? app.age + ' Years' : 'N/A';
+          const bookingDate = app.timestamp ? 
+            new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
+            new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : 'N/A';
+          
+          return `
+        <tr>
+          <td>${app.serial}</td>
+          <td>${app.name}</td>
+          <td>${age}</td>
+          <td>${app.phone || 'নাই'}</td>
+          <td>${app.time}</td>
+          <td>${bookingDate}</td>
+        </tr>`;
+        }).join('')}
+      </table>
+      
+      <p style="margin-top: 20px; color: #666; font-size: 11px; text-align: center;">
+        Generated by Admin Dashboard | ${new Date().getFullYear()}
+      </p>
+    </body>
+    </html>`;
+
+        const blob = new Blob([wordContent], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `appointments_${new Date().toISOString().split('T')[0]}.doc`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showAlert(`${sortedAppointments.length}টি অ্যাপয়েন্টমেন্ট Word ফরম্যাটে ডাউনলোড করা হয়েছে`, 'success');
+        
+      } catch (error) {
+        console.error('Word export error:', error);
+        showAlert('Word এক্সপোর্ট করতে সমস্যা হয়েছে', 'error');
+      }
+    }
+
+    // ==================== REAL DOCX EXPORT ====================
+    function exportToHTMLDocs(appointments) {
+      try {
+        const sortedAppointments = [...appointments].sort((a, b) => a.serial - b.serial);
+        
+        const htmlContent = `
+    <meta charset="UTF-8">
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 20px;
+          box-sizing: border-box;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 11px;
+          table-layout: fixed;
+        }
+        th, td {
+          border: 1px solid #000;
+          padding: 6px;
+          word-wrap: break-word;
+        }
+      </style>
+    </head>
+    <body>
+      <h1 style="text-align: center; color: #2563eb; margin-bottom: 10px; font-size: 16px;">Doctor Appointment Report</h1>
+      
+      <p style="text-align: center; color: #666; margin-bottom: 15px; font-size: 12px;">
+        <strong>Generated Date:</strong> ${new Date().toLocaleDateString('en-BD')} | 
+        <strong>Time:</strong> ${new Date().toLocaleTimeString('en-BD')}
+      </p>
+      
+      <div style="background: #f8fafc; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #2563eb; font-size: 11px;">
+        <strong>Summary:</strong><br>
+        • Total Appointments: ${sortedAppointments.length}<br>
+        • Day: ${getDayFilterTextEnglish()}<br>
+        • Type: ${getTypeFilterTextEnglish()}<br>
+        • Filtered Time: ${getTimeFilterTextEnglish()}
+      </div>
+
+      <table>
+        <tr style="background-color: #2563eb; color: white; font-weight: bold;">
+          <th style="width: 8%">Serial</th>
+          <th style="width: 30%">Patient Name</th>
+          <th style="width: 12%">Age</th>
+          <th style="width: 15%">Phone</th>
+          <th style="width: 12%">Time</th>
+          <th style="width: 23%">Booking Date</th>
+        </tr>
+        ${sortedAppointments.map(app => {
+  // ✅ বয়স ফরম্যাট করা - CORRECTED VERSION
+  let age = 'N/A';
+  
+  // ১. প্রথমে ageYears, ageMonths, ageDays চেক করুন (নতুন সিস্টেম)
+  if (app.ageYears || app.ageMonths || app.ageDays) {
+    const parts = [];
+    if (app.ageYears && app.ageYears > 0) parts.push(`${app.ageYears} Years`);
+    if (app.ageMonths && app.ageMonths > 0) parts.push(`${app.ageMonths} Months`);
+    if (app.ageDays && app.ageDays > 0) parts.push(`${app.ageDays} Day`);
+    age = parts.join('  ');
+  }
+  // ২. তারপর পুরানো app.age ফিল্ড চেক করুন
+  else if (app.age) {
+    // যদি app.age একটি সংখ্যা হয় (যেমন: 20)
+    if (!isNaN(app.age) && app.age !== '') {
+      age = app.age + ' Years';
+    } 
+    // যদি app.age একটি স্ট্রিং হয় যা ইতিমধ্যে বাংলায় ফরম্যাটেড (যেমন: "১ বছর ৮ মাস")
+    else if (typeof app.age === 'string') {
+      age = app.age;
+    }
+  }
+  
+  // ✅ বুকিং তারিখ ফরম্যাট করা - CORRECTED VERSION
+  let bookingDate = 'N/A';
+  if (app.timestamp) {
+    let dateObj;
+    
+    // Firebase timestamp বিভিন্ন ফরম্যাট handle করা
+    if (app.timestamp.toDate && typeof app.timestamp.toDate === 'function') {
+      dateObj = app.timestamp.toDate();
+    } else if (app.timestamp.seconds) {
+      dateObj = new Date(app.timestamp.seconds * 1000);
+    } else if (app.timestamp instanceof Date) {
+      dateObj = app.timestamp;
+    } else if (typeof app.timestamp === 'string') {
+      dateObj = new Date(app.timestamp);
+    }
+    
+    if (dateObj && !isNaN(dateObj.getTime())) {
+      const dateStr = dateObj.toLocaleDateString('en-BD');
+      const timeStr = dateObj.toLocaleTimeString('en-BD', {
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      bookingDate = `${dateStr} ${timeStr}`;
+    }
+  }
+  
+  // ✅ টেবিল রো রিটার্ন করা
+  return `
+        <tr>
+          <td style="width: 8%">${app.serial}</td>
+          <td style="width: 30%">${app.name}</td>
+          <td style="width: 12%">${age}</td>
+          <td style="width: 15%">${app.phone}</td>
+          <td style="width: 12%">${app.time}</td>
+          <td style="width: 23%">${bookingDate}</td>
+        </tr>`;
+        }).join('')}
+      </table>
+      
+      <p style="margin-top: 15px; color: #666; font-size: 10px; text-align: center;">
+        Generated by Admin Dashboard | ${new Date().getFullYear()}
+      </p>
+    </body>
+    </html>`;
+
+        // Create HTML file
+        const blob = new Blob([htmlContent], { 
+          type: 'text/html; charset=utf-8'
+        });
+        
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `appointments_${new Date().toISOString().split('T')[0]}.html`;
+        
+        link.click();
+        
+        showAlert(`
+          <div style="text-align: left;">
+            <strong>✅ ডক্স রিপোর্ট ডাউনলোড হয়েছে!</strong><br><br>
+            <strong>Google Docs এ ওপেন করতে:</strong><br>
+            1. Google Docs ওপেন করুন<br>
+            2. File → Import → Upload<br>
+            3. এই HTML ফাইল সিলেক্ট করুন<br>
+            4. Insert ক্লিক করুন
+          </div>
+        `, 'success', 8000);
+        
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        
+      } catch (error) {
+        console.error('Docs export error:', error);
+        showAlert('ডক্স এক্সপোর্ট করতে সমস্যা হয়েছে', 'error');
+      }
+    }
+
+    // ==================== EVENT LISTENERS ====================
     function initializeEventListeners() {
       // Mobile menu
       elements.mobileMenuBtn.addEventListener('click', () => {
@@ -3128,13 +3695,97 @@ function exportToHTMLDocs(appointments) {
         if (e.target === elements.editAppointmentModal) elements.editAppointmentModal.style.display = 'none';
         if (e.target === elements.exportModal) elements.exportModal.style.display = 'none';
       });
+      
+      // ✅ এডিট মডালের ইভেন্ট লিসেনার যোগ করুন
+      setupEditModalEventListeners();
+    }
+
+    // ✅ এডিট মডালের ইভেন্ট লিসেনার সেটআপ
+    function setupEditModalEventListeners() {
+      // দিন বা ধরন পরিবর্তন হলে
+      document.getElementById('editDay').addEventListener('change', () => {
+        updateEditTimeOptions();
+        document.getElementById('editTime').value = '';
+        updateEditSerialGrid();
+      });
+      
+      document.getElementById('editType').addEventListener('change', () => {
+        updateEditTimeOptions();
+        document.getElementById('editTime').value = '';
+        updateEditSerialGrid();
+      });
+      
+      // টাইম পরিবর্তন হলে
+      document.getElementById('editTime').addEventListener('change', () => {
+        updateEditSerialGrid();
+      });
+    }
+
+    // ==================== DEBUG FUNCTIONS ====================
+    // ব্রাউজার কনসোলে ডিবাগ করার জন্য
+    function debugAppointments() {
+      console.log('=== APPOINTMENTS DEBUG INFO ===');
+      console.log('Total appointments:', appointments.length);
+      
+      if (appointments.length === 0) {
+        console.log('No appointments found!');
+        return;
+      }
+      
+      appointments.forEach((app, index) => {
+        console.log(`${index + 1}. ID: ${app.id}, Name: ${app.name}, Age: ${JSON.stringify(app.age)}`);
+      });
+      
+      // প্রথম ৩টি appointment এর বিস্তারিত দেখান
+      console.log('First 3 appointment details:');
+      appointments.slice(0, 3).forEach((app, index) => {
+        console.log(`Appointment ${index + 1}:`, app);
+      });
+      
+      // Edit বাটনের event listener চেক করুন
+      const editButtons = document.querySelectorAll('.edit-btn');
+      console.log('Edit buttons found:', editButtons.length);
+      
+      editButtons.forEach((btn, i) => {
+        const id = btn.getAttribute('data-id');
+        console.log(`Edit button ${i + 1}: data-id="${id}"`);
+        
+        // বাটনটি ক্লিকযোগ্য কিনা টেস্ট করুন
+        btn.addEventListener('click', function() {
+          console.log(`Button ${i + 1} clicked! ID: ${id}`);
+        }, { once: true });
+      });
+    }
+
+    // সরাসরি এডিট মডাল ওপেন করার জন্য
+    function openEditModalDirectly() {
+      if (appointments.length > 0) {
+        const firstId = appointments[0].id;
+        console.log('Opening edit modal for first appointment ID:', firstId);
+        editAppointment(firstId);
+      } else {
+        console.log('No appointments available to edit');
+      }
+    }
+
+    // সব appointments কনসোলে দেখুন
+    function showAllAppointments() {
+      console.table(appointments.map(app => ({
+        ID: app.id,
+        Name: app.name,
+        Age: app.age,
+        Phone: app.phone,
+        Day: app.day,
+        Time: app.time,
+        Serial: app.serial
+      })));
     }
 
     // ==================== INITIALIZATION ====================
     document.addEventListener('DOMContentLoaded', function() {
       if (!checkAuthentication()) {
         return; 
-    }
+      }
       initializeFirebase();
       initializeEventListeners();
       
