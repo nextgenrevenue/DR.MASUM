@@ -42,6 +42,8 @@
     main {
       flex: 1;
       position: relative;
+      display: flex;
+      flex-direction: column;
     }
     
     header {
@@ -124,6 +126,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      flex: 1;
     }
     
     .hero::before {
@@ -172,7 +175,7 @@
       margin-left: auto;
       margin-right: auto;
     }
-    
+  
     /* 🔥 এনিমেশন ডেফিনিশন */
     @keyframes slideInDown {
       from {
@@ -240,14 +243,25 @@
       }
     }
 
+    @keyframes fadeInUpHospital {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     @keyframes zoomInOut {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.2);
-  }
-}
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.2);
+      }
+    }
     
     /* Doctor Info - সাদা কার্ড ছাড়া */
     .doctor-info {
@@ -335,8 +349,10 @@
     button:hover {
       background-color: #ff5a7f;
       transform: translateY(-2px);
+      animation: slideInUp 0.8s;
+
     }
-    
+
     .btn-primary {
       background-color: var(--secondary-color);
     }
@@ -363,6 +379,10 @@
       padding: 2rem;
       color: white;
       text-align: center;
+      position: relative;
+      z-index: 10;
+      margin-top: auto;
+      width: 100%;
     }
 
     .hospital-content {
@@ -388,8 +408,17 @@
       padding: 1.5rem;
       border-radius: 10px;
       backdrop-filter: blur(10px);
-      animation: fadeInUpStagger 0.8s ease-out 2.6s both;
       transition: transform 0.3s ease;
+      opacity: 0;
+      animation: fadeInUpStagger 0.8s ease-out 2.8s forwards;
+    }
+    
+    .info-card:nth-child(2) {
+      animation-delay: 3s;
+    }
+    
+    .info-card:nth-child(3) {
+      animation-delay: 3.2s;
     }
     
     .info-card:hover {
@@ -426,10 +455,10 @@
       align-items: center;
       flex-shrink: 0;
       position: relative;
-      margin-top: auto;
-      animation: fadeInUpStagger 0.8s ease-out 3s both;
+      z-index: 1;
+      min-height: 80px; 
     }
-    
+
     .footer-content {
       display: flex;
       flex-direction: column;
@@ -437,11 +466,32 @@
       justify-content: center;
       position: relative;
       z-index: 1;
-    }
+      width: 100%;
+   }
 
     .footer-content p {
-      margin: 0.3rem 0;
+     margin: 0;
+     opacity: 0;
+     animation: fadeInUpStagger 0.8s ease-out 3.4s forwards;
+     line-height: 1.4;
+     padding: 0.2rem 0;
+   }
+    
+    /* Notice Slider */
+    /*.notice-slider-container {
+      background: rgba(255, 111, 145, 0.1);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 2rem;
+      border: 2px solid rgba(255, 111, 145, 0.3);
     }
+    */
+    /*.floating-notice-text {
+      color: #e74c3c;
+      font-weight: 600;
+      font-size: 1.1rem;
+      padding: 10px;
+    }*/
     
     /* Beautiful Notice Popup */
     .notice-popup {
@@ -558,15 +608,6 @@
       box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
     }
 
-    .notice-btn-understood {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      color: white;
-    }
-
-    .notice-btn-understood:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
-    }
     
     /* Responsive Design */
     @media (max-width: 768px) {
@@ -695,6 +736,10 @@
       .notice-message {
         font-size: 14px;
       }
+      
+      .floating-notice-text {
+        font-size: 0.9rem;
+      }
     }
     
     @media (max-width: 480px) {
@@ -755,6 +800,15 @@
         width: calc(100% - 20px);
         padding: 12px;
       }
+      
+      .notice-slider-container {
+        padding: 8px;
+      }
+      
+      .floating-notice-text {
+        font-size: 0.8rem;
+        padding: 8px;
+      }
     }
 
     @media (max-height: 600px) {
@@ -801,7 +855,7 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #7ab8d4;
     }
-</style>
+  </style>
 </head>
 <body>
   <header>
@@ -823,12 +877,18 @@
   <main>
     <section class="hero">
       <div class="hero-content">
+        <div class="notice-slider-container" id="noticeSlider">
+          <div class="notice-slider-content">
+            <marquee class="floating-notice-text" id="dynamicNoticeText">প্রতিবার সাক্ষাতের জন্য সিরিয়াল দিতে হবে</marquee>
+          </div>
+        </div>
+        
         <div class="doctor-info">
           <p>চর্ম, এলার্জি, যৌনরোগ বিশেষজ্ঞ ও কসমেটিক ডার্মাটো সার্জন</p>
           <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
          
           <div class="doctor-details">
-             <div class="doctor-right">
+            <div class="doctor-right">
               <p class="qualification">এমবিবিএস, বিসিএস, ডিডিভি</p>
             </div>
             <div class="doctor-left">
@@ -849,7 +909,7 @@
       </div>
     </section>
 
-    <!-- New Hospital Info Section -->
+    <!-- Hospital Info Section -->
     <section class="hospital-info">
       <div class="hospital-content">
         <div class="hospital-details">
@@ -860,6 +920,8 @@
           </div>
           <div class="info-card">
             <h4>⏰ রোগী দেখার সময়</h4>
+            <p>বৃহস্পতিবার</p>
+            <p>বিকাল ৫টা থেকে রাত ৯টা</p> 
             <p>শুক্রবার</p>
             <p>সকাল ৭টা থেকে রাত ৯টা</p>
           </div>
@@ -894,9 +956,6 @@
           <!-- Update time will appear here -->
         </div>
         <div class="notice-actions">
-          <button class="notice-btn notice-btn-understood" onclick="closeNoticePopup()">
-            👍 বুঝেছি
-          </button>
           <button class="notice-btn notice-btn-close" onclick="closeNoticePopup()">
             ❌ বন্ধ করুন
           </button>
@@ -935,6 +994,48 @@
       } catch (error) {
         console.error("❌ Firebase initialization error:", error);
         return false;
+      }
+    }
+
+    // Dynamic Content Loading
+    async function loadDynamicContent() {
+      try {
+        if (!firebaseApp) {
+          if (!initializeFirebase()) return;
+        }
+        
+        // Load floating notice
+        const doc = await db.collection('settings').doc('dynamicContent').get();
+        
+        if (doc.exists) {
+          const data = doc.data();
+          
+          // Update floating notice
+          const noticeText = document.getElementById('dynamicNoticeText');
+          if (noticeText && data.floatingNotice && data.floatingNotice.trim() !== '') {
+            noticeText.textContent = data.floatingNotice;
+          } else {
+            // Hide notice slider if no content
+            const noticeSlider = document.getElementById('noticeSlider');
+            if (noticeSlider) {
+              noticeSlider.style.display = 'none';
+            }
+          }
+        } else {
+          // Hide notice slider if no document exists
+          const noticeSlider = document.getElementById('noticeSlider');
+          if (noticeSlider) {
+            noticeSlider.style.display = 'none';
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error loading dynamic content:', error);
+        
+        // Hide sections on error
+        const noticeSlider = document.getElementById('noticeSlider');
+        if (noticeSlider) {
+          noticeSlider.style.display = 'none';
+        }
       }
     }
 
@@ -997,53 +1098,60 @@
     const navLinks = document.querySelector('.nav-links');
     const body = document.body;
     
-    hamburger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      navLinks.classList.toggle('active');
-      hamburger.classList.toggle('active');
-      
-      if (navLinks.classList.contains('active')) {
-        body.style.overflow = 'hidden';
-      } else {
-        body.style.overflow = '';
-      }
-    });
+    if (hamburger) {
+      hamburger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        navLinks.classList.toggle('active');
+        hamburger.classList.toggle('active');
+        
+        if (navLinks.classList.contains('active')) {
+          body.style.overflow = 'hidden';
+        } else {
+          body.style.overflow = '';
+        }
+      });
+    }
     
     document.addEventListener('click', (e) => {
-      if (!hamburger.contains(e.target) && !navLinks.contains(e.target)) {
+      if (hamburger && !hamburger.contains(e.target) && navLinks && !navLinks.contains(e.target)) {
         navLinks.classList.remove('active');
-        hamburger.classList.remove('active');
+        if (hamburger) hamburger.classList.remove('active');
         body.style.overflow = '';
       }
     });
 
-    document.querySelectorAll('.nav-links a').forEach(link => {
-      link.addEventListener('click', () => {
-        navLinks.classList.remove('active');
-        hamburger.classList.remove('active');
-        body.style.overflow = '';
+    if (navLinks) {
+      document.querySelectorAll('.nav-links a').forEach(link => {
+        link.addEventListener('click', () => {
+          navLinks.classList.remove('active');
+          if (hamburger) hamburger.classList.remove('active');
+          body.style.overflow = '';
+        });
       });
-    });
+    }
 
     window.addEventListener('resize', () => {
       if (window.innerWidth > 768) {
-        navLinks.classList.remove('active');
-        hamburger.classList.remove('active');
+        if (navLinks) navLinks.classList.remove('active');
+        if (hamburger) hamburger.classList.remove('active');
         body.style.overflow = '';
       }
     });
 
     // Close popup when clicking outside
-    document.getElementById('noticePopup').addEventListener('click', function(e) {
-      if (e.target === this) {
-        closeNoticePopup();
-      }
-    });
+    const noticePopup = document.getElementById('noticePopup');
+    if (noticePopup) {
+      noticePopup.addEventListener('click', function(e) {
+        if (e.target === this) {
+          closeNoticePopup();
+        }
+      });
+    }
 
     // Keyboard support for popup
     document.addEventListener('keydown', function(e) {
       const popup = document.getElementById('noticePopup');
-      if (popup.style.display === 'flex') {
+      if (popup && popup.style.display === 'flex') {
         if (e.key === 'Escape') {
           closeNoticePopup();
         }
@@ -1062,12 +1170,22 @@
         firebaseScript.onload = function() {
           const firestoreScript = document.createElement('script');
           firestoreScript.src = 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js';
-          firestoreScript.onload = initializeFirebase;
+          firestoreScript.onload = function() {
+            initializeFirebase();
+            // Load dynamic content after Firebase is ready
+            setTimeout(() => {
+              loadDynamicContent();
+            }, 1000);
+          };
           document.head.appendChild(firestoreScript);
         };
         document.head.appendChild(firebaseScript);
       } else {
         initializeFirebase();
+        // Load dynamic content
+        setTimeout(() => {
+          loadDynamicContent();
+        }, 1000);
       }
     });
   </script>
