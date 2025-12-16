@@ -1,0 +1,1795 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>সিরিয়াল ম্যানেজমেন্ট</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+<style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #f59e0b;
+      --gray: #6b7280;
+      --light-gray: #f3f4f6;
+      --white: #ffffff;
+      --dark: #1f2937;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Noto Sans Bengali', sans-serif;
+      background-color: #f5f7fa;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Admin Container */
+    .admin-container {
+      display: flex;
+      flex: 1;
+      margin-top: 60px; 
+      height: calc(100vh - 60px);
+    }
+    
+    /* Main Content */
+    .admin-main {
+      flex: 1;
+      padding: 20px;
+      background-color: #f9fafb;
+      overflow-y: auto;
+    }
+    
+    .page-title {
+      color: var(--dark);
+      margin-bottom: 25px;
+      font-size: 24px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--light-gray);
+    }
+    
+    /* Statistics Cards */
+    .stats-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    
+    .stat-card {
+      background-color: var(--white);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .stat-card h3 {
+      color: var(--gray);
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    
+    .stat-card p {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--dark);
+    }
+    
+    
+    .stat-card.thursday p {
+      color: var(--primary);
+    }
+    
+    
+    .stat-card.friday p {
+      color: #8b5cf6;
+    }
+    
+
+    .stat-card.disabled p {
+      color: var(--warning);
+    }
+
+    
+    .stat-card.enable p {
+      color: var(--success);
+    }
+    
+    
+    .stat-card.pending p {
+      color: #0ea5e9;
+    }
+    
+    /* Alert Messages */
+    .alert {
+      padding: 12px 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-weight: 500;
+    }
+    
+    .alert-success {
+      background-color: #dcfce7;
+      color: var(--success);
+      border: 1px solid #bbf7d0;
+    }
+    
+    .alert-error {
+      background-color: #fee2e2;
+      color: var(--danger);
+      border: 1px solid #fecaca;
+    }
+    
+    /* Serial Management Component Styles */
+    .serial-management-component {
+      margin-top: 20px;
+    }
+    
+    .serial-management-component .admin-table {
+      width: 100%;
+      background-color: var(--white);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+    
+    .serial-management-component .admin-table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+      border-bottom: 1px solid #e5e7eb;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    
+    .serial-management-component .admin-table-header h2 {
+      font-size: 18px;
+      color: var(--dark);
+      flex: 1 0 100%;
+      text-align: center;
+      margin-bottom: 10px;
+      order: 1;
+    }
+    
+    .serial-management-component .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex: 1 0 100%;
+      order: 3;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .serial-management-component .filter-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: right;
+      order: 2;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    
+    .serial-management-component .filter-group select {
+      padding: 8px 15px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      font-family: 'Noto Sans Bengali', sans-serif;
+      background-color: var(--white);
+      cursor: pointer;
+      flex: 1;
+      min-width: 120px;
+      max-width: 200px;
+    }
+    
+    .serial-management-component .filter-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    
+    .serial-management-component .search-box {
+      position: relative;
+      order: 4;
+      flex: 1;
+      min-width: 200px;
+      max-width: 300px;
+    }
+    
+    .serial-management-component .search-box input {
+      padding: 8px 15px 8px 35px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      font-family: 'Noto Sans Bengali', sans-serif;
+      width: 100%;
+    }
+    
+    .serial-management-component .search-box input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    
+    .serial-management-component .search-box i {
+      position: absolute;
+      left: 12px;
+      top: 10px;
+      color: var(--gray);
+    }
+    
+    .serial-management-component .add-btn {
+      background-color: var(--primary);
+      color: var(--white);
+      padding: 8px 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Noto Sans Bengali', sans-serif;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+      order: 5;
+      white-space: nowrap;
+    }
+    
+    .serial-management-component .add-btn:hover {
+      background-color: var(--primary-hover);
+    }
+    
+    .serial-management-component .table-container {
+      overflow-x: auto;
+    }
+    
+    .serial-management-component table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 800px;
+    }
+    
+    .serial-management-component th, 
+    .serial-management-component td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .serial-management-component th {
+      background-color: var(--light-gray);
+      font-weight: 600;
+      color: var(--dark);
+    }
+    
+    .serial-management-component tr {
+      transition: all 0.2s ease;
+    }
+    
+    .serial-management-component tr:hover {
+      background-color: #f9fafb;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* রঙিন ব্যাকগ্রাউন্ডের জন্য স্টাইল */
+    .serial-management-component tr.fully-booked {
+      background-color: #fef2f2 !important;
+    }
+    
+   /* .serial-management-component tr.fully-booked td:first-child {
+      border-left: 4px solid #dc2626;
+    }*/
+    
+    .serial-management-component tr.fully-available {
+      background-color: #f0fdf4 !important;
+    }
+    
+   /* .serial-management-component tr.fully-available td:first-child {
+      border-left: 4px solid #16a34a;
+    }
+    */
+    .serial-management-component tr.low-availability {
+      background-color: #fffbeb !important;
+    }
+    
+    /*.serial-management-component tr.low-availability td:first-child {
+      border-left: 4px solid #f59e0b;
+    }
+    */
+    .serial-management-component .status {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 5px;
+    }
+    
+    .serial-management-component .status.booked {
+      background-color: #fee2e2;
+      color: var(--danger);
+    }
+    
+    .serial-management-component .status.available {
+      background-color: #dcfce7;
+      color: var(--success);
+    }
+    
+    .serial-management-component .status.pending {
+      background-color: #dbeafe;
+      color: #2563eb;
+    }
+    
+    .serial-management-component .status.disabled {
+      background-color: #f3f4f6;
+      color: var(--gray);
+    }
+
+    .serial-management-component .action-btn {
+      padding: 5px 10px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Noto Sans Bengali', sans-serif;
+      font-size: 13px;
+      margin-right: 5px;
+      transition: background-color 0.2s ease;
+    }
+    
+    .serial-management-component .edit-btn {
+      background-color: #bfdbfe;
+      color: var(--primary);
+    }
+    
+    .serial-management-component .edit-btn:hover {
+      background-color: #93c5fd;
+    }
+    
+    .serial-management-component .cancel-btn {
+      background-color: #fee2e2;
+      color: var(--danger);
+    }
+    
+    .serial-management-component .cancel-btn:hover {
+      background-color: #fecaca;
+    }
+    
+    .serial-management-component .disable-btn {
+      background-color: #fef3c7;
+      color: var(--warning);
+    }
+    
+    .serial-management-component .disable-btn:hover {
+      background-color: #fde68a;
+    }
+    
+    .serial-management-component .enable-btn {
+      background-color: #dcfce7;
+      color: var(--success);
+    }
+    
+    .serial-management-component .enable-btn:hover {
+      background-color: #bbf7d0;
+    }
+    
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .modal-content {
+      background-color: var(--white);
+      padding: 25px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .modal-header h2 {
+      color: var(--dark);
+      font-size: 20px;
+    }
+    
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--gray);
+    }
+    
+    .close-btn:hover {
+      color: var(--dark);
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: var(--dark);
+    }
+    
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px 15px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      font-family: 'Noto Sans Bengali', sans-serif;
+      font-size: 14px;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    
+    .form-actions button {
+      padding: 8px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Noto Sans Bengali', sans-serif;
+      font-weight: 600;
+      border: none;
+      transition: background-color 0.2s ease;
+    }
+    
+    .submit-btn {
+      background-color: var(--primary);
+      color: var(--white);
+    }
+    
+    .submit-btn:hover {
+      background-color: var(--primary-hover);
+    }
+    
+    .cancel-btn-modal {
+      background-color: var(--light-gray);
+      color: var(--dark);
+    }
+    
+    .cancel-btn-modal:hover {
+      background-color: #e5e7eb;
+    }
+    
+    /* Loading Spinner */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--gray);
+    }
+    
+    .empty-state i {
+      font-size: 48px;
+      margin-bottom: 15px;
+      opacity: 0.5;
+    }
+    
+    .empty-state h3 {
+      margin-bottom: 10px;
+      color: var(--dark);
+    }
+    
+    .empty-state p {
+      margin-bottom: 20px;
+    }
+    
+    /* Mobile Responsive */
+@media (max-width: 768px) {
+  .admin-main {
+    padding: 15px;
+  }
+  
+  .stats-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 25px;
+  }
+  
+  .stat-card {
+    background-color: var(--white);
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  
+  .stat-card h3 {
+    color: var(--gray);
+    font-size: 13px;
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+  
+  .stat-card p {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--dark);
+  }
+  
+  .serial-management-component .admin-table-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+  
+  .serial-management-component .admin-table-header h2 {
+    order: 1;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  
+  .serial-management-component .header-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+  
+  .serial-management-component .filter-group {
+    order: 2;
+    flex-direction: row;
+    justify-content: center;
+    margin-bottom: 10px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 5px;
+    width: 100%;
+    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    overflow-x: visible;
+  }
+  
+  .serial-management-component .filter-group select {
+    flex: none;
+    min-width: 110px;
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+  
+  .serial-management-component .search-box {
+    order: 3;
+    width: 100%;
+    min-width: auto;
+    max-width: none;
+    margin-bottom: 10px;
+  }
+  
+  .serial-management-component .search-box input {
+    width: 100%;
+    font-size: 14px;
+  }
+  
+  .serial-management-component .add-btn {
+    order: 4;
+    width: 100%;
+    padding: 10px;
+    text-align: center;
+  }
+  
+  .modal-content {
+    margin: 10px;
+    width: calc(100% - 20px);
+    padding: 15px;
+  }
+  
+  .serial-management-component th, 
+  .serial-management-component td {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-main {
+    padding: 10px;
+  }
+  
+  .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  
+  .stat-card {
+    padding: 12px;
+    min-height: 85px;
+  }
+  
+  .stat-card h3 {
+    font-size: 12px;
+  }
+  
+  .stat-card p {
+    font-size: 20px;
+  }
+  
+  .page-title {
+    font-size: 20px;
+  }
+  
+  .serial-management-component .filter-group {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  
+  .serial-management-component .filter-group select {
+    min-width: 100px;
+    font-size: 13px;
+    padding: 6px 10px;
+  }
+  
+  .modal-content {
+    margin: 5px;
+    width: calc(100% - 10px);
+    padding: 12px;
+  }
+  
+  .serial-management-component .action-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    margin-right: 3px;
+    margin-bottom: 3px;
+  }
+  
+  .serial-management-component .status {
+    font-size: 11px;
+    padding: 3px 6px;
+    margin-right: 3px;
+    margin-bottom: 3px;
+  }
+}
+
+/* খুব ছোট ফোনের জন্য */
+@media (max-width: 360px) {
+  .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  
+  .stat-card {
+    padding: 10px;
+    min-height: 80px;
+  }
+  
+  .stat-card h3 {
+    font-size: 11px;
+  }
+  
+  .stat-card p {
+    font-size: 18px;
+  }
+  
+  .serial-management-component .filter-group select {
+    min-width: 95px;
+    font-size: 12px;
+    padding: 5px 8px;
+  }
+}
+    
+/* ডেস্কটপের জন্য - সব এক লাইনে (769px এবং উপরে) */
+@media (min-width: 769px) {
+  .serial-management-component .admin-table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    flex-wrap: nowrap;
+  }
+  
+  .serial-management-component .admin-table-header h2 {
+    flex: 0 0 auto;
+    margin: 0;
+    white-space: nowrap;
+  }
+  
+  .serial-management-component .header-actions {
+    display: flex;
+    flex: 1;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+  
+  .serial-management-component .filter-group {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    order: 1;
+  }
+  
+  .serial-management-component .filter-group select {
+    width: auto;
+    min-width: 110px;
+    max-width: 130px;
+  }
+  
+  .serial-management-component .search-box {
+    order: 2;
+    width: 200px;
+    margin: 0;
+  }
+  
+  .serial-management-component .add-btn {
+    order: 3;
+    white-space: nowrap;
+  }
+}
+    
+    /* ছোট ফোনের জন্য অতিরিক্ত স্টাইল */
+    @media (max-width: 480px) {
+      .serial-management-component .filter-group {
+        gap: 5px;
+      }
+      
+      .serial-management-component .filter-group select {
+        min-width: 95px;
+        font-size: 13px;
+        padding: 5px 8px;
+      }
+    }
+    
+    /* ট্যাবলেট/বড় ফোনের জন্য */
+    @media (min-width: 481px) and (max-width: 768px) {
+      .serial-management-component .filter-group select {
+        min-width: 130px;
+      }
+    }
+    
+    /* Print Styles */
+    @media print {
+      .serial-management-component .admin-table-header,
+      .serial-management-component .filter-group,
+      .serial-management-component .search-box,
+      .serial-management-component .add-btn,
+      .serial-management-component .action-btn {
+        display: none !important;
+      }
+      
+      .serial-management-component table {
+        min-width: auto;
+      }
+      
+      .admin-main {
+        padding: 0;
+      }
+      
+      .stats-cards {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- হেডার কন্টেইনার -->
+  <div id="header-container"></div>
+  
+  <!-- Admin Container -->
+  <div class="admin-container">
+    <!-- সাইডবার কন্টেইনার -->
+    <div id="sidebar-container"></div>
+    
+    <!-- Main Content -->
+    <main class="admin-main">
+      <!-- Alert Messages Container -->
+      <div id="alertContainer"></div>
+      
+      <!-- Page Title -->
+      <h1 class="page-title">সিরিয়াল ম্যানেজমেন্ট</h1>
+      
+      <!-- Statistics Cards -->
+      <div class="stats-cards">
+        <div class="stat-card thursday">
+          <h3>বৃহস্পতিবার সিরিয়াল</h3>
+          <p id="thursdaySerials">0</p>
+        </div>
+        
+        <div class="stat-card friday">
+          <h3>শুক্রবার সিরিয়াল</h3>
+          <p id="fridaySerials">0</p>
+        </div>
+        
+        <div class="stat-card">
+          <h3>মোট সিরিয়াল স্লট</h3>
+          <p id="totalSlots">0</p>
+        </div>
+        
+        <div class="stat-card disabled">
+          <h3>ডিসেবল স্লট</h3>
+          <p id="disabledSlots">0</p>
+        </div>
+
+        <div class="stat-card enable">
+          <h3>এনাবল স্লট</h3>
+          <p id="enableSlots">0</p>
+        </div>
+        
+        <div class="stat-card pending">
+          <h3>পেন্ডিং সিরিয়াল</h3>
+          <p id="pendingSerials">0</p>
+        </div>
+      </div>
+      
+      <!-- Serial Management Section HTML - সরাসরি এখানে -->
+      <div class="serial-management-component">
+        <div class="admin-table">
+          <div class="admin-table-header">
+            <h2>সিরিয়াল ম্যানেজমেন্ট</h2>
+            <div class="header-actions">
+              <div class="filter-group">
+                <select class="day-filter-serial">
+                  <option value="all">সকল দিন</option>
+                  <option value="Thursday">বৃহস্পতিবার</option>
+                  <option value="Friday">শুক্রবার</option>
+                </select>
+                <select class="type-filter-serial">
+                  <option value="all">সকল ধরন</option>
+                  <option value="new">নতুন রোগী</option>
+                  <option value="old">পুরাতন রোগী</option>
+                </select>
+                <select class="time-filter-serial">
+                  <option value="all">সকল সময়</option>
+                </select>
+              </div>
+              <div class="search-box">
+                <i>🔍</i>
+                <input type="text" class="search-serials" placeholder="সময় বা ধরন দিয়ে খুঁজুন...">
+              </div>
+              <button class="add-btn add-serial-range-btn">সিরিয়াল রেঞ্জ যোগ করুন</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="serials-table">
+              <thead>
+                <tr>
+                  <th>দিন</th>
+                  <th>সময়</th>
+                  <th>ধরন</th>
+                  <th>সিরিয়াল রেঞ্জ</th>
+                  <th>স্ট্যাটাস</th>
+                  <th>অ্যাকশন</th>
+                </tr>
+              </thead>
+              <tbody id="serialsTableBody">
+                <tr>
+                  <td colspan="6" style="text-align: center; padding: 20px; color: #6b7280;">
+                    লোড হচ্ছে...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Serial Modal HTML - সরাসরি এখানে -->
+      <div class="modal" id="serialModal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 id="serialModalTitle">সিরিয়াল রেঞ্জ যোগ করুন</h2>
+            <button class="close-btn" id="closeSerialModal">&times;</button>
+          </div>
+          <form id="serialForm">
+            <div class="form-group">
+              <label for="serialDay">দিন</label>
+              <select id="serialDay" required>
+                <option value="">-- নির্বাচন করুন --</option>
+                <option value="Thursday">বৃহস্পতিবার</option>
+                <option value="Friday">শুক্রবার</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="serialTime">সময়</label>
+              <input type="text" id="serialTime" placeholder="যেমন: 5:00 PM" required>
+            </div>
+            <div class="form-group">
+              <label for="serialType">ধরন</label>
+              <select id="serialType" required>
+                <option value="">-- নির্বাচন করুন --</option>
+                <option value="new">নতুন রোগী</option>
+                <option value="old">পুরাতন রোগী</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="serialStart">শুরু সিরিয়াল</label>
+              <input type="number" id="serialStart" min="1" required>
+            </div>
+            <div class="form-group">
+              <label for="serialEnd">শেষ সিরিয়াল</label>
+              <input type="number" id="serialEnd" min="1" required>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="cancel-btn-modal" id="cancelSerialModal">বাতিল</button>
+              <button type="submit" class="submit-btn" id="submitSerialBtn">সংরক্ষণ করুন</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ফুটার কন্টেইনার -->
+  <div id="footer-container"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  
+  <!-- কম্পোনেন্ট লোডার -->
+  <script src="components-inline.js"></script>
+
+<script>
+    // ==================== FIREBASE CONFIGURATION ====================
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+      authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+      projectId: "doctor-appointment-syste-23828",
+      storageBucket: "doctor-appointment-syste-23828.appspot.com",
+      messagingSenderId: "79600391014",
+      appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+    };
+
+    let db;
+    let realtimeListeners = [];
+    let serialManager = null;
+    let adminPendingSelections = {};
+    let currentAdminSessionId = null;
+
+    // ==================== UTILITY FUNCTIONS ====================
+    function showAlert(message, type = 'success') {
+      const alert = document.createElement('div');
+      alert.className = `alert alert-${type}`;
+      alert.textContent = message;
+      document.getElementById('alertContainer').appendChild(alert);
+      
+      setTimeout(() => {
+        alert.remove();
+      }, 5000);
+    }
+
+    // ==================== AUTHENTICATION CHECK ====================
+    function checkAuthentication() {
+      const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
+      const loginTime = sessionStorage.getItem('loginTime');
+      
+      if (!isLoggedIn) {
+        alert('Please login first!!');
+        window.location.href = '/login';
+        return false;
+      }
+      
+      const currentTime = new Date().getTime();
+      const sessionDuration = 2 * 60 * 60 * 1000; // 2 hours
+      
+      if (currentTime - parseInt(loginTime) > sessionDuration) {
+        sessionStorage.clear();
+        alert('Session expired! Please login again.');
+        window.location.href = '/login';
+        return false;
+      }
+      
+      return true;
+    }
+
+    // ==================== SERIAL MANAGEMENT CLASS ====================
+    class SerialManagement {
+      constructor() {
+        this.db = window.db;
+        this.appointments = [];
+        this.serialRanges = { Thursday: {}, Friday: {} };
+        this.pendingSelections = {};
+        this.adminPendingSelections = {};
+        this.realtimeListeners = [];
+        this.searchTimer = null;
+        this.disabledSlots = {};
+        
+        this.initialize();
+      }
+      
+      async initialize() {
+        console.log('Initializing SerialManagement...');
+        
+        // Load disabled slots
+        this.disabledSlots = JSON.parse(localStorage.getItem('disabledSerialSlots') || '{}');
+        
+        // Load initial data
+        await this.loadSerialRanges();
+        await this.loadAppointments();
+        await this.loadAllPendingSelections();
+        
+        // Setup event listeners
+        this.setupEventListeners();
+        
+        // Load table
+        await this.loadSerialTable();
+        
+        // Update stats
+        this.updateStats();
+      }
+      
+      async loadSerialRanges() {
+        try {
+          if (!this.db) {
+            console.error('Firebase not initialized');
+            return;
+          }
+          
+          const doc = await this.db.collection('settings').doc('serialRanges').get();
+          if (doc.exists) {
+            this.serialRanges = doc.data();
+            console.log('Loaded serial ranges:', this.serialRanges);
+            if (!this.serialRanges.Thursday) this.serialRanges.Thursday = {};
+            if (!this.serialRanges.Friday) this.serialRanges.Friday = {};
+          } else {
+            // Create default if not exists
+            this.serialRanges = { Thursday: {}, Friday: {} };
+            await this.db.collection('settings').doc('serialRanges').set(this.serialRanges);
+            console.log('Created default serial ranges');
+          }
+          
+          this.updateTimeFilterOptions();
+          
+        } catch (error) {
+          console.error('Error loading serial ranges:', error);
+          this.showAlert('সিরিয়াল রেঞ্জ লোড করতে সমস্যা হয়েছে', 'error');
+        }
+      }
+      
+      async loadAppointments() {
+        try {
+          if (!this.db) return;
+          
+          const listener = this.db.collection('appointments')
+            .orderBy('timestamp', 'desc')
+            .onSnapshot(snapshot => {
+              this.appointments = [];
+              snapshot.forEach(doc => {
+                this.appointments.push({
+                  id: doc.id,
+                  ...doc.data()
+                });
+              });
+              
+              this.loadSerialTable();
+              this.updateStats();
+            }, error => {
+              console.error('Error loading appointments:', error);
+            });
+          
+          this.realtimeListeners.push(listener);
+          
+        } catch (error) {
+          console.error('Error loading appointments:', error);
+        }
+      }
+      
+      async loadAllPendingSelections() {
+        try {
+          if (!this.db) return;
+          
+          const listener = this.db.collection('pendingSelections')
+            .where('expiresAt', '>', new Date())
+            .onSnapshot(snapshot => {
+              this.pendingSelections = {};
+              this.adminPendingSelections = {};
+              
+              snapshot.forEach(doc => {
+                const data = doc.data();
+                const key = `${data.day}_${data.time}_${data.type}`;
+                
+                // Check if bookedBy field exists
+                const bookedBy = data.bookedBy || 'user'; // Default to 'user' if not specified
+                
+                if (bookedBy === 'user') {
+                  // User pending
+                  if (!this.pendingSelections[key]) {
+                    this.pendingSelections[key] = new Set();
+                  }
+                  this.pendingSelections[key].add(data.serial);
+                } else if (bookedBy === 'admin') {
+                  // Admin pending
+                  if (!this.adminPendingSelections[key]) {
+                    this.adminPendingSelections[key] = {};
+                  }
+                  this.adminPendingSelections[key][data.serial] = {
+                    id: doc.id,
+                    sessionId: data.sessionId || ''
+                  };
+                } else {
+                  // Legacy pending (no bookedBy field)
+                  if (!this.pendingSelections[key]) {
+                    this.pendingSelections[key] = new Set();
+                  }
+                  this.pendingSelections[key].add(data.serial);
+                }
+              });
+              
+              console.log('Pending data loaded:', {
+                user: this.pendingSelections,
+                admin: this.adminPendingSelections
+              });
+              
+              this.loadSerialTable();
+              this.updateStats();
+            }, error => {
+              console.error('Error loading pending selections:', error);
+            });
+          
+          this.realtimeListeners.push(listener);
+          
+        } catch (error) {
+          console.error('Error loading pending selections:', error);
+        }
+      }
+      
+      updateTimeFilterOptions() {
+        const dayFilter = document.querySelector('.day-filter-serial')?.value || 'all';
+        const typeFilter = document.querySelector('.type-filter-serial')?.value || 'all';
+        const times = new Set();
+        
+        for (const day in this.serialRanges) {
+          if (dayFilter !== 'all' && day !== dayFilter) continue;
+          
+          for (const type in this.serialRanges[day]) {
+            if (typeFilter !== 'all' && type !== typeFilter) continue;
+            
+            for (const time in this.serialRanges[day][type]) {
+              times.add(time);
+            }
+          }
+        }
+        
+        const timeSelect = document.querySelector('.time-filter-serial');
+        if (!timeSelect) return;
+        
+        timeSelect.innerHTML = '<option value="all">সকল সময়</option>';
+        
+        const sortedTimes = Array.from(times).sort((a, b) => {
+          return this.extractTimeNumber(a) - this.extractTimeNumber(b);
+        });
+        
+        sortedTimes.forEach(time => {
+          const option = document.createElement('option');
+          option.value = time;
+          option.textContent = time;
+          timeSelect.appendChild(option);
+        });
+      }
+      
+      extractTimeNumber(timeStr) {
+        const timePart = timeStr.split(' ')[0];
+        const [hours, minutes] = timePart.split(':');
+        const hour = parseInt(hours);
+        const minute = parseInt(minutes) || 0;
+        
+        const isPM = timeStr.toUpperCase().includes('PM');
+        let militaryHour = hour;
+        
+        if (isPM && hour !== 12) {
+          militaryHour += 12;
+        } else if (!isPM && hour === 12) {
+          militaryHour = 0;
+        }
+        
+        return militaryHour * 100 + minute;
+      }
+      
+      async loadSerialTable(searchTerm = '') {
+        const tableBody = document.getElementById('serialsTableBody');
+        if (!tableBody) return;
+        
+        const dayFilter = document.querySelector('.day-filter-serial')?.value || 'all';
+        const typeFilter = document.querySelector('.type-filter-serial')?.value || 'all';
+        const timeFilter = document.querySelector('.time-filter-serial')?.value || 'all';
+        
+        let html = '';
+        let foundSlots = false;
+        
+        const timeSlots = [];
+        
+        for (const day in this.serialRanges) {
+          if (dayFilter !== 'all' && day !== dayFilter) continue;
+          
+          for (const type in this.serialRanges[day]) {
+            if (typeFilter !== 'all' && type !== typeFilter) continue;
+            
+            for (const time in this.serialRanges[day][type]) {
+              if (timeFilter !== 'all' && time !== timeFilter) continue;
+              
+              if (searchTerm && 
+                  !time.toLowerCase().includes(searchTerm.toLowerCase()) && 
+                  !type.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                  !day.toLowerCase().includes(searchTerm.toLowerCase())) {
+                continue;
+              }
+              
+              timeSlots.push({ day, type, time, range: this.serialRanges[day][type][time] });
+            }
+          }
+        }
+        
+        timeSlots.sort((a, b) => this.extractTimeNumber(a.time) - this.extractTimeNumber(b.time));
+        
+        // Clear table
+        tableBody.innerHTML = '';
+        
+        for (const slot of timeSlots) {
+          foundSlots = true;
+          const [start, end] = slot.range;
+          const total = end - start + 1;
+          
+          // Count booked appointments
+          const bookedCount = this.appointments.filter(app => {
+            const patientType = app.patientType || app.type;
+            return app.day === slot.day && 
+                   app.time === slot.time && 
+                   patientType === slot.type;
+          }).length;
+          
+          // Count pending selections
+          const key = `${slot.day}_${slot.time}_${slot.type}`;
+          
+          // User pending
+          const userPendingCount = this.pendingSelections[key] ? this.pendingSelections[key].size : 0;
+          
+          // Admin pending
+          const adminPendingCount = this.adminPendingSelections[key] ? Object.keys(this.adminPendingSelections[key]).length : 0;
+          
+          const pendingCount = userPendingCount + adminPendingCount;
+          const available = total - bookedCount - pendingCount;
+          const isDisabled = this.disabledSlots[key] === true;
+          
+          const dayText = slot.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
+          const typeText = slot.type === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+          
+          const row = document.createElement('tr');
+          
+          // রঙিন ব্যাকগ্রাউন্ড ক্লাস যোগ করুন
+          if (available === 0) {
+            row.classList.add('fully-booked');
+          } else if (available === total) {
+            row.classList.add('fully-available');
+          } else if (available < total / 2) {
+            row.classList.add('low-availability');
+          }
+          
+          row.innerHTML = `
+            <td>${dayText}</td>
+            <td>${slot.time}</td>
+            <td>${typeText}</td>
+            <td>${start} - ${end} (মোট: ${total})</td>
+            <td>
+              ${pendingCount > 0 ? `<span class="status pending">পেন্ডিং: ${pendingCount}</span>` : ''}
+              <span class="status booked">বুকড: ${bookedCount}</span>
+              <span class="status available">খালি: ${available}</span>
+              ${isDisabled ? '<span class="status disabled">ডিসেবল</span>' : ''}
+            </td>
+            <td>
+              <button class="action-btn edit-btn" onclick="serialManager.editSerial('${slot.day}', '${slot.type}', '${slot.time}')">
+                এডিট
+              </button>
+              ${isDisabled ? 
+                `<button class="action-btn enable-btn" onclick="serialManager.toggleSlot('${slot.day}', '${slot.type}', '${slot.time}', true)">
+                  এনাবল
+                </button>` : 
+                `<button class="action-btn disable-btn" onclick="serialManager.toggleSlot('${slot.day}', '${slot.type}', '${slot.time}', false)">
+                  ডিসেবল
+                </button>`
+              }
+              <button class="action-btn cancel-btn" onclick="serialManager.deleteSerial('${slot.day}', '${slot.type}', '${slot.time}')">
+                মুছুন
+              </button>
+            </td>
+          `;
+          
+          tableBody.appendChild(row);
+        }
+        
+        if (!foundSlots) {
+          tableBody.innerHTML = `
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 20px; color: #6b7280;">
+                ${searchTerm ? 'কোনো সিরিয়াল পাওয়া যায়নি' : 'কোনো সিরিয়াল স্লট নেই। "সিরিয়াল রেঞ্জ যোগ করুন" বাটনে ক্লিক করে নতুন সিরিয়াল যোগ করুন।'}
+              </td>
+            </tr>
+          `;
+        }
+      }
+      
+      updateStats() {
+        const dayFilter = document.querySelector('.day-filter-serial')?.value || 'all';
+        const typeFilter = document.querySelector('.type-filter-serial')?.value || 'all';
+        const timeFilter = document.querySelector('.time-filter-serial')?.value || 'all';
+        const searchTerm = document.querySelector('.search-serials')?.value || '';
+        
+        let thursdayCount = 0;
+        let fridayCount = 0;
+        let totalSlots = 0;
+        let pendingTotal = 0;
+        let enabledCount = 0;
+        let disabledCount = 0;
+        
+        for (const day in this.serialRanges) {
+          // Apply day filter
+          if (dayFilter !== 'all' && day !== dayFilter) continue;
+          
+          for (const type in this.serialRanges[day]) {
+            // Apply type filter
+            if (typeFilter !== 'all' && type !== typeFilter) continue;
+            
+            for (const time in this.serialRanges[day][type]) {
+              // Apply time filter
+              if (timeFilter !== 'all' && time !== timeFilter) continue;
+              
+              // Apply search filter
+              if (searchTerm && 
+                  !time.toLowerCase().includes(searchTerm.toLowerCase()) && 
+                  !type.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                  !day.toLowerCase().includes(searchTerm.toLowerCase())) {
+                continue;
+              }
+              
+              const [start, end] = this.serialRanges[day][type][time];
+              const slotCount = end - start + 1;
+           
+              totalSlots += slotCount;
+          
+              if (day === 'Thursday') {
+                thursdayCount += slotCount;
+              } else if (day === 'Friday') {
+                fridayCount += slotCount;
+              }
+                  
+              // Count pending for this slot
+              const key = `${day}_${time}_${type}`;
+              
+              // User pending
+              const userPendingCount = this.pendingSelections[key] ? this.pendingSelections[key].size : 0;
+              
+              // Admin pending
+              const adminPendingCount = this.adminPendingSelections[key] ? Object.keys(this.adminPendingSelections[key]).length : 0;
+              
+              const totalPendingForSlot = userPendingCount + adminPendingCount;
+              pendingTotal += totalPendingForSlot;
+
+              // Count enabled/disabled slots
+              if (this.disabledSlots[key]) {
+                disabledCount += slotCount;
+              } else {
+                enabledCount += slotCount;
+              }
+            }
+          }
+        }
+        
+        document.getElementById('thursdaySerials').textContent = thursdayCount;
+        document.getElementById('fridaySerials').textContent = fridayCount;
+        document.getElementById('totalSlots').textContent = totalSlots;
+        document.getElementById('disabledSlots').textContent = disabledCount;
+        document.getElementById('enableSlots').textContent = enabledCount;
+        document.getElementById('pendingSerials').textContent = pendingTotal;
+      }
+      
+      async editSerial(day, type, time) {
+        const range = this.serialRanges[day]?.[type]?.[time];
+        if (!range) {
+          this.showAlert('সিরিয়াল খুঁজে পাওয়া যায়নি', 'error');
+          return;
+        }
+        
+        const [start, end] = range;
+        
+        document.getElementById('serialModalTitle').textContent = 'সিরিয়াল রেঞ্জ এডিট করুন';
+        document.getElementById('serialDay').value = day;
+        document.getElementById('serialTime').value = time;
+        document.getElementById('serialType').value = type;
+        document.getElementById('serialStart').value = start;
+        document.getElementById('serialEnd').value = end;
+        
+        // Store original values for comparison
+        document.getElementById('serialDay').dataset.originalDay = day;
+        document.getElementById('serialType').dataset.originalType = type;
+        document.getElementById('serialTime').dataset.originalTime = time;
+        
+        document.getElementById('serialModal').style.display = 'flex';
+      }
+      
+      async deleteSerial(day, type, time) {
+        if (!confirm(`আপনি কি ${day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার'} ${time} সময়ের ${type === 'new' ? 'নতুন' : 'পুরাতন'} রোগীর সিরিয়াল মুছতে চান?`)) {
+          return;
+        }
+        
+        try {
+          // ✅ FIXED: Delete from serialRanges object
+          if (this.serialRanges[day] && this.serialRanges[day][type] && this.serialRanges[day][type][time]) {
+            delete this.serialRanges[day][type][time];
+            
+            // Clean up empty objects
+            if (Object.keys(this.serialRanges[day][type]).length === 0) {
+              delete this.serialRanges[day][type];
+            }
+            if (Object.keys(this.serialRanges[day]).length === 0) {
+              delete this.serialRanges[day];
+            }
+          }
+          
+          // ✅ FIXED: Save to Firebase
+          if (this.db) {
+            await this.db.collection('settings').doc('serialRanges').set(this.serialRanges);
+            console.log('Deleted serial from Firebase:', { day, type, time });
+          }
+          
+          // ✅ FIXED: Remove disabled slot
+          const key = `${day}_${time}_${type}`;
+          if (this.disabledSlots[key]) {
+            delete this.disabledSlots[key];
+            localStorage.setItem('disabledSerialSlots', JSON.stringify(this.disabledSlots));
+            
+            // Also remove from Firebase
+            if (this.db) {
+              try {
+                await this.db.collection('settings').doc('disabledSlots').set(this.disabledSlots, { merge: true });
+              } catch (error) {
+                console.error('Error saving disabled slots:', error);
+              }
+            }
+          }
+          
+          // ✅ FIXED: Clean up pending selections
+          await this.cleanupPendingSelections(day, time, type);
+          
+          // ✅ FIXED: Update UI immediately
+          await this.loadSerialTable();
+          this.updateStats();
+          this.showAlert('সিরিয়াল সফলভাবে মুছে ফেলা হয়েছে', 'success');
+          
+        } catch (error) {
+          console.error('Error deleting serial:', error);
+          this.showAlert('সিরিয়াল মুছতে সমস্যা হয়েছে: ' + error.message, 'error');
+        }
+      }
+      
+      // ✅ FIXED: পেন্ডিং সিলেকশন ক্লিনআপ
+      async cleanupPendingSelections(day, time, type) {
+        if (!this.db) return;
+        
+        try {
+          // Get all pending selections for this slot
+          const pendingSnapshot = await this.db.collection('pendingSelections')
+            .where('day', '==', day)
+            .where('time', '==', time)
+            .where('type', '==', type)
+            .get();
+          
+          if (!pendingSnapshot.empty) {
+            const batch = this.db.batch();
+            pendingSnapshot.forEach(doc => {
+              batch.delete(doc.ref);
+            });
+            await batch.commit();
+            console.log(`Cleaned up ${pendingSnapshot.size} pending selections for ${day} ${time} ${type}`);
+          }
+        } catch (error) {
+          console.error('Error cleaning up pending selections:', error);
+        }
+      }
+      
+      async toggleSlot(day, type, time, enable) {
+        const key = `${day}_${time}_${type}`;
+        
+        if (enable) {
+          delete this.disabledSlots[key];
+          console.log('Enabled slot:', key);
+          this.showAlert(`${day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার'} - ${time} (${type === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী'}) এনাবল করা হয়েছে`, 'success');
+        } else {
+          this.disabledSlots[key] = true;
+          console.log('Disabled slot:', key);
+          this.showAlert(`${day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার'} - ${time} (${type === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী'}) ডিসেবল করা হয়েছে`, 'success');
+        }
+        
+        // Save to localStorage
+        localStorage.setItem('disabledSerialSlots', JSON.stringify(this.disabledSlots));
+        
+        // ✅ FIXED: Save to Firebase to persist across refreshes
+        if (this.db) {
+          try {
+            await this.db.collection('settings').doc('disabledSlots').set(this.disabledSlots, { merge: true });
+            console.log('Saved disabled slots to Firebase:', this.disabledSlots);
+          } catch (error) {
+            console.error('Error saving disabled slots to Firebase:', error);
+          }
+        }
+        
+        await this.loadSerialTable();
+        this.updateStats();
+      }
+      
+      async saveSerial(e) {
+        e.preventDefault();
+        
+        const day = document.getElementById('serialDay').value;
+        const time = document.getElementById('serialTime').value.trim();
+        const type = document.getElementById('serialType').value;
+        const start = parseInt(document.getElementById('serialStart').value);
+        const end = parseInt(document.getElementById('serialEnd').value);
+        
+        if (!day || !time || !type || isNaN(start) || isNaN(end)) {
+          this.showAlert('অনুগ্রহ করে ফর্মের সকল ঘর পূরণ করুন।', 'error');
+          return;
+        }
+        
+        if (start > end) {
+          this.showAlert('শুরু সিরিয়াল শেষ সিরিয়ালের চেয়ে বেশি হতে পারে না', 'error');
+          return;
+        }
+        
+        if (start < 1) {
+          this.showAlert('সিরিয়াল নম্বর ১ বা তার বেশি হতে হবে', 'error');
+          return;
+        }
+        
+        const originalDay = document.getElementById('serialDay').dataset.originalDay;
+        const originalType = document.getElementById('serialType').dataset.originalType;
+        const originalTime = document.getElementById('serialTime').dataset.originalTime;
+        
+        const isEdit = !!originalDay;
+        
+        console.log('Edit mode:', isEdit, 'Original:', { originalDay, originalType, originalTime }, 'New:', { day, type, time });
+        
+        // ✅ FIXED: Check for duplicate only if it's a new entry or day/time/type changed
+        if (!isEdit || (originalDay !== day || originalType !== type || originalTime !== time)) {
+          if (this.serialRanges[day]?.[type]?.[time]) {
+            this.showAlert('এই দিন, সময় এবং ধরনের জন্য ইতিমধ্যেই সিরিয়াল সেট করা আছে!', 'error');
+            return;
+          }
+        }
+        
+        try {
+          // ✅ FIXED: Remove old entry if editing with different values
+          if (isEdit && (originalDay !== day || originalType !== type || originalTime !== time)) {
+            if (this.serialRanges[originalDay]?.[originalType]?.[originalTime]) {
+              delete this.serialRanges[originalDay][originalType][originalTime];
+              
+              // Clean up empty objects
+              if (Object.keys(this.serialRanges[originalDay][originalType]).length === 0) {
+                delete this.serialRanges[originalDay][originalType];
+              }
+              if (Object.keys(this.serialRanges[originalDay]).length === 0) {
+                delete this.serialRanges[originalDay];
+              }
+              
+              console.log('Removed old serial range:', { originalDay, originalType, originalTime });
+            }
+          }
+          
+          // ✅ FIXED: Add/update new entry
+          if (!this.serialRanges[day]) this.serialRanges[day] = {};
+          if (!this.serialRanges[day][type]) this.serialRanges[day][type] = {};
+          this.serialRanges[day][type][time] = [start, end];
+          
+          console.log('Updated serialRanges:', this.serialRanges);
+          
+          // ✅ FIXED: Save to Firebase
+          if (this.db) {
+            await this.db.collection('settings').doc('serialRanges').set(this.serialRanges);
+            console.log('Saved to Firebase successfully');
+          }
+          
+          document.getElementById('serialModal').style.display = 'none';
+          document.getElementById('serialForm').reset();
+          
+          // Clear original data
+          delete document.getElementById('serialDay').dataset.originalDay;
+          delete document.getElementById('serialType').dataset.originalType;
+          delete document.getElementById('serialTime').dataset.originalTime;
+          
+          await this.loadSerialTable();
+          this.updateStats();
+          this.showAlert(isEdit ? 'সিরিয়াল আপডেট করা হয়েছে' : 'নতুন সিরিয়াল যোগ করা হয়েছে', 'success');
+          
+        } catch (error) {
+          console.error('Error saving serial:', error);
+          this.showAlert('সিরিয়াল সংরক্ষণ করতে সমস্যা হয়েছে: ' + error.message, 'error');
+        }
+      }
+      
+      showAlert(message, type = 'success') {
+        showAlert(message, type);
+      }
+      
+      setupEventListeners() {
+        // ফিল্টার ইভেন্ট
+        document.querySelectorAll('.day-filter-serial, .type-filter-serial').forEach(select => {
+          select.addEventListener('change', () => {
+            this.updateTimeFilterOptions();
+            this.loadSerialTable();
+            this.updateStats();
+          });
+        });
+        
+        document.querySelector('.time-filter-serial')?.addEventListener('change', () => {
+          this.loadSerialTable();
+          this.updateStats();
+        });
+        
+        // সার্চ ইভেন্ট
+        const searchInput = document.querySelector('.search-serials');
+        if (searchInput) {
+          searchInput.addEventListener('input', (e) => {
+            clearTimeout(this.searchTimer);
+            this.searchTimer = setTimeout(() => {
+              this.loadSerialTable(e.target.value);
+              this.updateStats();
+            }, 300);
+          });
+        }
+        
+        // মডাল ইভেন্ট
+        document.querySelector('.add-serial-range-btn')?.addEventListener('click', () => {
+          this.openSerialModal();
+        });
+        
+        document.getElementById('closeSerialModal')?.addEventListener('click', () => {
+          document.getElementById('serialModal').style.display = 'none';
+        });
+        
+        document.getElementById('cancelSerialModal')?.addEventListener('click', () => {
+          document.getElementById('serialModal').style.display = 'none';
+        });
+        
+        document.getElementById('serialForm')?.addEventListener('submit', (e) => {
+          this.saveSerial(e);
+        });
+        
+        window.addEventListener('click', (e) => {
+          if (e.target === document.getElementById('serialModal')) {
+            document.getElementById('serialModal').style.display = 'none';
+          }
+        });
+      }
+      
+      openSerialModal() {
+        document.getElementById('serialModalTitle').textContent = 'সিরিয়াল রেঞ্জ যোগ করুন';
+        document.getElementById('serialForm').reset();
+        
+        // Clear original data
+        delete document.getElementById('serialDay').dataset.originalDay;
+        delete document.getElementById('serialType').dataset.originalType;
+        delete document.getElementById('serialTime').dataset.originalTime;
+        
+        document.getElementById('serialModal').style.display = 'flex';
+      }
+      
+      destroy() {
+        this.realtimeListeners.forEach(unsubscribe => {
+          if (unsubscribe && typeof unsubscribe === 'function') {
+            unsubscribe();
+          }
+        });
+      }
+    }
+
+    // ==================== INITIALIZATION ====================
+    function initializeFirebase() {
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.firestore();
+        console.log("✅ Firebase initialized successfully");
+        
+        window.db = db;
+        
+        // Admin session ID
+        if (!sessionStorage.getItem('adminSessionId')) {
+          const sessionId = 'admin_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          sessionStorage.setItem('adminSessionId', sessionId);
+        }
+        currentAdminSessionId = sessionStorage.getItem('adminSessionId');
+        console.log('✅ Admin Session ID:', currentAdminSessionId);
+        
+        return true;
+      } catch (error) {
+        console.error("❌ Firebase initialization error:", error);
+        showAlert('Firebase initialization failed: ' + error.message, 'error');
+        return false;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // ১. প্রথমে কম্পোনেন্ট লোড করুন
+      ComponentLoader.loadAllComponents('সিরিয়াল ম্যানেজমেন্ট');
+      
+      // ২. তারপর authentication চেক করুন
+      if (!checkAuthentication()) {
+        return;
+      }
+      
+      // ৩. Firebase ইনিশিয়ালাইজ
+      if (initializeFirebase()) {
+        // ৪. Serial Manager শুরু করুন
+        setTimeout(() => {
+          serialManager = new SerialManagement();
+          console.log('✅ Serial Management initialized');
+          
+          // ডিবাগিং জন্য
+          window.serialManager = serialManager;
+        }, 500);
+      }
+    });
+
+    // ==================== CLEANUP ====================
+    window.addEventListener('beforeunload', function() {
+      if (serialManager) {
+        serialManager.destroy();
+      }
+      
+      if (realtimeListeners.length > 0) {
+        realtimeListeners.forEach(unsubscribe => {
+          if (unsubscribe && typeof unsubscribe === 'function') {
+            unsubscribe();
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
