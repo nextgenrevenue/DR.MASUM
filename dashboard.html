@@ -1097,8 +1097,10 @@
       }
       
       .age-inputs {
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
         gap: 8px;
+        margin-top: 5px;
       }
       
       /* ছোট মোবাইলের জন্য ফিল্টার স্টাইল */
@@ -1735,192 +1737,271 @@ if (!checkAuthentication()) {
     }
 
     // =======================================================
-    // ৪. ড্যাশবোর্ড কার্ড আপডেট - UPDATED
-    // =======================================================
-    function updateDashboardCards(snapshot) {
-      if (!snapshot) return;
+// ৪. ড্যাশবোর্ড কার্ড আপডেট - UPDATED (সকল ডাটার জন্য)
+// =======================================================
+function updateDashboardCards(snapshot) {
+  if (!snapshot) return;
+  
+  // রিসেট কাউন্টার
+  let total = 0;
+  let thursday = 0;
+  let friday = 0;
+  let called = 0;
+  let notCalled = 0;
+  let tokenGiven = 0;
+  let tokenNotGiven = 0;
+  let newPatientLastCallSerial = 0;
+  let oldPatientLastCallSerial = 0;
+  
+  // ✅ সপ্তাহের তারিখ রেঞ্জ বের করা (শনিবার থেকে শুক্রবার)
+  const weekDateRange = getWeekDateRange();
+  
+  // সকল ডাটা প্রসেস
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    
+    // ✅ তারিখ চেক: শুধুমাত্র বর্তমান সপ্তাহের ডাটা (শনিবার থেকে শুক্রবার)
+    let appointmentDate = null;
+    
+    if (data.appointmentDate) {
+      appointmentDate = new Date(data.appointmentDate);
+    } else if (data.timestamp && data.timestamp.toDate) {
+      appointmentDate = data.timestamp.toDate();
+    }
+    
+    // তারিখ না থাকলে বা বর্তমান সপ্তাহে না হলে স্কিপ
+    if (!appointmentDate) {
+      // কিছু পুরানো ডাটা তারিখ ছাড়া থাকতে পারে, সেগুলোও গণনা করুন
+    } else if (!isDateInCurrentWeek(appointmentDate)) {
+      return; // বর্তমান সপ্তাহের বাইরের ডাটা বাদ দিন
+    }
+    
+    // ফিল্টার প্রয়োগ (UI ফিল্টার অনুযায়ী)
+    const dayMatch = currentFilters.day === 'all' || data.day === currentFilters.day;
+    const typeMatch = currentFilters.type === 'all' || (data.patientType || data.type) === currentFilters.type;
+    const timeMatch = currentFilters.time === 'all' || data.time === currentFilters.time;
+    const callStatusMatch = currentFilters.callStatus === 'all' || 
+      (currentFilters.callStatus === 'called' && data.called === true) ||
+      (currentFilters.callStatus === 'not_called' && data.called !== true);
+    const tokenStatusMatch = currentFilters.tokenStatus === 'all' || 
+      (currentFilters.tokenStatus === 'given' && data.tokenGiven === true) ||
+      (currentFilters.tokenStatus === 'not_given' && data.tokenGiven !== true);
+    const searchMatch = !currentFilters.search || 
+      (data.name && data.name.toLowerCase().includes(currentFilters.search)) ||
+      (data.phone && data.phone.includes(currentFilters.search)) ||
+      (data.serial && data.serial.toString().includes(currentFilters.search));
+    
+    if (dayMatch && typeMatch && timeMatch && callStatusMatch && tokenStatusMatch && searchMatch) {
+      // মোট কাউন্টার
+      total++;
       
-      // শুধু ৪ দিনের ডাটা গণনা (অন্যান্য কার্ডের জন্য)
-      const fourDaysAgo = new Date();
-      fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
+      // দিন অনুযায়ী
+      if (data.day === 'Thursday') thursday++;
+      if (data.day === 'Friday') friday++;
       
-      let total = 0;
-      let thursday = 0;
-      let friday = 0;
-      let called = 0;
-      let notCalled = 0;
-      let tokenGiven = 0;
-      let tokenNotGiven = 0;
-      let newPatientLastCallSerial = 0;
-      let oldPatientLastCallSerial = 0;
+      // কল স্ট্যাটাস
+      if (data.called === true) {
+        called++;
+      } else {
+        notCalled++;
+      }
       
-      // ✅ নতুন/পুরাতন লাস্ট কল শুধুমাত্র দিন ফিল্টার দ্বারা প্রভাবিত হবে
-      const dayFilter = currentFilters.day;
+      // টোকেন স্ট্যাটাস
+      if (data.tokenGiven === true) {
+        tokenGiven++;
+      } else {
+        tokenNotGiven++;
+      }
       
-      // ফিল্টার প্রয়োগ
-      snapshot.forEach(doc => {
-        const data = doc.data();
+      // ✅ নতুন/পুরাতন রোগীর শেষ কল
+      if (data.called === true) {
+        const type = data.patientType || data.type || 'new';
+        const serial = parseInt(data.serial) || 0;
         
-        // ৪ দিনের ডাটা চেক
-        if (data.timestamp && data.timestamp.toDate) {
-          const appointmentDate = data.timestamp.toDate();
-          if (appointmentDate < fourDaysAgo) {
-            // ৪ দিনের পুরানো ডাটা শুধু নতুন/পুরাতন লাস্ট কলের জন্য চেক করবে
-            // অন্যান্য গণনার জন্য স্কিপ
-          } else {
-            // ৪ দিনের কম পুরানো ডাটা - অন্যান্য কার্ডের জন্য
-            // কারেন্ট ফিল্টার প্রয়োগ
-            const dayMatch = currentFilters.day === 'all' || data.day === currentFilters.day;
-            const typeMatch = currentFilters.type === 'all' || (data.patientType || data.type) === currentFilters.type;
-            const timeMatch = currentFilters.time === 'all' || data.time === currentFilters.time;
-            const callStatusMatch = currentFilters.callStatus === 'all' || 
-              (currentFilters.callStatus === 'called' && data.called === true) ||
-              (currentFilters.callStatus === 'not_called' && data.called !== true);
-            const tokenStatusMatch = currentFilters.tokenStatus === 'all' || 
-              (currentFilters.tokenStatus === 'given' && data.tokenGiven === true) ||
-              (currentFilters.tokenStatus === 'not_given' && data.tokenGiven !== true);
-            const searchMatch = !currentFilters.search || 
-              (data.name && data.name.toLowerCase().includes(currentFilters.search)) ||
-              (data.phone && data.phone.includes(currentFilters.search)) ||
-              (data.serial && data.serial.toString().includes(currentFilters.search));
-            
-            if (dayMatch && typeMatch && timeMatch && callStatusMatch && tokenStatusMatch && searchMatch) {
-              total++;
-              
-              // দিন অনুযায়ী
-              if (data.day === 'Thursday') thursday++;
-              if (data.day === 'Friday') friday++;
-              
-              // কল স্ট্যাটাস
-              if (data.called === true) called++;
-              else notCalled++;
-              
-              // টোকেন স্ট্যাটাস
-              if (data.tokenGiven === true) tokenGiven++;
-              else tokenNotGiven++;
-            }
+        if (type === 'new' && serial > newPatientLastCallSerial) {
+          newPatientLastCallSerial = serial;
+        } else if (type === 'old' && serial > oldPatientLastCallSerial) {
+          oldPatientLastCallSerial = serial;
+        }
+      }
+    }
+  });
+  
+  // কার্ড আপডেট
+  elements.calledCount.textContent = toBengaliNumber(called);
+  elements.notCalledCount.textContent = toBengaliNumber(notCalled);
+  elements.tokenGivenCount.textContent = toBengaliNumber(tokenGiven);
+  elements.tokenNotGivenCount.textContent = toBengaliNumber(tokenNotGiven);
+  elements.thursdayAppointments.textContent = toBengaliNumber(thursday);
+  elements.fridayAppointments.textContent = toBengaliNumber(friday);
+  elements.totalAppointments.textContent = toBengaliNumber(total);
+  
+  // নতুন/পুরাতন রোগী লাস্ট কল কার্ড
+  elements.newPatientLastCall.textContent = toBengaliNumber(newPatientLastCallSerial);
+  elements.oldPatientLastCall.textContent = toBengaliNumber(oldPatientLastCallSerial);
+  
+  // সিরিয়াল স্ট্যাটস আপডেট
+  updateSerialStats();
+}
+
+// =======================================================
+// নতুন হেল্পার ফাংশন যোগ করুন
+// =======================================================
+
+// ✅ বর্তমান সপ্তাহের তারিখ রেঞ্জ বের করা (শনিবার থেকে শুক্রবার)
+function getWeekDateRange() {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+  
+  // সপ্তাহের প্রথম দিন (শনিবার)
+  const saturday = new Date(today);
+  const daysToSaturday = dayOfWeek === 6 ? 0 : (dayOfWeek + 1) % 7;
+  saturday.setDate(today.getDate() - daysToSaturday);
+  saturday.setHours(0, 0, 0, 0);
+  
+  // সপ্তাহের শেষ দিন (শুক্রবার)
+  const friday = new Date(saturday);
+  friday.setDate(saturday.getDate() + 6);
+  friday.setHours(23, 59, 59, 999);
+  
+  return {
+    saturday: saturday,
+    friday: friday,
+    saturdayStr: formatDateToDisplay(saturday),
+    fridayStr: formatDateToDisplay(friday)
+  };
+}
+
+// ✅ তারিখ বর্তমান সপ্তাহে আছে কিনা চেক করা
+function isDateInCurrentWeek(date) {
+  const weekRange = getWeekDateRange();
+  return date >= weekRange.saturday && date <= weekRange.friday;
+}
+
+// ✅ তারিখ ফর্ম্যাট করা (ডিসপ্লে জন্য)
+function formatDateToDisplay(date) {
+  return date.toLocaleDateString('bn-BD', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+// ✅ তারিখ রেঞ্জ মেসেজ আপডেট
+function updateDateRangeMessage(dateRange) {
+  const rangeInfo = document.getElementById('dateRangeInfo');
+  if (!rangeInfo) {
+    // নতুন এলিমেন্ট তৈরি করুন
+    const newRangeInfo = document.createElement('div');
+    newRangeInfo.id = 'dateRangeInfo';
+    newRangeInfo.className = 'stats-info';
+    newRangeInfo.style.marginTop = '10px';
+    newRangeInfo.style.backgroundColor = '#f0f9ff';
+    newRangeInfo.style.color = '#0369a1';
+  }
+  
+  // মেসেজ আপডেট
+  const rangeElement = document.getElementById('dateRangeInfo');
+  if (rangeElement) {
+    rangeElement.textContent = `দেখানো হচ্ছে: ${dateRange.saturdayStr} থেকে ${dateRange.fridayStr} পর্যন্ত অ্যাপয়েন্টমেন্ট`;
+  }
+}
+
+// ✅ নো রেজাল্ট মেসেজ
+function getNoResultsMessage(dateRange) {
+  return `বর্তমান সপ্তাহে (${dateRange.saturdayStr} থেকে ${dateRange.fridayStr}) কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
+}
+
+// =======================================================
+// ৫. সিরিয়াল স্ট্যাটস ক্যালকুলেশন - UPDATED
+// =======================================================
+async function updateSerialStats() {
+  try {
+    // লোড সিরিয়াল রেঞ্জ
+    await loadSerialRanges();
+    
+    // ক্যালকুলেট স্ট্যাটস
+    let totalSerialCount = 0;
+    
+    // ✅ মোট সিরিয়াল স্লট - শুধুমাত্র নির্বাচিত দিনের জন্য (যদি 'all' নয়)
+    const selectedDay = currentFilters.day;
+    
+    if (selectedDay === 'all') {
+      // সব দিনের স্লট গণনা
+      for (const day in serialRanges) {
+        for (const type in serialRanges[day]) {
+          for (const time in serialRanges[day][type]) {
+            const [start, end] = serialRanges[day][type][time];
+            totalSerialCount += (end - start + 1);
           }
         }
+      }
+    } else {
+      // শুধুমাত্র নির্বাচিত দিনের স্লট গণনা
+      if (serialRanges[selectedDay]) {
+        for (const type in serialRanges[selectedDay]) {
+          for (const time in serialRanges[selectedDay][type]) {
+            const [start, end] = serialRanges[selectedDay][type][time];
+            totalSerialCount += (end - start + 1);
+          }
+        }
+      }
+    }
+    
+    // ✅ বর্তমান সপ্তাহের এক্টিভ বুকিং গণনা
+    const weekRange = getWeekDateRange();
+    
+    let activeBookings = 0;
+    let totalBookings = 0;
+    if (allAppointmentsSnapshot) {
+      allAppointmentsSnapshot.forEach(doc => {
+        const data = doc.data();
+        totalBookings++;
         
-        // ✅ নতুন/পুরাতন রোগীর শেষ কল - শুধুমাত্র দিন ফিল্টার দ্বারা প্রভাবিত
-        if (data.called === true) {
-          const type = data.patientType || data.type || 'new';
-          
-          // দিন ফিল্টার চেক
-          const isDayMatch = dayFilter === 'all' || data.day === dayFilter;
-          
-          if (isDayMatch) {
-            if (type === 'new') {
-              newPatientLastCallSerial = Math.max(newPatientLastCallSerial, data.serial || 0);
-            } else {
-              oldPatientLastCallSerial = Math.max(oldPatientLastCallSerial, data.serial || 0);
-            }
+        // তারিখ চেক
+        let appointmentDate = null;
+        if (data.appointmentDate) {
+          appointmentDate = new Date(data.appointmentDate);
+        } else if (data.timestamp && data.timestamp.toDate) {
+          appointmentDate = data.timestamp.toDate();
+        }
+        
+        // বর্তমান সপ্তাহের ডাটা
+        if (appointmentDate && isDateInCurrentWeek(appointmentDate)) {
+          // শুধুমাত্র নির্বাচিত দিনের বুকিং (যদি 'all' নয়)
+          if (selectedDay === 'all' || data.day === selectedDay) {
+            activeBookings++;
           }
         }
       });
-      
-      // কার্ড আপডেট
-      elements.calledCount.textContent = toBengaliNumber(called);
-      elements.notCalledCount.textContent = toBengaliNumber(notCalled);
-      elements.tokenGivenCount.textContent = toBengaliNumber(tokenGiven);
-      elements.tokenNotGivenCount.textContent = toBengaliNumber(tokenNotGiven);
-      elements.thursdayAppointments.textContent = toBengaliNumber(thursday);
-      elements.fridayAppointments.textContent = toBengaliNumber(friday);
-      elements.totalAppointments.textContent = toBengaliNumber(total);
-      
-      // ✅ নতুন/পুরাতন রোগী লাস্ট কল কার্ড - শুধুমাত্র দিন ফিল্টার দ্বারা প্রভাবিত
-      elements.newPatientLastCall.textContent = toBengaliNumber(newPatientLastCallSerial);
-      elements.oldPatientLastCall.textContent = toBengaliNumber(oldPatientLastCallSerial);
-      
-      // সিরিয়াল স্ট্যাটস আপডেট - শুধুমাত্র দিন ফিল্টার দ্বারা
-      updateSerialStats();
     }
-
-    // =======================================================
-    // ৫. সিরিয়াল স্ট্যাটস ক্যালকুলেশন (শুধুমাত্র দিন ফিল্টার দ্বারা প্রভাবিত)
-    // =======================================================
-    async function updateSerialStats() {
-      try {
-        // লোড সিরিয়াল রেঞ্জ
-        await loadSerialRanges();
-        
-        // ক্যালকুলেট স্ট্যাটস
-        let totalSerialCount = 0;
-        
-        // ✅ মোট সিরিয়াল স্লট - শুধুমাত্র নির্বাচিত দিনের জন্য (যদি 'all' নয়)
-        const selectedDay = currentFilters.day;
-        
-        if (selectedDay === 'all') {
-          // সব দিনের স্লট গণনা
-          for (const day in serialRanges) {
-            for (const type in serialRanges[day]) {
-              for (const time in serialRanges[day][type]) {
-                const [start, end] = serialRanges[day][type][time];
-                totalSerialCount += (end - start + 1);
-              }
-            }
-          }
-        } else {
-          // শুধুমাত্র নির্বাচিত দিনের স্লট গণনা
-          if (serialRanges[selectedDay]) {
-            for (const type in serialRanges[selectedDay]) {
-              for (const time in serialRanges[selectedDay][type]) {
-                const [start, end] = serialRanges[selectedDay][type][time];
-                totalSerialCount += (end - start + 1);
-              }
-            }
-          }
+    
+    // পেন্ডিং কাউন্ট - শুধুমাত্র নির্বাচিত দিনের জন্য
+    let pendingCount = 0;
+    for (const key in pendingSelections) {
+      if (pendingSelections[key]) {
+        // দিন ফিল্টার চেক
+        const dayFromKey = key.split('_')[0];
+        if (selectedDay === 'all' || dayFromKey === selectedDay) {
+          pendingCount += pendingSelections[key].user.length;
         }
-        
-        // ✅ ৪ দিনের এক্টিভ বুকিং গণনা (৪ দিনের কম পুরানো)
-        const fourDaysAgo = new Date();
-        fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
-        
-        let activeBookings = 0;
-        let totalBookings = 0;
-        if (allAppointmentsSnapshot) {
-          allAppointmentsSnapshot.forEach(doc => {
-            const data = doc.data();
-            totalBookings++;
-            
-            // ৪ দিনের কম পুরানো ডাটা
-            if (data.timestamp && data.timestamp.toDate) {
-              const appointmentDate = data.timestamp.toDate();
-              if (appointmentDate >= fourDaysAgo) {
-                // শুধুমাত্র নির্বাচিত দিনের বুকিং (যদি 'all' নয়)
-                if (selectedDay === 'all' || data.day === selectedDay) {
-                  activeBookings++;
-                }
-              }
-            }
-          });
-        }
-        
-        // পেন্ডিং কাউন্ট - শুধুমাত্র নির্বাচিত দিনের জন্য
-        let pendingCount = 0;
-        for (const key in pendingSelections) {
-          if (pendingSelections[key]) {
-            // দিন ফিল্টার চেক
-            const dayFromKey = key.split('_')[0];
-            if (selectedDay === 'all' || dayFromKey === selectedDay) {
-              pendingCount += pendingSelections[key].user.length;
-            }
-          }
-        }
-        
-        // এভেইলেবল = মোট স্লট - এক্টিভ বুকিং - পেন্ডিং
-        const availableSerials = Math.max(0, totalSerialCount - activeBookings - pendingCount);
-        
-        // আপডেট কার্ড
-        elements.totalSerials.textContent = toBengaliNumber(totalSerialCount);
-        elements.availableSerials.textContent = toBengaliNumber(availableSerials);
-        elements.pendingSerials.textContent = toBengaliNumber(pendingCount);
-        
-      } catch (error) {
-        console.error('❌ Error updating serial stats:', error);
-        showAlert('সিরিয়াল স্ট্যাটস আপডেট করতে সমস্যা হয়েছে', 'error');
       }
     }
+    
+    // এভেইলেবল = মোট স্লট - এক্টিভ বুকিং - পেন্ডিং
+    const availableSerials = Math.max(0, totalSerialCount - activeBookings - pendingCount);
+    
+    // আপডেট কার্ড
+    elements.totalSerials.textContent = toBengaliNumber(totalSerialCount);
+    elements.availableSerials.textContent = toBengaliNumber(availableSerials);
+    elements.pendingSerials.textContent = toBengaliNumber(pendingCount);
+    
+  } catch (error) {
+    console.error('❌ Error updating serial stats:', error);
+    showAlert('সিরিয়াল স্ট্যাটস আপডেট করতে সমস্যা হয়েছে', 'error');
+  }
+}
 
     // =======================================================
     // ৬. টাইম ফিল্টার অপশন আপডেট
@@ -1982,136 +2063,174 @@ if (!checkAuthentication()) {
       }
     }
 
-    // =======================================================
-    // ৭. অ্যাপয়েন্টমেন্ট রেন্ডার (শুধু ৪ দিনের ডাটা)
-    // =======================================================
-    function renderAppointments() {
-      if (!allAppointmentsSnapshot) return;
-      
-      elements.appointmentsBody.innerHTML = '';
-      elements.loadingMessage.style.display = 'none';
-      elements.appointmentsTable.style.display = 'table';
-      
-      // শুধু শেষ ৪ দিনের ডাটা দেখাবে
-      const fourDaysAgo = new Date();
-      fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
-      
-      let filteredDocs = [];
-      let filteredCount = 0;
-      let displayedCount = 0;
-      
-      // ফিল্টার প্রয়োগ
-      allAppointmentsSnapshot.forEach(doc => {
-        const data = doc.data();
-        let isMatch = true;
-        
-        // ৪ দিনের ফিল্টার
-        if (data.timestamp && data.timestamp.toDate) {
-          const appointmentDate = data.timestamp.toDate();
-          if (appointmentDate < fourDaysAgo) {
-            isMatch = false;
-          }
-        }
-        
-        // ফিল্টার প্রয়োগ
-        if (isMatch && currentFilters.day !== 'all' && data.day !== currentFilters.day) isMatch = false;
-        if (isMatch && currentFilters.type !== 'all') {
-          const type = data.patientType || data.type;
-          if (type !== currentFilters.type) isMatch = false;
-        }
-        if (isMatch && currentFilters.time !== 'all' && data.time !== currentFilters.time) isMatch = false;
-        if (isMatch && currentFilters.callStatus !== 'all') {
-          const isCalled = data.called === true;
-          if ((currentFilters.callStatus === 'called' && !isCalled) ||
-              (currentFilters.callStatus === 'not_called' && isCalled)) {
-            isMatch = false;
-          }
-        }
-        if (isMatch && currentFilters.tokenStatus !== 'all') {
-          const isTokenGiven = data.tokenGiven === true;
-          if ((currentFilters.tokenStatus === 'given' && !isTokenGiven) ||
-              (currentFilters.tokenStatus === 'not_given' && isTokenGiven)) {
-            isMatch = false;
-          }
-        }
-        if (isMatch && currentFilters.search) {
-          const name = (data.name || '').toLowerCase();
-          const phone = String(data.phone || '');
-          const serial = String(data.serial || '');
-          
-          if (!name.includes(currentFilters.search) && 
-              !phone.includes(currentFilters.search) && 
-              !serial.includes(currentFilters.search)) {
-            isMatch = false;
-          }
-        }
-        
-        if (isMatch) {
-          filteredCount++;
-          filteredDocs.push({ id: doc.id, data: data });
-          displayedCount++;
-        }
-      });
-      
-      // স্ট্যাটাস বার্তা আপডেট
-      elements.filteredCount.textContent = toBengaliNumber(filteredCount);
-      elements.displayedCount.textContent = toBengaliNumber(displayedCount);
-      
-      if (filteredDocs.length === 0) {
-        elements.appointmentsBody.innerHTML = `
-          <tr>
-            <td colspan="11" style="text-align: center; padding: 40px; color: var(--gray);">
-              ফিল্টার অনুযায়ী কোনো অ্যাপয়েন্টমেন্ট খুঁজে পাওয়া যায়নি
-            </td>
-          </tr>
-        `;
-        return;
+// =======================================================
+// ৭. অ্যাপয়েন্টমেন্ট রেন্ডার - UPDATED FOR SATURDAY TO FRIDAY
+// =======================================================
+function renderAppointments() {
+  if (!allAppointmentsSnapshot) return;
+  
+  elements.appointmentsBody.innerHTML = '';
+  elements.loadingMessage.style.display = 'none';
+  elements.appointmentsTable.style.display = 'table';
+  
+  // ✅ নতুন: শনিবার থেকে শুক্রবার পর্যন্ত সপ্তাহের জন্য তারিখ রেঞ্জ বের করা
+  const dateRange = getWeekDateRange();
+  
+  let filteredDocs = [];
+  let filteredCount = 0;
+  let displayedCount = 0;
+  
+  // ফিল্টার প্রয়োগ
+  allAppointmentsSnapshot.forEach(doc => {
+    const data = doc.data();
+    let isMatch = true;
+    
+    // ✅ ১. তারিখ ফিল্টার: শনিবার থেকে শুক্রবার পর্যন্ত
+    let appointmentDate = null;
+    
+    if (data.appointmentDate) {
+      // নতুন সিস্টেম: সরাসরি appointmentDate থেকে
+      appointmentDate = new Date(data.appointmentDate);
+    } else if (data.timestamp && data.timestamp.toDate) {
+      // পুরাতন সিস্টেম: timestamp থেকে
+      appointmentDate = data.timestamp.toDate();
+    }
+    
+    if (appointmentDate) {
+      // ✅ তারিখটা বর্তমান সপ্তাহে (শনিবার থেকে শুক্রবার) কিনা চেক
+      if (!isDateInCurrentWeek(appointmentDate)) {
+        isMatch = false;
       }
+    }
+    
+    // ✅ ২. দিন ফিল্টার (যদি 'all' না হয়)
+    if (isMatch && currentFilters.day !== 'all' && data.day !== currentFilters.day) {
+      isMatch = false;
+    }
+    
+    // ✅ ৩. টাইপ ফিল্টার
+    if (isMatch && currentFilters.type !== 'all') {
+      const type = data.patientType || data.type;
+      if (type !== currentFilters.type) isMatch = false;
+    }
+    
+    // ✅ ৪. সময় ফিল্টার
+    if (isMatch && currentFilters.time !== 'all' && data.time !== currentFilters.time) {
+      isMatch = false;
+    }
+    
+    // ✅ ৫. কল স্ট্যাটাস ফিল্টার
+    if (isMatch && currentFilters.callStatus !== 'all') {
+      const isCalled = data.called === true;
+      if ((currentFilters.callStatus === 'called' && !isCalled) ||
+          (currentFilters.callStatus === 'not_called' && isCalled)) {
+        isMatch = false;
+      }
+    }
+    
+    // ✅ ৬. টোকেন স্ট্যাটাস ফিল্টার
+    if (isMatch && currentFilters.tokenStatus !== 'all') {
+      const isTokenGiven = data.tokenGiven === true;
+      if ((currentFilters.tokenStatus === 'given' && !isTokenGiven) ||
+          (currentFilters.tokenStatus === 'not_given' && isTokenGiven)) {
+        isMatch = false;
+      }
+    }
+    
+    // ✅ ৭. সার্চ ফিল্টার
+    if (isMatch && currentFilters.search) {
+      const name = (data.name || '').toLowerCase();
+      const phone = String(data.phone || '');
+      const serial = String(data.serial || '');
       
-      // সিরিয়াল অনুসারে সাজানো
-      filteredDocs.sort((a, b) => (a.data.serial || 0) - (b.data.serial || 0));
-      
-      // টেবিল রো রেন্ডার
-      filteredDocs.forEach(item => {
-        const { id, data } = item;
-        const row = elements.appointmentsBody.insertRow();
-        
-        // স্ট্যাটাস
-        const isCalled = data.called === true;
-        const callStatusClass = isCalled ? 'status-called' : 'status-not-called';
-        const callStatusText = isCalled ? 'কল করা হয়েছে' : 'কল করা হয়নি';
-        const callButtonClass = isCalled ? 'btn-call-undo' : 'btn-call';
-        const callButtonText = isCalled ? 'কল বাতিল' : data.name || 'কল করুন';
-        
-        const isTokenGiven = data.tokenGiven === true;
-        const tokenStatusClass = isTokenGiven ? 'status-token-given' : 'status-token-not-given';
-        const tokenStatusText = isTokenGiven ? 'টোকেন দেওয়া' : 'টোকেন বাকি';
-        const tokenButtonClass = isTokenGiven ? 'btn-token-undo' : 'btn-token';
-        const tokenButtonText = isTokenGiven ? 'টোকেন বাতিল' : data.name || 'টোকেন দিন';
-        
-        const ageDisplay = getAgeDisplay(data);
-        const typeText = (data.patientType || data.type) === 'old' ? 'পুরাতন' : 'নতুন';
-        
-        row.innerHTML = `
-          <td>${toBengaliNumber(data.serial || '—')}</td>
-          <td><span class="status-badge ${callStatusClass}">${callStatusText}</span></td>
-          <td><span class="status-badge ${tokenStatusClass}">${tokenStatusText}</span></td>
-          <td>${data.name || '—'}</td>
-          <td>${ageDisplay}</td>
-          <td style="text-align: center;">${data.phone ? toBengaliNumber(data.phone) : '—'}</td>
-          <td>${data.day || '—'}, ${data.time || '—'}</td>
-          <td>${typeText}</td>
-          <td>${formatTimestamp(data.timestamp)}</td>
-          <td><button class="action-btn ${callButtonClass}" data-id="${id}" data-field="called" data-status="${isCalled}">${callButtonText}</button></td>
-          <td><button class="action-btn ${tokenButtonClass}" data-id="${id}" data-field="tokenGiven" data-status="${isTokenGiven}">${tokenButtonText}</button></td>
-        `;
-        
-        // ইভেন্ট লিসেনার
-        row.querySelectorAll('.action-btn').forEach(btn => {
-          btn.addEventListener('click', () => updateStatus(btn));
-        });
+      if (!name.includes(currentFilters.search) && 
+          !phone.includes(currentFilters.search) && 
+          !serial.includes(currentFilters.search)) {
+        isMatch = false;
+      }
+    }
+    
+    if (isMatch) {
+      filteredCount++;
+      filteredDocs.push({ id: doc.id, data: data });
+      displayedCount++;
+    }
+  });
+  
+  // স্ট্যাটাস বার্তা আপডেট
+  elements.filteredCount.textContent = toBengaliNumber(filteredCount);
+  elements.displayedCount.textContent = toBengaliNumber(displayedCount);
+  
+  // ✅ তারিখ রেঞ্জ মেসেজ দেখানো
+  updateDateRangeMessage(dateRange);
+  
+  if (filteredDocs.length === 0) {
+    elements.appointmentsBody.innerHTML = `
+      <tr>
+        <td colspan="11" style="text-align: center; padding: 40px; color: var(--gray);">
+          ${getNoResultsMessage(dateRange)}
+        </td>
+      </tr>
+    `;
+    return;
+  }
+  
+  // সিরিয়াল অনুসারে সাজানো
+  filteredDocs.sort((a, b) => (a.data.serial || 0) - (b.data.serial || 0));
+  
+  // টেবিল রো রেন্ডার
+  filteredDocs.forEach(item => {
+    const { id, data } = item;
+    const row = elements.appointmentsBody.insertRow();
+    
+    // স্ট্যাটাস
+    const isCalled = data.called === true;
+    const callStatusClass = isCalled ? 'status-called' : 'status-not-called';
+    const callStatusText = isCalled ? 'কল করা হয়েছে' : 'কল করা হয়নি';
+    const callButtonClass = isCalled ? 'btn-call-undo' : 'btn-call';
+    const callButtonText = isCalled ? 'কল বাতিল' : data.name || 'কল করুন';
+    
+    const isTokenGiven = data.tokenGiven === true;
+    const tokenStatusClass = isTokenGiven ? 'status-token-given' : 'status-token-not-given';
+    const tokenStatusText = isTokenGiven ? 'টোকেন দেওয়া' : 'টোকেন বাকি';
+    const tokenButtonClass = isTokenGiven ? 'btn-token-undo' : 'btn-token';
+    const tokenButtonText = isTokenGiven ? 'টোকেন বাতিল' : data.name || 'টোকেন দিন';
+    
+    const ageDisplay = getAgeDisplay(data);
+    const typeText = (data.patientType || data.type) === 'old' ? 'পুরাতন' : 'নতুন';
+    
+    // তারিখ ফর্ম্যাট
+    let dateDisplay = data.appointmentDateDisplay || '—';
+    if (!dateDisplay && data.timestamp && data.timestamp.toDate) {
+      const date = data.timestamp.toDate();
+      dateDisplay = date.toLocaleDateString('bn-BD', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
       });
     }
+    
+    row.innerHTML = `
+      <td>${toBengaliNumber(data.serial || 'N/A')}</td>
+      <td><span class="status-badge ${callStatusClass}">${callStatusText}</span></td>
+      <td><span class="status-badge ${tokenStatusClass}">${tokenStatusText}</span></td>
+      <td>${data.name || 'N/A'}</td>
+      <td>${ageDisplay}</td>
+      <td style="text-align: center;">${data.phone ? toBengaliNumber(data.phone) : 'N/A'}</td>
+      <td>${dateDisplay || 'N/A'}, ${data.time || 'N/A'}</td>
+      <td>${typeText}</td>
+      <td>${formatTimestamp(data.timestamp)}</td>
+      <td><button class="action-btn ${callButtonClass}" data-id="${id}" data-field="called" data-status="${isCalled}">${callButtonText}</button></td>
+      <td><button class="action-btn ${tokenButtonClass}" data-id="${id}" data-field="tokenGiven" data-status="${isTokenGiven}">${tokenButtonText}</button></td>
+    `;
+    
+    // ইভেন্ট লিসেনার
+    row.querySelectorAll('.action-btn').forEach(btn => {
+      btn.addEventListener('click', () => updateStatus(btn));
+    });
+  });
+}
 
    // =======================================================
 // ৮. স্ট্যাটাস আপডেট - FINAL SIMPLE VERSION
@@ -2567,133 +2686,195 @@ async function updateStatus(button) {
         }, 100);
       }
     }
-    
-    async function addQuickSerial() {
-      if (!db) {
-        showAlert('Firebase সংযোগ নেই', 'error');
-        return;
-      }
-      
-      const name = elements.quickName.value.trim();
-      const day = elements.quickDay.value;
-      const time = elements.quickTime.value;
-      const type = elements.selectedPatientType.value;
-      const serial = parseInt(elements.serialInput.value);
-      const years = parseInt(elements.quickAgeYears.value) || 0;
-      const months = parseInt(elements.quickAgeMonths.value) || 0;
-      const days = parseInt(elements.quickAgeDays.value) || 0;
-      const phone = elements.quickPhone.value.trim();
-      
-      // ভ্যালিডেশন
-      if (!name) {
-        showAlert('রোগীর নাম প্রয়োজন', 'error');
-        return;
-      }
-      
-      if (!day || !time) {
-        showAlert('দিন এবং সময় নির্বাচন করুন', 'error');
-        return;
-      }
-      
-      if (!serial) {
-        showAlert('সিরিয়াল নির্বাচন করুন', 'error');
-        return;
-      }
-      
-      if (years === 0 && months === 0 && days === 0) {
-        showAlert('বয়স দিন', 'error');
-        return;
-      }
-      
-      // চেক ১: এক্টিভ বুকিং (৪ দিনের কম পুরানো) আছে কিনা
-      const fourDaysAgo = new Date();
-      fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
-      
-      const activeAppointment = appointments.find(app => {
-        const patientType = app.patientType || app.type;
-        if (app.day === day && 
-            app.time === time && 
-            patientType === type &&
-            app.serial === serial) {
-          
-          if (app.timestamp && app.timestamp.toDate) {
-            const appointmentDate = app.timestamp.toDate();
-            return appointmentDate >= fourDaysAgo;
-          }
-          return true;
-        }
-        return false;
-      });
-      
-      if (activeAppointment) {
-        showAlert(`সিরিয়াল #${serial} ইতিমধ্যে বুক করা হয়েছে!`, 'error');
-        return;
-      }
-      
-      try {
-        // বয়স স্ট্রিং তৈরি
-        let ageString = '';
-        if (years > 0) ageString += `${years} বছর`;
-        if (months > 0) {
-          if (ageString) ageString += ', ';
-          ageString += `${months} মাস`;
-        }
-        if (days > 0) {
-          if (ageString) ageString += ', ';
-          ageString += `${days} দিন`;
-        }
-        
-        // অ্যাপয়েন্টমেন্ট ডেটা
-        const appointmentData = {
-          name: name,
-          age: ageString,
-          ageYears: years,
-          ageMonths: months,
-          ageDays: days,
-          phone: phone || null,
-          day: day,
-          time: time,
-          patientType: type,
-          type: type,
-          serial: serial,
-          called: false,
-          tokenGiven: false,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        
-        // লোডিং স্টেট
-        const submitBtn = document.getElementById('submitQuickBtn');
-        const originalText = submitBtn.innerHTML;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> যুক্ত করা হচ্ছে...';
-        submitBtn.disabled = true;
 
-        await db.collection('appointments').add(appointmentData);
-        
-        // সফল মেসেজ (demo.html এর মত)
-        showAlert(`সিরিয়াল #${serial} সফলভাবে যুক্ত হয়েছে!`, 'success');
-        
-        // ফর্ম রিসেট
-        resetQuickSerialForm();
-        elements.quickSerialModal.style.display = 'none';
-        
-        // Grid System ক্লিনআপ
-        if (gridSystem) {
-          gridSystem.cleanup();
-          gridSystem = null;
+    // =======================================================
+// তারিখ গণনা ফাংশন যোগ করুন (search.html থেকে)
+// =======================================================
+function getNextDateByDay(targetDay) {
+  const daysMap = {
+    "Sunday": 0,
+    "Monday": 1,
+    "Tuesday": 2,
+    "Wednesday": 3,
+    "Thursday": 4,
+    "Friday": 5,
+    "Saturday": 6
+  };
+  
+  const targetDayIndex = daysMap[targetDay];
+  const today = new Date();
+  
+  const todayIndex = today.getDay();
+  let daysToAdd = targetDayIndex - todayIndex;
+  
+  if (daysToAdd < 0) {
+    daysToAdd += 7;
+  }
+  
+  const nextDate = new Date(today);
+  nextDate.setDate(today.getDate() + daysToAdd);
+  
+  const year = nextDate.getFullYear();
+  const month = String(nextDate.getMonth() + 1).padStart(2, '0');
+  const day = String(nextDate.getDate()).padStart(2, '0');
+  
+  return {
+    date: nextDate,
+    dateString: `${year}-${month}-${day}`,
+    displayDate: nextDate.toLocaleDateString('bn-BD', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })
+  };
+}
+    
+async function addQuickSerial() {
+  if (!db) {
+    showAlert('Firebase সংযোগ নেই', 'error');
+    return;
+  }
+  
+  const name = elements.quickName.value.trim();
+  const day = elements.quickDay.value;
+  const time = elements.quickTime.value;
+  const type = elements.selectedPatientType.value;
+  const serial = parseInt(elements.serialInput.value);
+  const years = parseInt(elements.quickAgeYears.value) || 0;
+  const months = parseInt(elements.quickAgeMonths.value) || 0;
+  const days = parseInt(elements.quickAgeDays.value) || 0;
+  const phone = elements.quickPhone.value.trim();
+  
+  // ভ্যালিডেশন
+  if (!name) {
+    showAlert('রোগীর নাম প্রয়োজন', 'error');
+    return;
+  }
+  
+  if (!day || !time) {
+    showAlert('দিন এবং সময় নির্বাচন করুন', 'error');
+    return;
+  }
+  
+  if (!serial) {
+    showAlert('সিরিয়াল নির্বাচন করুন', 'error');
+    return;
+  }
+  
+  if (years === 0 && months === 0 && days === 0) {
+    showAlert('বয়স দিন', 'error');
+    return;
+  }
+  
+  // ✅ আসল অ্যাপয়েন্টমেন্ট তারিখ বের করুন
+  const appointmentDateInfo = getNextDateByDay(day);
+  
+  // চেক ১: একই দিন, সময়, টাইপ, সিরিয়াল এবং তারিখের জন্য বুকিং আছে কিনা
+  const appointmentDateStr = appointmentDateInfo.dateString; // "2024-01-22"
+  
+  const activeAppointment = appointments.find(app => {
+    const patientType = app.patientType || app.type;
+    
+    // দিন, সময়, টাইপ, সিরিয়াল মিলছে কিনা
+    if (app.day === day && 
+        app.time === time && 
+        patientType === type &&
+        app.serial === serial) {
+      
+      // ✅ এখন তারিখও চেক করুন
+      if (app.appointmentDate) {
+        // যদি আগে থেকে appointmentDate থাকে
+        return app.appointmentDate === appointmentDateStr;
+      } else {
+        // পুরাতন রেকর্ডের জন্য (appointmentDate নেই)
+        // টাইমস্ট্যাম্প থেকে তারিখ বের করুন
+        if (app.timestamp && app.timestamp.toDate) {
+          const appDate = app.timestamp.toDate();
+          const appDateStr = `${appDate.getFullYear()}-${String(appDate.getMonth() + 1).padStart(2, '0')}-${String(appDate.getDate()).padStart(2, '0')}`;
+          return appDateStr === appointmentDateStr;
         }
-        
-      } catch (error) {
-        console.error('❌ Error adding serial:', error);
-        showAlert('সিরিয়াল যুক্ত করতে সমস্যা হয়েছে', 'error');
-      } finally {
-        // বাটন রিসেট
-        const submitBtn = document.getElementById('submitQuickBtn');
-        if (submitBtn) {
-          submitBtn.innerHTML = 'সিরিয়াল যুক্ত করুন';
-          submitBtn.disabled = false;
-        }
+        return true; // সাবধানতার জন্য true রিটার্ন
       }
     }
+    return false;
+  });
+  
+  if (activeAppointment) {
+    showAlert(`সিরিয়াল #${serial} ইতিমধ্যে ${appointmentDateInfo.displayDate} তারিখের জন্য বুক করা হয়েছে!`, 'error');
+    return;
+  }
+  
+  try {
+    // বয়স স্ট্রিং তৈরি
+    let ageString = '';
+    if (years > 0) ageString += `${years} বছর`;
+    if (months > 0) {
+      if (ageString) ageString += ', ';
+      ageString += `${months} মাস`;
+    }
+    if (days > 0) {
+      if (ageString) ageString += ', ';
+      ageString += `${days} দিন`;
+    }
+    
+    // ✅ **সম্পূর্ণ আপডেটেড ডাটা**
+    const appointmentData = {
+      name: name,
+      age: ageString,
+      ageYears: years,
+      ageMonths: months,
+      ageDays: days,
+      phone: phone || null,
+      day: day,
+      time: time,
+      patientType: type,
+      type: type,
+      serial: serial,
+      called: false,
+      tokenGiven: false,
+      status: 'confirmed',
+      
+      // ✅ নতুন ফিল্ড যোগ করুন
+      appointmentDate: appointmentDateInfo.dateString, // "2024-01-22"
+      appointmentDateDisplay: appointmentDateInfo.displayDate, // "বৃহস্পতিবার, ২২ জানুয়ারী ২০২৪"
+      
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    // লোডিং স্টেট
+    const submitBtn = document.getElementById('submitQuickBtn');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> যুক্ত করা হচ্ছে...';
+    submitBtn.disabled = true;
+
+    await db.collection('appointments').add(appointmentData);
+    
+    // সফল মেসেজ
+    showAlert(`সিরিয়াল #${serial} ${appointmentDateInfo.displayDate} তারিখের জন্য সফলভাবে যুক্ত হয়েছে!`, 'success');
+    
+    // ফর্ম রিসেট
+    resetQuickSerialForm();
+    elements.quickSerialModal.style.display = 'none';
+    
+    // Grid System ক্লিনআপ
+    if (gridSystem) {
+      gridSystem.cleanup();
+      gridSystem = null;
+    }
+    
+  } catch (error) {
+    console.error('❌ Error adding serial:', error);
+    showAlert('সিরিয়াল যুক্ত করতে সমস্যা হয়েছে', 'error');
+  } finally {
+    // বাটন রিসেট
+    const submitBtn = document.getElementById('submitQuickBtn');
+    if (submitBtn) {
+      submitBtn.innerHTML = 'সিরিয়াল যুক্ত করুন';
+      submitBtn.disabled = false;
+    }
+  }
+}
   
     function resetQuickSerialForm() {
       elements.quickSerialForm.reset();

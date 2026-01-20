@@ -444,6 +444,10 @@
       text-align: center;
       max-width: 500px;
       width: 90%;
+      max-height: 85vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
       animation: popupIn 0.3s ease-out;
     }
@@ -541,7 +545,7 @@
       }
       
       .appointment-header {
-        flex-direction: column;
+        flex-direction: row;
         gap: 10px;
         align-items: flex-start;
       }
@@ -690,7 +694,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 
-  <script>
+<script>
     // ==================== FIREBASE CONFIGURATION ====================
     const firebaseConfig = {
       apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
@@ -704,6 +708,152 @@
     // Global db variable
     let db;
     let currentAppointmentData = null;
+
+    // ==================== তারিখ গণনা ফাংশন ====================
+    function getNextDateByDay(targetDay) {
+      const daysMap = {
+        "Sunday": 0,
+        "Monday": 1,
+        "Tuesday": 2,
+        "Wednesday": 3,
+        "Thursday": 4,
+        "Friday": 5,
+        "Saturday": 6
+      };
+      
+      const targetDayIndex = daysMap[targetDay];
+      const today = new Date();
+      
+      const todayIndex = today.getDay();
+      let daysToAdd = targetDayIndex - todayIndex;
+      
+      if (daysToAdd < 0) {
+        daysToAdd += 7;
+      }
+      
+      const nextDate = new Date(today);
+      nextDate.setDate(today.getDate() + daysToAdd);
+      
+      const year = nextDate.getFullYear();
+      const month = String(nextDate.getMonth() + 1).padStart(2, '0');
+      const day = String(nextDate.getDate()).padStart(2, '0');
+      
+      const banglaMonths = [
+        'জানুয়ারী', 'ফেব্রুয়ারী', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+        'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+      ];
+      
+      const banglaDays = [
+        'রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 
+        'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'
+      ];
+      
+      const banglaDate = `${banglaDays[nextDate.getDay()]}, ${nextDate.getDate()} ${banglaMonths[nextDate.getMonth()]} ${year}`;
+      
+      return {
+        date: nextDate,
+        dateString: `${year}-${month}-${day}`,
+        displayDate: nextDate.toLocaleDateString('bn-BD', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        banglaDate: banglaDate,
+        isToday: daysToAdd === 0
+      };
+    }
+
+    // ==================== অ্যাপয়েন্টমেন্ট তারিখ ফাংশন ====================
+    function getDateForAppointment(appointmentDay, appointmentTimestamp) {
+      // প্রথমে এক্সপায়ার্ড চেক
+      const isExpired = checkIfAppointmentExpired(appointmentDay, appointmentTimestamp);
+      
+      // যদি এক্সপায়ার্ড হয়, আসল তারিখ বের করুন
+      if (isExpired && appointmentTimestamp) {
+        try {
+          const bookingDate = appointmentTimestamp.toDate();
+          const daysMap = {
+            "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3,
+            "Thursday": 4, "Friday": 5, "Saturday": 6
+          };
+          
+          const targetDayIndex = daysMap[appointmentDay];
+          let appointmentDate = new Date(bookingDate);
+          const bookingDayIndex = appointmentDate.getDay();
+          
+          let daysToAdd = targetDayIndex - bookingDayIndex;
+          
+          // যদি আগামী সপ্তাহে হয়
+          if (daysToAdd < 0) {
+            daysToAdd += 7;
+          }
+          
+          appointmentDate.setDate(bookingDate.getDate() + daysToAdd);
+          
+          const year = appointmentDate.getFullYear();
+          const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
+          const day = String(appointmentDate.getDate()).padStart(2, '0');
+          
+          const banglaMonths = [
+            'জানুয়ারী', 'ফেব্রুয়ারী', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+            'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+          ];
+          
+          const banglaDays = [
+            'রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 
+            'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'
+          ];
+          
+          const banglaDate = `${banglaDays[appointmentDate.getDay()]}, ${appointmentDate.getDate()} ${banglaMonths[appointmentDate.getMonth()]} ${year}`;
+          
+          return {
+            date: appointmentDate,
+            dateString: `${year}-${month}-${day}`,
+            displayDate: appointmentDate.toLocaleDateString('bn-BD', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            }),
+            banglaDate: banglaDate,
+            isExpired: true
+          };
+        } catch (error) {
+          console.error('Error calculating expired date:', error);
+          // Fallback to getNextDateByDay if error
+          return getNextDateByDay(appointmentDay);
+        }
+      } else {
+        // যদি কনফার্মড থাকে, ভবিষ্যতের তারিখ দেখান
+        return getNextDateByDay(appointmentDay);
+      }
+    }
+
+    // ==================== বয়স ফর্ম্যাট ফাংশন ====================
+    function getAgeDisplay(appointmentData) {
+      if (appointmentData.ageDisplay) {
+        return appointmentData.ageDisplay;
+      } else if (appointmentData.ageString) {
+        return appointmentData.ageString;
+      } else if (appointmentData.ageYears || appointmentData.ageMonths || appointmentData.ageDays) {
+        const parts = [];
+        if (appointmentData.ageYears > 0) parts.push(`${appointmentData.ageYears} বছর`);
+        if (appointmentData.ageMonths > 0) parts.push(`${appointmentData.ageMonths} মাস`);
+        if (appointmentData.ageDays > 0) parts.push(`${appointmentData.ageDays} দিন`);
+        return parts.join(' ') || '০ বছর ০ মাস ০ দিন';
+      } else if (appointmentData.age) {
+        const years = Math.floor(appointmentData.age / 12);
+        const months = Math.round(appointmentData.age % 12);
+        if (years > 0) {
+          return `${years} বছর${months > 0 ? ` ${months} মাস` : ''}`;
+        } else {
+          return `${months} মাস`;
+        }
+      } else {
+        return 'বয়স তথ্য নেই';
+      }
+    }
 
     // Firebase initialization
     function initializeFirebase() {
@@ -845,30 +995,18 @@
 
     // ==================== CONFIRMATION SLIP SYSTEM ====================
     function showConfirmationSlip(appointmentData) {
+      // এক্সপায়ার্ড চেক (টাইমস্ট্যাম্প সহ)
+      const isExpired = checkIfAppointmentExpired(appointmentData.day, appointmentData.timestamp);
+      
       // Update slip content
       slipName.textContent = appointmentData.name;
-      
-      // ✅ নতুন বয়স সিস্টেম - প্রথমে ডিসপ্লে ফিল্ড চেক করুন
-      if (appointmentData.ageDisplay) {
-        slipAge.textContent = appointmentData.ageDisplay;
-      } else if (appointmentData.ageString) {
-        // পুরাতন ডাটাবেজ রেকর্ডের জন্য
-        slipAge.textContent = appointmentData.ageString;
-      } else if (appointmentData.ageYears || appointmentData.ageMonths || appointmentData.ageDays) {
-        // যদি নতুন ফিল্ড থাকে
-        const parts = [];
-        if (appointmentData.ageYears > 0) parts.push(`${appointmentData.ageYears} বছর`);
-        if (appointmentData.ageMonths > 0) parts.push(`${appointmentData.ageMonths} মাস`);
-        if (appointmentData.ageDays > 0) parts.push(`${appointmentData.ageDays} দিন`);
-        slipAge.textContent = parts.join(' ') || '০ বছর ০ মাস ০ দিন';
-      } else {
-        // পুরাতন সিস্টেমের জন্য (fallback)
-        slipAge.textContent = appointmentData.age ? `${appointmentData.age} বছর` : '-';
-      }
-      
+      slipAge.textContent = getAgeDisplay(appointmentData);
       slipPhoneEl.textContent = appointmentData.phone;
       slipType.textContent = appointmentData.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
-      slipDay.textContent = appointmentData.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
+      
+      // ✅ তারিখ যোগ করুন - getDateForAppointment ব্যবহার করুন
+      const dateInfo = getDateForAppointment(appointmentData.day, appointmentData.timestamp);
+      slipDay.textContent = dateInfo.banglaDate;
       slipTime.textContent = appointmentData.time + "\n" + "অনুগ্রহ করে নির্ধারিত/সম্ভাব্য সময়ে চেম্বারে উপস্থিত থাকবেন";
       slipSerial.textContent = '#' + appointmentData.serial;
       
@@ -887,9 +1025,18 @@
       
       slipDateTime.textContent = dateTimeString;
       
-      // Show slip and download buttons
-      confirmationSlip.style.display = 'block';
-      downloadButtons.style.display = 'flex';
+      // Show slip and download buttons (শুধু কনফার্মড হলে)
+      if (!isExpired) {
+        confirmationSlip.style.display = 'block';
+        downloadButtons.style.display = 'flex';
+      } else {
+        // এক্সপায়ার্ড হলে শুধু তথ্য দেখান, ডাউনলোড বাটন নয়
+        confirmationSlip.style.display = 'block';
+        downloadButtons.style.display = 'none';
+        popupButtons.innerHTML = `
+          <button class="popup-btn cancel" onclick="resetEverything()">বন্ধ করুন</button>
+        `;
+      }
     }
 
     // ==================== DOWNLOAD FUNCTIONS ====================
@@ -1035,7 +1182,6 @@
     }
 
     // ==================== SEARCH FUNCTIONS ====================
-
     async function searchAppointments() {
       const phone = searchPhone.value.trim();
       
@@ -1066,10 +1212,12 @@
         searchBtn.classList.add('loading');
         searchBtn.textContent = '🔍 খুঁজছি...';
         
-        console.log(`🔍 Searching appointments for phone: ${phone}`);
+        console.log(`🔍 Searching CONFIRMED appointments for phone: ${phone}`);
         
+        // শুধুমাত্র কনফার্মড অ্যাপয়েন্টমেন্ট খোঁজা (পেন্ডিং নয়)
         const snapshot = await db.collection('appointments')
           .where('phone', '==', phone)
+          .where('status', '==', 'confirmed')
           .get();
         
         const appointments = [];
@@ -1095,6 +1243,103 @@
       }
     }
 
+    // ==================== এক্সপায়ার্ড চেক ফাংশন (টাইমস্ট্যাম্প সহ) ====================
+    function checkIfAppointmentExpired(appointmentDay, appointmentTimestamp) {
+      const now = new Date();
+      const today = now.getDay(); // 0=রবি, 1=সোম, 2=মঙ্গল, 3=বুধ, 4=বৃহস্পতি, 5=শুক্র, 6=শনি
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      
+      // ডে ম্যাপিং
+      const dayMap = {
+        "Thursday": 4,
+        "Friday": 5
+      };
+      
+      const appDayIndex = dayMap[appointmentDay];
+      
+      // যদি বৃহস্পতিবার বা শুক্রবার না হয়
+      if (appDayIndex === undefined) {
+        return false;
+      }
+      
+      // ✅ যদি টাইমস্ট্যাম্প থাকে, সেটা ব্যবহার করুন
+      if (appointmentTimestamp) {
+        try {
+          const appointmentDate = appointmentTimestamp.toDate ? appointmentTimestamp.toDate() : new Date(appointmentTimestamp);
+          
+          // অ্যাপয়েন্টমেন্টের আসল তারিখ বের করুন (বুকিং তারিখ থেকে)
+          const daysMap = {
+            "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3,
+            "Thursday": 4, "Friday": 5, "Saturday": 6
+          };
+          
+          const targetDayIndex = daysMap[appointmentDay];
+          const bookingDayIndex = appointmentDate.getDay();
+          
+          // বুকিং তারিখ থেকে অ্যাপয়েন্টমেন্ট দিন কতদিন পর
+          let daysToAdd = targetDayIndex - bookingDayIndex;
+          if (daysToAdd < 0) {
+            daysToAdd += 7; // পরের সপ্তাহে
+          }
+          
+          // অ্যাপয়েন্টমেন্টের আসল তারিখ
+          const actualAppointmentDate = new Date(appointmentDate);
+          actualAppointmentDate.setDate(appointmentDate.getDate() + daysToAdd);
+          
+          // আজকের তারিখ (শুধু তারিখ, সময় বাদ)
+          const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          
+          // অ্যাপয়েন্টমেন্ট তারিখ (শুধু তারিখ, সময় বাদ)
+          const appointmentDateOnly = new Date(
+            actualAppointmentDate.getFullYear(), 
+            actualAppointmentDate.getMonth(), 
+            actualAppointmentDate.getDate()
+          );
+          
+          // ✅ তারিখের ভিত্তিতে চেক:
+          // 1. অ্যাপয়েন্টমেন্ট তারিখ < আজকের তারিখ → এক্সপায়ার্ড
+          if (appointmentDateOnly < todayDateOnly) {
+            return true;
+          }
+          // 2. অ্যাপয়েন্টমেন্ট তারিখ === আজকের তারিখ → রাত ১১:৫৯ পর্যন্ত কনফার্মড
+          else if (appointmentDateOnly.getTime() === todayDateOnly.getTime()) {
+            if (currentHour < 23 || (currentHour === 23 && currentMinute < 59)) {
+              return false; // এখনও কনফার্মড
+            } else {
+              return true; // এক্সপায়ার্ড
+            }
+          }
+          // 3. অ্যাপয়েন্টমেন্ট তারিখ > আজকের তারিখ → কনফার্মড
+          else {
+            return false;
+          }
+          
+        } catch (error) {
+          console.error('Error calculating expired status with timestamp:', error);
+          // Error হলে পুরাতন লজিক ব্যবহার করুন
+        }
+      }
+      
+      // ✅ যদি টাইমস্ট্যাম্প না থাকে, পুরাতন লজিক ব্যবহার করুন
+      // আজকের দিনের সাথে অ্যাপয়েন্টমেন্ট দিনের তুলনা
+      if (today === appDayIndex) {
+        // আজকের দিনই অ্যাপয়েন্টমেন্টের দিন
+        // রাত ১১:৫৯ পর্যন্ত কনফার্মড থাকবে
+        if (currentHour < 23 || (currentHour === 23 && currentMinute < 59)) {
+          return false; // এখনও কনফার্মড
+        } else {
+          return true; // এক্সপায়ার্ড
+        }
+      } else if (today > appDayIndex) {
+        // অ্যাপয়েন্টমেন্টের দিন পার হয়ে গেছে
+        return true; // এক্সপায়ার্ড
+      } else {
+        // অ্যাপয়েন্টমেন্টের দিন এখনও আসেনি
+        return false; // কনফার্মড
+      }
+    }
+
     function displaySearchResults(appointments) {
       resultsContainer.innerHTML = '';
       
@@ -1102,9 +1347,9 @@
         resultsContainer.innerHTML = `
           <div class="no-results">
             <div>🔍</div>
-            <h3>কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি</h3>
-            <p>এই ফোন নম্বর দিয়ে কোনো অ্যাপয়েন্টমেন্ট রেকর্ড নেই</p>
-            <p>অনুগ্রহ করে সঠিক ফোন নম্বর দিন অথবা নতুন অ্যাপয়েন্টমেন্ট করুন</p>
+            <h3>কোনো সক্রিয় অ্যাপয়েন্টমেন্ট পাওয়া যায়নি</h3>
+            <p>এই ফোন নম্বর দিয়ে কোনো কনফার্মড অ্যাপয়েন্টমেন্ট নেই</p>
+            <p>অথবা পূর্বের অ্যাপয়েন্টমেন্টগুলি এক্সপায়ার্ড হয়ে গেছে</p>
           </div>
         `;
         resultsSection.style.display = 'block';
@@ -1113,6 +1358,13 @@
       
       // Sort appointments by day and serial
       appointments.sort((a, b) => {
+        // প্রথমে এক্সপায়ার্ড চেক (টাইমস্ট্যাম্প সহ)
+        const aExpired = checkIfAppointmentExpired(a.day, a.timestamp);
+        const bExpired = checkIfAppointmentExpired(b.day, b.timestamp);
+        
+        // কনফার্মড উপরে, এক্সপায়ার্ড নিচে
+        if (!aExpired && bExpired) return -1; // a কনফার্মড, b এক্সপায়ার্ড → a উপরে
+        if (aExpired && !bExpired) return 1;  // a এক্সপায়ার্ড, b কনফার্মড → b উপরে
         if (a.day !== b.day) {
           return a.day === 'Thursday' ? -1 : 1;
         }
@@ -1124,43 +1376,35 @@
       appointments.forEach(app => {
         const dayText = app.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
         const typeText = app.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
-        const statusText = app.status === 'confirmed' ? 'কনফার্মড' : 'পেন্ডিং';
         
-        // ✅ নতুন বয়স সিস্টেম - বয়স সঠিকভাবে দেখানো
-        let ageDisplayText = '';
+        // ✅ এক্সপায়ার্ড চেক (টাইমস্ট্যাম্প সহ)
+        const isExpired = checkIfAppointmentExpired(app.day, app.timestamp);
+        const statusText = isExpired ? 'এক্সপায়ার্ড' : 'কনফার্মড';
+        const statusColor = isExpired ? 'background: var(--danger); color: white;' : 'background: var(--success); color: white;';
         
-        if (app.ageDisplay) {
-          // নতুন সিস্টেম: ageDisplay ফিল্ড ব্যবহার
-          ageDisplayText = app.ageDisplay;
-        } else if (app.ageString) {
-          // পুরাতন রেকর্ড: ageString ফিল্ড ব্যবহার
-          ageDisplayText = app.ageString;
-        } else if (app.ageYears || app.ageMonths || app.ageDays) {
-          // নতুন ফিল্ড থেকে তৈরি
-          const parts = [];
-          if (app.ageYears > 0) parts.push(`${app.ageYears} বছর`);
-          if (app.ageMonths > 0) parts.push(`${app.ageMonths} মাস`);
-          if (app.ageDays > 0) parts.push(`${app.ageDays} দিন`);
-          ageDisplayText = parts.join(' ') || '০ বছর ০ মাস ০ দিন';
-        } else if (app.age) {
-          // পুরাতন সিস্টেম: মাসে কনভার্ট করা সংখ্যা
-          const years = Math.floor(app.age / 12);
-          const months = Math.round(app.age % 12);
-          if (years > 0) {
-            ageDisplayText = `${years} বছর`;
-            if (months > 0) ageDisplayText += ` ${months} মাস`;
-          } else {
-            ageDisplayText = `${months} মাস`;
-          }
-        } else {
-          ageDisplayText = 'বয়স তথ্য নেই';
-        }
+        // ✅ তারিখ বের করুন - getDateForAppointment ব্যবহার করুন
+        const dateInfo = getDateForAppointment(app.day, app.timestamp);
+        
+        // ✅ বয়স সিস্টেম
+        let ageDisplayText = getAgeDisplay(app);
+
+        // ✅ এক্সপায়ার্ড হলে ডাউনলোড বাটন হাইড করা
+        const downloadButtonHTML = isExpired 
+          ? `<div class="expired-notice" style="color: var(--danger); font-style: italic; margin-top: 10px; padding: 10px; background: #fee; border-radius: 5px;">
+              ⛔ এক্সপায়ার্ড - স্লিপ ডাউনলোড করা যাবে না<br>
+              <small>অ্যাপয়েন্টমেন্টের তারিখ: ${dateInfo.banglaDate}</small>
+             </div>` 
+          : `<button class="download-btn" onclick="downloadAppointmentSlip(${JSON.stringify(app).replace(/"/g, '&quot;')})">
+              📄 স্লিপ ডাউনলোড করুন
+            </button>`;
         
         html += `
           <div class="appointment-card">
             <div class="appointment-header">
               <div class="appointment-serial">সিরিয়াল #${app.serial}</div>
-              <div class="appointment-status">${statusText}</div>
+              <div class="appointment-status" style="${statusColor}">
+                ${statusText}
+              </div>
             </div>
             
             <div class="appointment-details">
@@ -1174,7 +1418,7 @@
               </div>
               <div class="detail-row">
                 <span class="detail-label">দিন:</span>
-                <span class="detail-value">${dayText}</span>
+                <span class="detail-value">${dateInfo.banglaDate}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">সময়:</span>
@@ -1190,9 +1434,7 @@
               </div>
             </div>
             
-            <button class="download-btn" onclick="downloadAppointmentSlip(${JSON.stringify(app).replace(/"/g, '&quot;')})">
-              📄 স্লিপ ডাউনলোড করুন
-            </button>
+            ${downloadButtonHTML}
           </div>
         `;
       });
@@ -1205,6 +1447,13 @@
     }
 
     function downloadAppointmentSlip(appointmentData) {
+      // ✅ প্রথমে এক্সপায়ার্ড চেক করুন (টাইমস্ট্যাম্প সহ)
+      const isExpired = checkIfAppointmentExpired(appointmentData.day, appointmentData.timestamp);
+      
+      if (isExpired) {
+        showPopup('error', 'এক্সপায়ার্ড', 'এই অ্যাপয়েন্টমেন্টটি এক্সপায়ার্ড হয়ে গেছে। স্লিপ ডাউনলোড করা যাবে না।');
+        return;
+      }
       // Store for slip generation
       currentAppointmentData = appointmentData;
       
@@ -1257,6 +1506,6 @@
       // Auto-focus on phone input
       searchPhone.focus();
     });
-  </script>
+</script>
 </body>
 </html>
