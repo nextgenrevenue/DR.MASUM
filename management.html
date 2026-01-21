@@ -1094,32 +1094,56 @@
       }
       
       async loadAppointments() {
-        try {
-          if (!this.db) return;
-          
-          const listener = this.db.collection('appointments')
-            .orderBy('timestamp', 'desc')
-            .onSnapshot(snapshot => {
-              this.appointments = [];
-              snapshot.forEach(doc => {
-                this.appointments.push({
-                  id: doc.id,
-                  ...doc.data()
-                });
-              });
-              
-              this.loadSerialTable();
-              this.updateStats();
-            }, error => {
-              console.error('Error loading appointments:', error);
-            });
-          
-          this.realtimeListeners.push(listener);
-          
-        } catch (error) {
-          console.error('Error loading appointments:', error);
-        }
-      }
+  try {
+    if (!this.db) return;
+    
+    // বর্তমান সপ্তাহের সীমানা নির্ধারণ (শনিবার থেকে শুক্রবার)
+    const now = new Date();
+    const today = now.getDay(); // 0 = Sunday, 6 = Saturday
+    
+    // এই সপ্তাহের শনিবার খুঁজে বের করুন
+    let startOfWeek = new Date(now);
+    if (today === 6) { // আজ শনিবার
+      startOfWeek.setHours(0, 0, 0, 0);
+    } else {
+      const daysSinceSaturday = (today + 1) % 7; // শনিবার থেকে কতদিন গেছে
+      startOfWeek.setDate(now.getDate() - daysSinceSaturday);
+      startOfWeek.setHours(0, 0, 0, 0);
+    }
+    
+    // এই সপ্তাহের শুক্রবার (পরের শুক্রবার)
+    let endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // শনিবার + 6 দিন = শুক্রবার
+    endOfWeek.setHours(23, 59, 59, 999);
+    
+    console.log('Current week range:', startOfWeek, 'to', endOfWeek);
+    
+    const listener = this.db.collection('appointments')
+      .where('timestamp', '>=', startOfWeek)
+      .where('timestamp', '<=', endOfWeek)
+      .orderBy('timestamp', 'desc')
+      .onSnapshot(snapshot => {
+        this.appointments = [];
+        snapshot.forEach(doc => {
+          this.appointments.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+        
+        console.log(`Loaded ${this.appointments.length} appointments for current week`);
+        this.loadSerialTable();
+        this.updateStats();
+      }, error => {
+        console.error('Error loading appointments:', error);
+      });
+    
+    this.realtimeListeners.push(listener);
+    
+  } catch (error) {
+    console.error('Error loading appointments:', error);
+  }
+}
       
       async loadAllPendingSelections() {
         try {

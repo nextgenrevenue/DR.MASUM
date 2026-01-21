@@ -264,6 +264,7 @@
       transition: background-color 0.2s ease;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
     }
     
@@ -623,6 +624,34 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+      /* তারিখ ইনপুট স্টাইল */
+  .date-filter-appointments {
+    padding: 8px 15px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-family: 'Noto Sans Bengali', sans-serif;
+    background-color: var(--white);
+    cursor: pointer;
+    min-width: 150px;
+  }
+  
+  .date-filter-appointments:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  
+  /* তারিখ নির্বাচক জন্য কাস্টম স্টাইল */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    background-color: var(--light-gray);
+  }
+  
+  input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    background-color: #e5e7eb;
+  }
     
     /* Mobile Responsive */
     @media (max-width: 768px) {
@@ -813,11 +842,8 @@
             <h2>সকল অ্যাপয়েন্টমেন্টসমূহ</h2>
             <div class="header-actions">
               <div class="filter-group">
-                <select class="day-filter-appointments">
-                  <option value="all">সকল দিন</option>
-                  <option value="Thursday">বৃহস্পতিবার</option>
-                  <option value="Friday">শুক্রবার</option>
-                </select>
+                <input type="date" id="dateFilter" class="date-filter-appointments">
+
                 <select class="type-filter-appointments">
                   <option value="all">সকল ধরন</option>
                   <option value="new">নতুন রোগী</option>
@@ -851,6 +877,7 @@
                   <th>দিন</th>
                   <th>সময়</th>
                   <th>ধরন</th>
+                  <th>ভিজিটি তারিখ</th>
                   <th>বুকিং তারিখ</th>
                   <th>অ্যাকশন</th>
                 </tr>
@@ -991,8 +1018,9 @@
   
   <!-- কম্পোনেন্ট লোডার -->
   <script src="components-inline.js"></script>
+  <script src="grid.js"></script>
 
-  <script>
+<script>
     // ==================== FIREBASE CONFIGURATION ====================
     const firebaseConfig = {
       apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
@@ -1021,6 +1049,7 @@
     };
     let pendingSelections = {};
     let adminSessionId = 'admin_' + Date.now();
+    let editGridSystem = null; // Edit Modal গ্রিড সিস্টেমের জন্য
 
     // ==================== UTILITY FUNCTIONS ====================
     function showAlert(message, type = 'success') {
@@ -1120,6 +1149,248 @@
         
         return aMinutes - bMinutes;
       });
+    }
+
+    // ==================== বর্তমান সপ্তাহের তারিখ ফাংশন ====================
+    function getCurrentWeekDateRange() {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0=রবি, 1=সোম, ..., 6=শনি
+    
+    // Find the most recent Saturday (including today if it's Saturday)
+    const lastSaturday = new Date(today);
+    
+    // Calculate days to subtract to get to Saturday
+    // If today is Saturday (6), don't subtract
+    // If today is Sunday (0), subtract 1 day to get Saturday
+    // etc.
+    const daysSinceSaturday = (dayOfWeek + 1) % 7;
+    lastSaturday.setDate(today.getDate() - daysSinceSaturday);
+    lastSaturday.setHours(0, 0, 0, 0); // Set to 12:00 AM
+    
+    // Calculate next Friday
+    const nextFriday = new Date(lastSaturday);
+    nextFriday.setDate(lastSaturday.getDate() + 6); // Saturday + 6 = Friday
+    nextFriday.setHours(23, 59, 59, 999); // Set to 11:59:59.999 PM
+    
+    return {
+        startDate: lastSaturday,
+        endDate: nextFriday,
+        startString: formatDateForFilter(lastSaturday),
+        endString: formatDateForFilter(nextFriday),
+        isInCurrentWeek: function(dateToCheck) {
+            const date = new Date(dateToCheck);
+            return date >= lastSaturday && date <= nextFriday;
+        }
+    };
+}
+
+    // তারিখকে YYYY-MM-DD ফরম্যাটে ফরম্যাট করুন
+    function formatDateForFilter(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // তারিখ স্ট্রিংকে Date অবজেক্টে রূপান্তর
+    function parseDateString(dateString) {
+      if (!dateString) return null;
+      const [year, month, day] = dateString.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    }
+
+    // ==================== দিন থেকে পরবর্তী তারিখ বের করা ====================
+    function getNextDateByDay(targetDay) {
+      const daysMap = {
+        "Sunday": 0,
+        "Monday": 1,
+        "Tuesday": 2,
+        "Wednesday": 3,
+        "Thursday": 4,
+        "Friday": 5,
+        "Saturday": 6
+      };
+      
+      const targetDayIndex = daysMap[targetDay];
+      const today = new Date();
+      
+      const todayIndex = today.getDay();
+      let daysToAdd = targetDayIndex - todayIndex;
+      
+      if (daysToAdd < 0) {
+        daysToAdd += 7;
+      }
+      
+      const nextDate = new Date(today);
+      nextDate.setDate(today.getDate() + daysToAdd);
+      
+      const year = nextDate.getFullYear();
+      const month = String(nextDate.getMonth() + 1).padStart(2, '0');
+      const day = String(nextDate.getDate()).padStart(2, '0');
+      
+      const banglaMonths = [
+        'জানুয়ারী', 'ফেব্রুয়ারী', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+        'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+      ];
+      
+      const banglaDays = [
+        'রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 
+        'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'
+      ];
+      
+      const banglaDate = `${banglaDays[nextDate.getDay()]}, ${nextDate.getDate()} ${banglaMonths[nextDate.getMonth()]} ${year}`;
+      
+      return {
+        date: nextDate,
+        dateString: `${year}-${month}-${day}`,
+        displayDate: nextDate.toLocaleDateString('bn-BD', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        banglaDate: banglaDate,
+        isToday: daysToAdd === 0
+      };
+    }
+
+    // ==================== EDIT MODAL GRID SYSTEM ====================
+    function initializeEditGridSystem() {
+      if (!window.db) {
+        console.error('❌ Database not available for edit grid system');
+        return;
+      }
+
+      editGridSystem = new RealTimeGridSystem({
+        db: window.db,
+        gridContainerId: 'editSerialGrid',
+        selectedSerialInputId: 'editSerial',
+        dayElementId: 'editDay',
+        timeElementId: 'editTime',
+        typeElementId: 'editType',
+        mode: 'admin',
+        adminSessionId: adminSessionId,
+        userPendingExpiry: 1 * 60 * 1000,
+        adminPendingExpiry: 5 * 60 * 1000,
+        
+        onSerialClick: function(data) {
+          console.log('Edit Modal - Serial clicked:', data);
+          
+          if (data.status === 'booked') {
+            Swal.fire({
+              title: 'সিরিয়াল বুকড',
+              text: `এই সিরিয়ালটি ${data.date} তারিখের জন্য ইতিমধ্যে বুক করা হয়েছে`,
+              icon: 'error'
+            });
+          } else if (data.status === 'pending') {
+            document.getElementById('editSerial').value = data.serial;
+            
+            // Show success message
+            Swal.fire({
+              title: 'সিরিয়াল সিলেক্ট করা হয়েছে',
+              text: `সিরিয়াল ${data.serial} সিলেক্ট করা হয়েছে`,
+              icon: 'success',
+              timer: 1500,
+              showConfirmButton: false
+            });
+          }
+        },
+        
+        onGridUpdate: function(type, data) {
+          console.log('Edit Modal - Grid updated:', type, data);
+          
+          // Update serial input with date info
+          const serialInput = document.getElementById('editSerial');
+          if (serialInput && data.date) {
+            serialInput.dataset.date = data.date;
+          }
+        }
+      });
+      
+      editGridSystem.init().then(success => {
+        if (success) {
+          console.log('✅ Edit Modal Grid System initialized successfully');
+        } else {
+          console.error('❌ Failed to initialize Edit Modal Grid System');
+        }
+      });
+    }
+
+    // ==================== বর্তমান সপ্তাহের তথ্য UI-তে দেখানো ====================
+    function displayCurrentWeekInfo() {
+      const currentWeek = getCurrentWeekDateRange();
+      const weekInfo = document.createElement('div');
+      weekInfo.id = 'currentWeekInfo';
+      weekInfo.style.cssText = `
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 14px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+      `;
+      
+      const startDateStr = currentWeek.startDate.toLocaleDateString('bn-BD', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      const endDateStr = currentWeek.endDate.toLocaleDateString('bn-BD', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      weekInfo.innerHTML = `
+        📅 <strong>বর্তমান সপ্তাহ:</strong> ${startDateStr} - ${endDateStr} 
+        | শুধুমাত্র এই সপ্তাহের ডাটা দেখানো হচ্ছে
+      `;
+      
+      const dashboardCards = document.querySelector('.dashboard-cards');
+      if (dashboardCards && !document.getElementById('currentWeekInfo')) {
+        dashboardCards.parentNode.insertBefore(weekInfo, dashboardCards);
+      }
+    }
+
+    function showFilteredDateInfo(dateString) {
+      let filterInfo = document.getElementById('filteredDateInfo');
+      
+      if (!filterInfo) {
+        filterInfo = document.createElement('div');
+        filterInfo.id = 'filteredDateInfo';
+        filterInfo.style.cssText = `
+          background: linear-gradient(135deg, #10b981, #059669);
+          color: white;
+          padding: 10px 15px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+          font-size: 14px;
+          text-align: center;
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        `;
+        
+        const dashboardCards = document.querySelector('.dashboard-cards');
+        if (dashboardCards) {
+          dashboardCards.parentNode.insertBefore(filterInfo, dashboardCards);
+        }
+      }
+      
+      const date = new Date(dateString);
+      const dateStr = date.toLocaleDateString('bn-BD', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      });
+      
+      filterInfo.innerHTML = `
+        🔍 <strong>ফিল্টার করা তারিখ:</strong> ${dateStr}
+        | শুধুমাত্র এই তারিখের ডাটা দেখানো হচ্ছে
+      `;
+      filterInfo.style.display = 'block';
     }
 
     // ==================== AUTHENTICATION CHECK ====================
@@ -1243,7 +1514,7 @@
       
       async initialize() {
         await this.loadSerialRanges();
-        await this.setupPendingSelectionsListener(); // রিয়েলটাইম লিসেনার যোগ
+        await this.setupPendingSelectionsListener();
         await this.loadAppointments();
         this.setupEventListeners();
         this.updateStats();
@@ -1254,32 +1525,46 @@
           const doc = await this.db.collection('settings').doc('serialRanges').get();
           if (doc.exists) {
             serialRanges = doc.data();
-            console.log('Serial ranges loaded:', serialRanges);
+            console.log('✅ Serial ranges loaded:', serialRanges);
+            
+            // Ensure proper structure
+            if (!serialRanges.Thursday) serialRanges.Thursday = { new: {}, old: {} };
+            if (!serialRanges.Friday) serialRanges.Friday = { new: {}, old: {} };
+            if (!serialRanges.Thursday.new) serialRanges.Thursday.new = {};
+            if (!serialRanges.Thursday.old) serialRanges.Thursday.old = {};
+            if (!serialRanges.Friday.new) serialRanges.Friday.new = {};
+            if (!serialRanges.Friday.old) serialRanges.Friday.old = {};
+            
+          } else {
+            serialRanges = {
+              Thursday: { new: {}, old: {} },
+              Friday: { new: {}, old: {} }
+            };
           }
         } catch (error) {
-          console.error('Error loading serial ranges:', error);
+          console.error('❌ Error loading serial ranges:', error);
         }
       }
       
       async setupPendingSelectionsListener() {
         try {
-          // রিয়েলটাইম লিসেনার সেটআপ
           this.pendingSelectionsListener = this.db.collection('pendingSelections')
             .where('expiresAt', '>', new Date())
             .onSnapshot(snapshot => {
               this.updatePendingSelections(snapshot);
               this.updateStats(); // আপডেট করুন
+              
               // এডিট মোড থাকলে সিরিয়াল গ্রিড রিফ্রেশ করুন
-              if (document.getElementById('editAppointmentModal').style.display === 'flex') {
-                this.updateEditSerialGrid();
+              if (editGridSystem) {
+                editGridSystem.updateGrid();
               }
             }, error => {
-              console.error('Error listening to pending selections:', error);
+              console.error('❌ Error listening to pending selections:', error);
             });
           
           this.realtimeListeners.push(this.pendingSelectionsListener);
         } catch (error) {
-          console.error('Error setting up pending selections listener:', error);
+          console.error('❌ Error setting up pending selections listener:', error);
         }
       }
       
@@ -1316,7 +1601,7 @@
           }
         });
         
-        console.log('Pending selections updated:', pendingSelections);
+        console.log('✅ Pending selections updated:', pendingSelections);
       }
       
       async loadAppointments() {
@@ -1343,16 +1628,16 @@
               
               this.populateTimeFilter();
               this.loadAppointmentsTable();
-              this.updateStats(); // আপডেট করুন
+              this.updateStats();
             }, error => {
-              console.error('Error loading appointments:', error);
+              console.error('❌ Error loading appointments:', error);
               showAlert('অ্যাপয়েন্টমেন্ট লোড করতে সমস্যা হয়েছে', 'error');
             });
           
           this.realtimeListeners.push(listener);
           
         } catch (error) {
-          console.error('Error loading appointments:', error);
+          console.error('❌ Error loading appointments:', error);
           showAlert('অ্যাপয়েন্টমেন্ট লোড করতে সমস্যা হয়েছে', 'error');
         }
       }
@@ -1391,11 +1676,12 @@
         return sortTimes(Array.from(times));
       }
       
+      // ==================== CORRECTED LOAD APPOINTMENTS TABLE ====================
       loadAppointmentsTable(searchTerm = '') {
         const tableBody = document.getElementById('appointmentsTableBody');
         if (!tableBody) return;
         
-        const dayFilter = document.querySelector('.day-filter-appointments')?.value || 'all';
+        const dateFilter = document.getElementById('dateFilter')?.value || '';
         const typeFilter = document.querySelector('.type-filter-appointments')?.value || 'all';
         const timeFilter = document.getElementById('timeFilterSerial')?.value || 'all';
         
@@ -1403,6 +1689,7 @@
         let foundAppointments = false;
         
         const filteredAppointments = this.appointments.filter(app => {
+          // Search term filter
           if (searchTerm && !(
             (app.name && app.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (app.phone && app.phone.includes(searchTerm)) ||
@@ -1411,10 +1698,38 @@
             return false;
           }
           
-          if (dayFilter !== 'all' && app.day !== dayFilter) {
-            return false;
+          // **CORRECTED DATE FILTER - প্রথমে appointmentDate চেক করুন**
+          if (dateFilter) {
+            if (app.appointmentDate) {
+              // সরাসরি YYYY-MM-DD ফরম্যাটে তুলনা
+              if (app.appointmentDate !== dateFilter) {
+                return false;
+              }
+            } else if (app.timestamp) {
+              // Firebase Timestamp কে JavaScript Date তে রূপান্তর
+              let appointmentDate;
+              if (app.timestamp && app.timestamp.seconds) {
+                appointmentDate = new Date(app.timestamp.seconds * 1000);
+              } else if (app.timestamp instanceof Date) {
+                appointmentDate = app.timestamp;
+              } else if (app.timestamp && app.timestamp.toDate) {
+                appointmentDate = app.timestamp.toDate();
+              } else {
+                return false;
+              }
+              
+              // তারিখ তুলনা করুন YYYY-MM-DD ফরম্যাটে
+              const appointmentDateStr = appointmentDate.toISOString().split('T')[0];
+              if (appointmentDateStr !== dateFilter) {
+                return false;
+              }
+            } else {
+              // কোনো তারিখ তথ্য নেই
+              return false;
+            }
           }
           
+          // Type filter
           if (typeFilter !== 'all') {
             const patientType = app.patientType || app.type;
             if (patientType !== typeFilter) {
@@ -1422,6 +1737,7 @@
             }
           }
           
+          // Time filter
           if (timeFilter !== 'all' && app.time !== timeFilter) {
             return false;
           }
@@ -1429,71 +1745,157 @@
           return true;
         });
         
+        // সিরিয়াল নাম্বার অনুসারে সাজান
         filteredAppointments.sort((a, b) => (a.serial || 0) - (b.serial || 0));
         
+        // টেবিলের রো জেনারেট করুন
         for (const app of filteredAppointments) {
           foundAppointments = true;
           
-          const dayText = app.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
-          const typeText = (app.patientType || app.type) === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+          // তারিখ ডিসপ্লে - সংশোধিত
+          let dayText = 'N/A';
+          let formattedDate = 'N/A';
+          let appointmentDate = null;
           
-          let ageDisplay = 'N/A';
-          let ageYears = 0, ageMonths = 0, ageDays = 0;
-          
-          if (app.ageYears !== undefined || app.ageMonths !== undefined || app.ageDays !== undefined) {
-            ageYears = Number(app.ageYears) || 0;
-            ageMonths = Number(app.ageMonths) || 0;
-            ageDays = Number(app.ageDays) || 0;
-            ageDisplay = formatAge(ageYears, ageMonths, ageDays);
-          } else if (app.age && typeof app.age === 'string') {
-            const parsedAge = parseAgeString(app.age);
-            ageYears = parsedAge.years;
-            ageMonths = parsedAge.months;
-            ageDays = parsedAge.days;
-            ageDisplay = app.age;
-          } else if (app.age && typeof app.age === 'number') {
-            ageYears = app.age;
-            ageDisplay = `${app.age} বছর`;
+          // প্রথমে appointmentDate ফিল্ড চেক করুন
+          if (app.appointmentDate) {
+            // YYYY-MM-DD থেকে JavaScript Date তৈরি করুন
+            const [year, month, day] = app.appointmentDate.split('-');
+            appointmentDate = new Date(year, month - 1, day);
+            
+            // দিনের নাম বের করুন
+            const dayNames = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+            const dayIndex = appointmentDate.getDay();
+            dayText = dayNames[dayIndex];
+            
+            // ফরম্যাটেড তারিখ তৈরি করুন
+            formattedDate = appointmentDate.toLocaleDateString('bn-BD', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          }
+          // যদি appointmentDate না থাকে, timestamp ব্যবহার করুন
+          else if (app.timestamp) {
+            if (app.timestamp && app.timestamp.seconds) {
+              appointmentDate = new Date(app.timestamp.seconds * 1000);
+            } else if (app.timestamp instanceof Date) {
+              appointmentDate = app.timestamp;
+            } else if (app.timestamp && app.timestamp.toDate) {
+              appointmentDate = app.timestamp.toDate();
+            }
+            
+            if (appointmentDate) {
+              const dayNames = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+              const dayIndex = appointmentDate.getDay();
+              dayText = dayNames[dayIndex];
+              
+              formattedDate = appointmentDate.toLocaleDateString('bn-BD', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+            }
           }
           
-          const bookingTime = app.timestamp ? 
-            formatDateTime(app.timestamp.toDate ? app.timestamp.toDate() : app.timestamp) : 
-            'N/A';
+          const typeText = (app.patientType || app.type) === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
           
-          const isSelected = selectedAppointments.has(app.id);
-          
-          html += `
-            <tr data-id="${app.id}" data-attendance="${app.attendance || 'absent'}">
-              <td>
-                <input type="checkbox" class="appointment-checkbox" value="${app.id}" 
-                       data-appointment-id="${app.id}"
-                       ${isSelected ? 'checked' : ''}>
-              </td>
-              <td>${app.serial || 'N/A'}</td>
-              <td>${app.name || 'N/A'}</td>
-              <td>${ageDisplay}</td>
-              <td style="text-align: center;">${app.phone || 'N/A'}</td>
-              <td>${dayText}</td>
-              <td>${app.time || 'N/A'}</td>
-              <td>${typeText}</td>
-              <td>${bookingTime}</td>
-              <td>
-                <button class="action-btn edit-btn" onclick="appointmentsManager.editAppointment('${app.id}')">
-                  এডিট
-                </button>
-                <button class="action-btn delete-btn" onclick="appointmentsManager.deleteAppointment('${app.id}')">
-                  মুছুন
-                </button>
-              </td>
-            </tr>
-          `;
+          // বয়স ডিসপ্লে
+let ageDisplay = 'N/A';
+
+if (app.ageYears !== undefined || app.ageMonths !== undefined || app.ageDays !== undefined) {
+    ageDisplay = formatAge(
+        Number(app.ageYears) || 0,
+        Number(app.ageMonths) || 0,
+        Number(app.ageDays) || 0
+    );
+} else if (app.ageString) {
+    ageDisplay = app.ageString;
+} else if (app.age && typeof app.age === 'string') {
+    ageDisplay = app.age;
+} else if (app.age && typeof app.age === 'number') {
+    ageDisplay = `${app.age} বছর`;
+}
+
+// বুকিং তারিখ বের করুন
+let bookingDate = 'N/A';
+if (app.timestamp) {
+    let bookingDateObj;
+    if (app.timestamp.seconds) {
+        bookingDateObj = new Date(app.timestamp.seconds * 1000);
+    } else if (app.timestamp instanceof Date) {
+        bookingDateObj = app.timestamp;
+    } else if (app.timestamp && app.timestamp.toDate) {
+        bookingDateObj = app.timestamp.toDate();
+    }
+    
+    if (bookingDateObj) {
+        bookingDate = bookingDateObj.toLocaleDateString('bn-BD', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second:  '2-digit'
+        });
+    }
+} else if (app.bookingDate) {
+    bookingDate = app.bookingDate;
+}
+
+const isSelected = selectedAppointments.has(app.id);
+
+html += `
+    <tr data-id="${app.id}" data-attendance="${app.attendance || 'absent'}" data-date="${app.appointmentDate || ''}">
+        <td>
+            <input type="checkbox" class="appointment-checkbox" value="${app.id}" 
+                   data-appointment-id="${app.id}"
+                   ${isSelected ? 'checked' : ''}>
+        </td>
+        <td>${app.serial || 'N/A'}</td>
+        <td>${app.name || 'N/A'}</td>
+        <td>${ageDisplay}</td>
+        <td style="text-align: center;">${app.phone || 'N/A'}</td>
+        <td>${dayText}</td>
+        <td>${app.time || 'N/A'}</td>
+        <td>${typeText}</td>
+        <td>${app.appointmentDateDisplay || formattedDate}</td>
+        <td>${bookingDate}</td>
+        <td>
+            <button class="action-btn edit-btn" onclick="appointmentsManager.editAppointment('${app.id}')">
+                এডিট
+            </button>
+            <button class="action-btn delete-btn" onclick="appointmentsManager.deleteAppointment('${app.id}')">
+                মুছুন
+            </button>
+        </td>
+    </tr>
+`;
         }
         
         if (!foundAppointments) {
+          let message = 'কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি';
+          
+          if (dateFilter) {
+            const date = new Date(dateFilter);
+            const dateString = date.toLocaleDateString('bn-BD', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+            message = `${dateString} তারিখে কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
+          } else if (searchTerm) {
+            message = `"${searchTerm}" অনুসারে কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
+          }
+          
           html = `
             <tr>
-              <td colspan="10" style="text-align: center; padding: 20px; color: #6b7280;">
-                ${searchTerm ? 'কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি' : 'কোনো অ্যাপয়েন্টমেন্ট নেই। নতুন অ্যাপয়েন্টমেন্ট যোগ করুন।'}
+              <td colspan="11" style="text-align: center; padding: 20px; color: #6b7280;">
+                ${message}
               </td>
             </tr>
           `;
@@ -1501,6 +1903,7 @@
         
         tableBody.innerHTML = html;
         
+        // চেকবক্সে ইভেন্ট লিসেনার যোগ করুন
         document.querySelectorAll('.appointment-checkbox').forEach(checkbox => {
           checkbox.addEventListener('change', (e) => {
             const appointmentId = e.target.value;
@@ -1519,56 +1922,260 @@
         });
       }
       
-      async calculateSerialStats() {
-        let totalSerialCount = 0;
-        let pendingCount = 0;
+      // ==================== CORRECTED CALCULATE SERIAL STATS ====================
+      calculateSerialStats() {
+        console.log("📊 Calculating serial statistics for CURRENT WEEK ONLY...");
         
-        // Calculate total serials from ranges
-        for (const day in serialRanges) {
-          for (const type in serialRanges[day]) {
-            for (const time in serialRanges[day][type]) {
-              const [start, end] = serialRanges[day][type][time];
-              totalSerialCount += (end - start + 1);
+        const dateFilter = document.getElementById('dateFilter')?.value || '';
+        const typeFilter = document.querySelector('.type-filter-appointments')?.value || 'all';
+        const timeFilter = document.getElementById('timeFilterSerial')?.value || 'all';
+        
+        // Get current week date range
+        const currentWeek = getCurrentWeekDateRange();
+        
+        let totalSerials = 0;
+        let availableSerials = 0;
+        let pendingSerials = 0;
+        let bookedSerials = 0;
+        
+        // Filtered appointments - শুধুমাত্র বর্তমান সপ্তাহের
+        const filteredAppointments = this.appointments.filter(app => {
+          // Date filter from UI
+          if (dateFilter) {
+            if (app.appointmentDate) {
+              if (app.appointmentDate !== dateFilter) return false;
+            }
+            else if (app.timestamp) {
+              let appointmentDate;
+              if (app.timestamp.seconds) {
+                appointmentDate = new Date(app.timestamp.seconds * 1000);
+              } else {
+                return false;
+              }
+              const appointmentDateStr = appointmentDate.toISOString().split('T')[0];
+              if (appointmentDateStr !== dateFilter) return false;
+            }
+            else {
+              return false;
+            }
+          } 
+          // No date filter - show only current week
+          else {
+            if (app.appointmentDate) {
+              const appointmentDate = parseDateString(app.appointmentDate);
+              if (!appointmentDate || !currentWeek.isInCurrentWeek(appointmentDate)) {
+                return false;
+              }
+            }
+            else if (app.timestamp) {
+              let appointmentDate;
+              if (app.timestamp.seconds) {
+                appointmentDate = new Date(app.timestamp.seconds * 1000);
+              } else {
+                return false;
+              }
+              if (!currentWeek.isInCurrentWeek(appointmentDate)) {
+                return false;
+              }
+            }
+            else {
+              return false; // No date information
+            }
+          }
+          
+          // Type filter
+          if (typeFilter !== 'all') {
+            const patientType = app.patientType || app.type;
+            if (patientType !== typeFilter) return false;
+          }
+          
+          // Time filter
+          if (timeFilter !== 'all' && app.time !== timeFilter) return false;
+          
+          return true;
+        });
+        
+        // Get all serial ranges
+        const serialCombinations = [];
+        
+        // For Thursday
+        if (serialRanges.Thursday) {
+          // New patients on Thursday
+          if (serialRanges.Thursday.new) {
+            for (const time in serialRanges.Thursday.new) {
+              if (timeFilter === 'all' || time === timeFilter) {
+                serialCombinations.push({
+                  day: 'Thursday',
+                  type: 'new',
+                  time: time,
+                  range: serialRanges.Thursday.new[time]
+                });
+              }
+            }
+          }
+          
+          // Old patients on Thursday
+          if (serialRanges.Thursday.old) {
+            for (const time in serialRanges.Thursday.old) {
+              if (timeFilter === 'all' || time === timeFilter) {
+                serialCombinations.push({
+                  day: 'Thursday',
+                  type: 'old',
+                  time: time,
+                  range: serialRanges.Thursday.old[time]
+                });
+              }
             }
           }
         }
         
-        // Calculate pending serials from current data
-        for (const key in pendingSelections) {
-          if (pendingSelections[key]) {
-            // User pending
-            pendingCount += pendingSelections[key].user.length;
-            
-            // Admin pending
-            for (const adminId in pendingSelections[key].admin) {
-              pendingCount += pendingSelections[key].admin[adminId].length;
+        // For Friday
+        if (serialRanges.Friday) {
+          // New patients on Friday
+          if (serialRanges.Friday.new) {
+            for (const time in serialRanges.Friday.new) {
+              if (timeFilter === 'all' || time === timeFilter) {
+                serialCombinations.push({
+                  day: 'Friday',
+                  type: 'new',
+                  time: time,
+                  range: serialRanges.Friday.new[time]
+                });
+              }
+            }
+          }
+          
+          // Old patients on Friday
+          if (serialRanges.Friday.old) {
+            for (const time in serialRanges.Friday.old) {
+              if (timeFilter === 'all' || time === timeFilter) {
+                serialCombinations.push({
+                  day: 'Friday',
+                  type: 'old',
+                  time: time,
+                  range: serialRanges.Friday.old[time]
+                });
+              }
             }
           }
         }
         
-        const bookedSerials = this.appointments.length;
-        const availableSerials = Math.max(0, totalSerialCount - bookedSerials - pendingCount);
+        // Filter by type if specified
+        const filteredCombinations = serialCombinations.filter(combo => {
+          if (typeFilter !== 'all' && combo.type !== typeFilter) return false;
+          return true;
+        });
+        
+        // Calculate statistics for each combination
+        filteredCombinations.forEach(combo => {
+          if (!combo.range || !Array.isArray(combo.range) || combo.range.length !== 2) {
+            return;
+          }
+          
+          const [start, end] = combo.range;
+          const totalInRange = end - start + 1;
+          totalSerials += totalInRange;
+          
+          // Count booked serials for this combination (CURRENT WEEK ONLY)
+          const bookedInRange = filteredAppointments.filter(app => {
+            const patientType = app.patientType || app.type;
+            return app.day === combo.day && 
+                   app.time === combo.time && 
+                   patientType === combo.type &&
+                   app.serial >= start && 
+                   app.serial <= end;
+          }).length;
+          
+          bookedSerials += bookedInRange;
+          
+          // Count pending serials for this combination
+          const pendingForCombo = this.getPendingSerialsForCombo(combo, currentWeek);
+          pendingSerials += pendingForCombo;
+          
+          // Calculate available serials (never negative)
+          const availableInRange = Math.max(0, totalInRange - bookedInRange - pendingForCombo);
+          availableSerials += availableInRange;
+          
+          console.log(`📊 ${combo.day} ${combo.time} ${combo.type}: Total=${totalInRange}, Booked=${bookedInRange}, Pending=${pendingForCombo}, Available=${availableInRange}`);
+        });
         
         // Update cards
-        document.getElementById('totalSerials').textContent = totalSerialCount;
+        document.getElementById('pendingSerials').textContent = pendingSerials;
         document.getElementById('availableSerials').textContent = availableSerials;
-        document.getElementById('pendingSerials').textContent = pendingCount;
+        document.getElementById('totalSerials').textContent = totalSerials;
         
-        return {
-          total: totalSerialCount,
-          booked: bookedSerials,
-          pending: pendingCount,
-          available: availableSerials
-        };
+        console.log(`📊 FINAL Stats: Total=${totalSerials}, Available=${availableSerials}, Pending=${pendingSerials}, Booked=${bookedSerials}`);
       }
       
+      // Pending serials for a specific combination (current week only)
+      getPendingSerialsForCombo(combo, currentWeek) {
+        let pendingCount = 0;
+        
+        // Check all pending selections
+        for (const key in pendingSelections) {
+          // Key format: date_day_time_type or day_time_type
+          const parts = key.split('_');
+          
+          if (parts.length >= 3) {
+            let day, time, type;
+            
+            if (parts.length === 4) {
+              // Has date: date_day_time_type
+              const dateStr = parts[0];
+              day = parts[1];
+              time = parts[2];
+              type = parts[3];
+              
+              // Check if this pending is for current week
+              const pendingDate = parseDateString(dateStr);
+              if (pendingDate && !currentWeek.isInCurrentWeek(pendingDate)) {
+                continue; // Skip pending from other weeks
+              }
+            } else {
+              // No date: day_time_type
+              day = parts[0];
+              time = parts[1];
+              type = parts[2];
+            }
+            
+            // Check if this pending matches our combination
+            if (day === combo.day && time === combo.time && type === combo.type) {
+              const pendingData = pendingSelections[key];
+              
+              // Count user pending
+              if (pendingData.user && Array.isArray(pendingData.user)) {
+                pendingCount += pendingData.user.length;
+              }
+              
+              // Count admin pending
+              if (pendingData.admin) {
+                // Flatten all admin pending arrays
+                const adminPendingArrays = Object.values(pendingData.admin);
+                adminPendingArrays.forEach(arr => {
+                  if (Array.isArray(arr)) {
+                    pendingCount += arr.length;
+                  }
+                });
+              }
+            }
+          }
+        }
+        
+        return pendingCount;
+      }
+      
+      // ==================== CORRECTED UPDATE STATS ====================
       updateStats() {
-        const dayFilter = document.querySelector('.day-filter-appointments')?.value;
-        const typeFilter = document.querySelector('.type-filter-appointments')?.value;
-        const timeFilter = document.getElementById('timeFilterSerial')?.value;
+        const dateFilter = document.getElementById('dateFilter')?.value || '';
+        const typeFilter = document.querySelector('.type-filter-appointments')?.value || 'all';
+        const timeFilter = document.getElementById('timeFilterSerial')?.value || 'all';
         const searchTerm = document.querySelector('.search-appointments')?.value || '';
         
+        // Get current week
+        const currentWeek = getCurrentWeekDateRange();
+        
         const filteredAppointments = this.appointments.filter(app => {
+          // Search term filter
           if (searchTerm && !(
             (app.name && app.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (app.phone && app.phone.includes(searchTerm)) ||
@@ -1577,26 +2184,88 @@
             return false;
           }
           
-          if (dayFilter !== 'all' && app.day !== dayFilter) {
-            return false;
+          // Date filter from UI
+          if (dateFilter) {
+            if (app.appointmentDate) {
+              if (app.appointmentDate !== dateFilter) return false;
+            }
+            else if (app.timestamp) {
+              let appointmentDate;
+              if (app.timestamp.seconds) {
+                appointmentDate = new Date(app.timestamp.seconds * 1000);
+              } else {
+                return false;
+              }
+              const appointmentDateStr = appointmentDate.toISOString().split('T')[0];
+              if (appointmentDateStr !== dateFilter) return false;
+            }
+            else {
+              return false;
+            }
           }
-          
-          if (typeFilter !== 'all') {
-            const patientType = app.patientType || app.type;
-            if (patientType !== typeFilter) {
+          // No date filter - show only current week
+          else {
+            if (app.appointmentDate) {
+              const appointmentDate = parseDateString(app.appointmentDate);
+              if (!appointmentDate || !currentWeek.isInCurrentWeek(appointmentDate)) {
+                return false;
+              }
+            }
+            else if (app.timestamp) {
+              let appointmentDate;
+              if (app.timestamp.seconds) {
+                appointmentDate = new Date(app.timestamp.seconds * 1000);
+              } else {
+                return false;
+              }
+              if (!currentWeek.isInCurrentWeek(appointmentDate)) {
+                return false;
+              }
+            }
+            else {
               return false;
             }
           }
           
-          if (timeFilter !== 'all' && app.time !== timeFilter) {
-            return false;
+          // Type filter
+          if (typeFilter !== 'all') {
+            const patientType = app.patientType || app.type;
+            if (patientType !== typeFilter) return false;
           }
+          
+          // Time filter
+          if (timeFilter !== 'all' && app.time !== timeFilter) return false;
           
           return true;
         });
         
-        const thursdayApps = filteredAppointments.filter(app => app.day === 'Thursday');
-        const fridayApps = filteredAppointments.filter(app => app.day === 'Friday');
+        // Calculate appointments by day
+        const thursdayApps = filteredAppointments.filter(app => {
+          if (app.appointmentDate) {
+            const [year, month, day] = app.appointmentDate.split('-');
+            const appointmentDate = new Date(year, month - 1, day);
+            return appointmentDate.getDay() === 4;
+          }
+          else if (app.timestamp && app.timestamp.seconds) {
+            const appointmentDate = new Date(app.timestamp.seconds * 1000);
+            return appointmentDate.getDay() === 4;
+          }
+          return false;
+        });
+        
+        const fridayApps = filteredAppointments.filter(app => {
+          if (app.appointmentDate) {
+            const [year, month, day] = app.appointmentDate.split('-');
+            const appointmentDate = new Date(year, month - 1, day);
+            return appointmentDate.getDay() === 5;
+          }
+          else if (app.timestamp && app.timestamp.seconds) {
+            const appointmentDate = new Date(app.timestamp.seconds * 1000);
+            return appointmentDate.getDay() === 5;
+          }
+          return false;
+        });
+        
         const totalApps = filteredAppointments.length;
         
         document.getElementById('thursdayAppointments').textContent = thursdayApps.length;
@@ -1607,6 +2276,7 @@
         this.calculateSerialStats();
       }
       
+      // ==================== CORRECTED EDIT APPOINTMENT ====================
       editAppointment(id) {
         const appointment = this.appointments.find(app => app.id === id);
         
@@ -1615,18 +2285,25 @@
           return;
         }
         
+        // Initialize grid system if not already
+        if (!editGridSystem) {
+          initializeEditGridSystem();
+        }
+        
         this.currentEditSelection = {
           id: id,
           serial: appointment.serial,
           day: appointment.day,
           time: appointment.time,
-          type: appointment.patientType || appointment.type
+          type: appointment.patientType || appointment.type,
+          appointmentDate: appointment.appointmentDate
         };
         
         document.getElementById('editAppointmentId').value = id;
         document.getElementById('editName').value = appointment.name || '';
         document.getElementById('editPhone').value = appointment.phone || '';
         
+        // Age fields
         let ageYears = 0, ageMonths = 0, ageDays = 0;
         
         if (appointment.ageYears !== undefined || appointment.ageMonths !== undefined || appointment.ageDays !== undefined) {
@@ -1649,21 +2326,28 @@
         document.getElementById('editDay').value = appointment.day || '';
         document.getElementById('editType').value = appointment.patientType || appointment.type || '';
         
+        // Update time options based on day and type
         this.updateEditTimeOptions();
         
+        // Set time and serial after a short delay
         setTimeout(() => {
           document.getElementById('editTime').value = appointment.time || '';
           document.getElementById('editSerial').value = appointment.serial || '';
           
-          this.updateEditSerialGrid();
+          // Update the grid
+          if (editGridSystem) {
+            editGridSystem.updateGrid();
+          }
           
+          // Highlight selected serial
           if (appointment.serial) {
             setTimeout(() => {
               this.highlightEditSerial(appointment.serial);
-            }, 300);
+            }, 500);
           }
         }, 100);
         
+        // Show modal
         document.getElementById('editAppointmentModal').style.display = 'flex';
       }
       
@@ -1678,143 +2362,68 @@
           return;
         }
         
-        const times = this.getFilteredTimes(day, type);
-        
-        times.forEach(time => {
-          const option = document.createElement('option');
-          option.value = time;
-          option.textContent = time;
-          timeSelect.appendChild(option);
-        });
+        // Get available times from serial ranges
+        if (serialRanges[day] && serialRanges[day][type]) {
+          const times = Object.keys(serialRanges[day][type]);
+          
+          if (times.length > 0) {
+            // Sort times
+            const sortedTimes = sortTimes(times);
+            
+            sortedTimes.forEach(time => {
+              const option = document.createElement('option');
+              option.value = time;
+              option.textContent = time;
+              timeSelect.appendChild(option);
+            });
+          }
+        }
       }
       
       updateEditSerialGrid() {
-        const day = document.getElementById('editDay').value;
-        const type = document.getElementById('editType').value;
-        const time = document.getElementById('editTime').value;
-        const serialGrid = document.getElementById('editSerialGrid');
-        
-        serialGrid.innerHTML = '';
-        
-        if (!day || !type || !time) {
-          serialGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--gray);">দিন, ধরন এবং সময় নির্বাচন করুন</div>';
-          return;
-        }
-        
-        let start = 1, end = 50;
-        if (serialRanges[day] && serialRanges[day][type] && serialRanges[day][type][time]) {
-          [start, end] = serialRanges[day][type][time];
-        }
-        
-        const bookedSerials = this.appointments.filter(app => {
-          const patientType = app.patientType || app.type;
-          return app.id !== document.getElementById('editAppointmentId').value &&
-                 app.day === day && 
-                 app.time === time && 
-                 patientType === type;
-        }).map(app => app.serial);
-        
-        const pendingKey = `${day}_${time}_${type}`;
-        const userPending = pendingSelections[pendingKey]?.user || [];
-        const adminPending = pendingSelections[pendingKey]?.admin || {};
-        
-        const currentAdminPending = adminPending[adminSessionId] || [];
-        const otherAdminPending = Object.keys(adminPending)
-          .filter(id => id !== adminSessionId)
-          .flatMap(id => adminPending[id]);
-        
-        const currentSerial = parseInt(document.getElementById('editSerial').value) || 0;
-        const currentAppointmentId = document.getElementById('editAppointmentId').value;
-        const currentAppointment = this.appointments.find(a => a.id === currentAppointmentId);
-        
-        for (let serial = start; serial <= end; serial++) {
-          const serialItem = document.createElement('div');
-          serialItem.className = 'serial-item';
-          serialItem.textContent = serial;
-          serialItem.setAttribute('data-serial', serial);
-          
-          const isCurrentAppointment = currentAppointment && 
-                                       currentAppointment.serial === serial &&
-                                       currentAppointment.day === day &&
-                                       currentAppointment.time === time &&
-                                       (currentAppointment.patientType || currentAppointment.type) === type;
-          
-          const isBooked = bookedSerials.includes(serial) && !isCurrentAppointment;
-          const isUserPending = userPending.some(p => p.serial === serial);
-          const isCurrentAdminPending = currentAdminPending.some(p => p.serial === serial);
-          const isOtherAdminPending = otherAdminPending.some(p => p.serial === serial);
-          
-          let tooltip = `সিরিয়াল: ${serial}`;
-          
-          if (isBooked) {
-            serialItem.classList.add('booked');
-            serialItem.style.cursor = 'not-allowed';
-            tooltip = 'এই সিরিয়ালটি ইতিমধ্যে বুক করা হয়েছে';
-          } else if (isUserPending) {
-            serialItem.classList.add('pending');
-            serialItem.style.cursor = 'not-allowed';
-            tooltip = 'ইউজার সিলেক্ট করেছেন (পেন্ডিং)';
-          } else if (isOtherAdminPending) {
-            serialItem.classList.add('pending');
-            serialItem.style.cursor = 'not-allowed';
-            tooltip = 'অন্য এডমিন সিলেক্ট করেছেন (পেন্ডিং)';
-          } else if (isCurrentAppointment || isCurrentAdminPending) {
-            serialItem.classList.add('selected');
-            tooltip = isCurrentAppointment ? 'বর্তমান অ্যাপয়েন্টমেন্ট' : 'আপনার নির্বাচিত (পেন্ডিং)';
-            serialItem.style.cursor = 'pointer';
-            serialItem.addEventListener('click', () => {
-              this.selectEditSerial(serial);
-            });
-          } else {
-            serialItem.classList.add('available');
-            serialItem.style.cursor = 'pointer';
-            tooltip = 'খালি সিরিয়াল - ক্লিক করে নির্বাচন করুন';
-            serialItem.addEventListener('click', () => {
-              this.selectEditSerial(serial);
-            });
-          }
-          
-          serialItem.title = tooltip;
-          serialGrid.appendChild(serialItem);
-        }
-        
-        if (window.innerWidth <= 768) {
-          serialGrid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+        // This function is no longer needed as grid.js handles it
+        if (editGridSystem) {
+          editGridSystem.updateGrid();
         }
       }
       
       highlightEditSerial(serial) {
-        document.querySelectorAll('#editSerialGrid .serial-item.selected').forEach(item => {
-          item.classList.remove('selected');
-        });
+        if (!editGridSystem || !serial) return;
         
-        const serialItem = document.querySelector(`#editSerialGrid .serial-item[data-serial="${serial}"]`);
+        const gridContainer = document.getElementById('editSerialGrid');
+        if (!gridContainer) return;
+        
+        const serialItem = gridContainer.querySelector(`.serial-item[data-serial="${serial}"]`);
         if (serialItem) {
-          serialItem.classList.add('selected');
-        }
-      }
-      
-      selectEditSerial(serial) {
-        // শুধুমাত্র সিলেক্ট করা সিরিয়ালের ক্লাস পরিবর্তন করুন
-        const clickedItem = document.querySelector(`#editSerialGrid .serial-item[data-serial="${serial}"]`);
-        
-        if (clickedItem && clickedItem.classList.contains('available')) {
-          // আগের সব সিলেক্টেড আইটেম রিসেট করুন
-          document.querySelectorAll('#editSerialGrid .serial-item.selected').forEach(item => {
+          // Remove selected class from all items
+          gridContainer.querySelectorAll('.serial-item.selected').forEach(item => {
             item.classList.remove('selected');
-            // শুধুমাত্র যদি আগে available ছিল, তাহলে available করুন
-            if (!item.classList.contains('booked') && !item.classList.contains('pending')) {
+            if (item.classList.contains('available')) {
               item.classList.add('available');
             }
           });
           
-          // নতুন আইটেম সিলেক্ট করুন
-          clickedItem.classList.remove('available');
-          clickedItem.classList.add('selected');
+          // Add selected class to clicked item
+          serialItem.classList.remove('available');
+          serialItem.classList.add('selected');
+          
+          // Update hidden input
           document.getElementById('editSerial').value = serial;
         }
       }
       
+      selectEditSerial(serial) {
+        // This function is now handled by grid.js
+        if (editGridSystem) {
+          // Find and click the serial item
+          const serialItem = document.querySelector(`#editSerialGrid .serial-item[data-serial="${serial}"]`);
+          if (serialItem && !serialItem.classList.contains('booked') && !serialItem.classList.contains('pending')) {
+            serialItem.click();
+          }
+        }
+      }
+      
+      // ==================== CORRECTED UPDATE APPOINTMENT ====================
       async updateAppointment(e) {
         e.preventDefault();
         
@@ -1828,11 +2437,6 @@
         
         const currentAppointment = this.appointments.find(app => app.id === id);
         if (!currentAppointment) return;
-        
-        const oldSerial = currentAppointment.serial;
-        const oldDay = currentAppointment.day;
-        const oldTime = currentAppointment.time;
-        const oldType = currentAppointment.patientType || currentAppointment.type;
         
         // Validation
         if (!newSerial) {
@@ -1853,6 +2457,7 @@
           return;
         }
         
+        // Get age data
         const years = parseInt(document.getElementById('editAgeYears').value) || 0;
         const months = parseInt(document.getElementById('editAgeMonths').value) || 0;
         const days = parseInt(document.getElementById('editAgeDays').value) || 0;
@@ -1866,7 +2471,7 @@
           return;
         }
         
-        // Age string
+        // Create age string
         let ageString = '';
         if (years > 0) ageString += `${years} বছর`;
         if (months > 0) {
@@ -1878,49 +2483,24 @@
           ageString += `${days} দিন`;
         }
         
-        // Check serial availability
-        const isAvailable = await this.checkEditSerialAvailability(id, newSerial, day, time, type);
-        if (!isAvailable) {
-          Swal.fire({
-            title: 'সমস্যা!',
-            text: 'এই সিরিয়ালটি ইতিমধ্যে বুকড! অন্য সিরিয়াল নির্বাচন করুন।',
-            icon: 'error'
-          });
-          return;
-        }
+        // Calculate appointment date
+        const nextDateInfo = getNextDateByDay(day);
+        const appointmentDate = nextDateInfo.dateString;
+        const appointmentDateDisplay = nextDateInfo.banglaDate;
         
-        // Pending selection management
-        if (oldSerial !== newSerial || oldDay !== day || oldTime !== time || oldType !== type) {
-          const oldPendingKey = `${oldDay}_${oldTime}_${oldType}`;
-          const newPendingKey = `${day}_${time}_${type}`;
-          
-          try {
-            // Remove old pending selection for current admin
-            if (pendingSelections[oldPendingKey]?.admin?.[adminSessionId]) {
-              const oldPending = pendingSelections[oldPendingKey].admin[adminSessionId]
-                .find(p => p.serial === oldSerial);
-              
-              if (oldPending) {
-                await db.collection('pendingSelections').doc(oldPending.id).delete();
-              }
+        // Check if serial is available using grid system
+        if (editGridSystem) {
+          const range = editGridSystem.getSerialRange(day, type, time);
+          if (range) {
+            const [start, end] = range;
+            if (newSerial < start || newSerial > end) {
+              Swal.fire({
+                title: 'সতর্কতা!',
+                text: `সিরিয়ালটি রেঞ্জের বাইরে (${start}-${end})`,
+                icon: 'warning'
+              });
+              return;
             }
-            
-            // Add new pending selection for current admin
-            const pendingRef = db.collection('pendingSelections').doc();
-            await pendingRef.set({
-              serial: newSerial,
-              day: day,
-              time: time,
-              type: type,
-              bookedBy: 'admin',
-              adminId: adminSessionId,
-              sessionId: adminSessionId,
-              expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-              createdAt: new Date()
-            });
-            
-          } catch (error) {
-            console.error('Error updating pending selection:', error);
           }
         }
         
@@ -1935,6 +2515,8 @@
           time: time,
           patientType: type,
           serial: newSerial,
+          appointmentDate: appointmentDate, // Add appointment date
+          appointmentDateDisplay: appointmentDateDisplay, // Add display date
           updatedAt: new Date()
         };
 
@@ -1947,6 +2529,12 @@
           this.currentEditSelection = null;
           
           document.getElementById('editAppointmentModal').style.display = 'none';
+          
+          // Cleanup grid system
+          if (editGridSystem) {
+            editGridSystem.cleanup();
+            editGridSystem = null;
+          }
           
           Swal.fire({
             title: 'সফল!',
@@ -2020,28 +2608,47 @@
         }
       }
       
+      // ==================== CORRECTED SETUP EVENT LISTENERS ====================
       setupEventListeners() {
-        document.querySelector('.day-filter-appointments')?.addEventListener('change', (e) => {
-          const day = e.target.value;
-          const type = document.querySelector('.type-filter-appointments').value;
-          this.updateTimeFilterOptions(day, type);
-          this.loadAppointmentsTable();
+        // তারিখ ফিল্টার ইভেন্ট
+        document.getElementById('dateFilter')?.addEventListener('change', (e) => {
+          const dateValue = e.target.value;
+          
+          if (dateValue) {
+            // তারিখ সিলেক্ট করলে সপ্তাহের ইনফো হাইড করুন
+            const weekInfo = document.getElementById('currentWeekInfo');
+            if (weekInfo) {
+              weekInfo.style.display = 'none';
+            }
+            
+            // ফিল্টার করা তারিখের ইনফো দেখান
+            showFilteredDateInfo(dateValue);
+          } else {
+            // তারিখ ফিল্টার ক্লিয়ার করলে সপ্তাহের ইনফো দেখান
+            const weekInfo = document.getElementById('currentWeekInfo');
+            if (weekInfo) {
+              weekInfo.style.display = 'block';
+            }
+          }
+          
+          const searchTerm = document.querySelector('.search-appointments').value || '';
+          this.loadAppointmentsTable(searchTerm);
           this.updateStats();
         });
         
         document.querySelector('.type-filter-appointments')?.addEventListener('change', (e) => {
-          const day = document.querySelector('.day-filter-appointments').value;
-          const type = e.target.value;
-          this.updateTimeFilterOptions(day, type);
-          this.loadAppointmentsTable();
+          const searchTerm = document.querySelector('.search-appointments').value || '';
+          this.loadAppointmentsTable(searchTerm);
           this.updateStats();
         });
         
         document.getElementById('timeFilterSerial')?.addEventListener('change', () => {
-          this.loadAppointmentsTable();
+          const searchTerm = document.querySelector('.search-appointments').value || '';
+          this.loadAppointmentsTable(searchTerm);
           this.updateStats();
         });
         
+        // Search input event
         const searchInput = document.querySelector('.search-appointments');
         if (searchInput) {
           searchInput.addEventListener('input', (e) => {
@@ -2053,6 +2660,7 @@
           });
         }
         
+        // Add appointment button
         document.getElementById('addAppointmentBtn')?.addEventListener('click', () => {
           Swal.fire({
             title: 'শীঘ্রই আসছে!',
@@ -2061,10 +2669,12 @@
           });
         });
         
+        // Export button
         document.getElementById('exportAppointmentsBtn')?.addEventListener('click', () => {
           document.getElementById('exportModal').style.display = 'flex';
         });
         
+        // Export options
         document.querySelectorAll('.export-option').forEach(option => {
           option.addEventListener('click', (e) => {
             const format = e.currentTarget.getAttribute('data-format');
@@ -2072,10 +2682,12 @@
           });
         });
         
+        // Close export modal
         document.getElementById('closeExportModal')?.addEventListener('click', () => {
           document.getElementById('exportModal').style.display = 'none';
         });
         
+        // Select all checkboxes
         document.getElementById('selectAllAppointments')?.addEventListener('change', (e) => {
           const isChecked = e.target.checked;
           document.querySelectorAll('.appointment-checkbox').forEach(checkbox => {
@@ -2091,6 +2703,7 @@
           updateBulkActions();
         });
         
+        // Bulk select all
         document.getElementById('selectAll')?.addEventListener('change', (e) => {
           const isChecked = e.target.checked;
           document.querySelectorAll('.appointment-checkbox').forEach(checkbox => {
@@ -2107,48 +2720,84 @@
           updateBulkActions();
         });
         
+        // Bulk delete button
         document.getElementById('deleteSelectedBtn')?.addEventListener('click', () => {
           deleteSelectedAppointments();
         });
         
+        // Clear selection button
         document.getElementById('clearSelectionBtn')?.addEventListener('click', () => {
           clearSelection();
         });
         
+        // Edit form submit
         document.getElementById('editAppointmentForm')?.addEventListener('submit', (e) => {
           this.updateAppointment(e);
         });
         
+        // Edit modal day change
         document.getElementById('editDay')?.addEventListener('change', () => {
           this.updateEditTimeOptions();
           document.getElementById('editTime').value = '';
-          this.updateEditSerialGrid();
+          document.getElementById('editSerial').value = '';
+          
+          if (editGridSystem) {
+            editGridSystem.updateGrid();
+          }
         });
         
+        // Edit modal type change
         document.getElementById('editType')?.addEventListener('change', () => {
           this.updateEditTimeOptions();
           document.getElementById('editTime').value = '';
-          this.updateEditSerialGrid();
+          document.getElementById('editSerial').value = '';
+          
+          if (editGridSystem) {
+            editGridSystem.updateGrid();
+          }
         });
         
+        // Edit modal time change
         document.getElementById('editTime')?.addEventListener('change', () => {
-          this.updateEditSerialGrid();
+          document.getElementById('editSerial').value = '';
+          
+          if (editGridSystem) {
+            editGridSystem.updateGrid();
+          }
         });
         
+        // Close edit modal
         document.getElementById('closeEditModal')?.addEventListener('click', () => {
           document.getElementById('editAppointmentModal').style.display = 'none';
           this.currentEditSelection = null;
+          
+          if (editGridSystem) {
+            editGridSystem.cleanup();
+            editGridSystem = null;
+          }
         });
         
+        // Cancel edit modal
         document.getElementById('cancelEditModal')?.addEventListener('click', () => {
           document.getElementById('editAppointmentModal').style.display = 'none';
           this.currentEditSelection = null;
+          
+          if (editGridSystem) {
+            editGridSystem.cleanup();
+            editGridSystem = null;
+          }
         });
         
+        // Close modals on outside click
         window.addEventListener('click', (e) => {
           if (e.target === document.getElementById('editAppointmentModal')) {
             document.getElementById('editAppointmentModal').style.display = 'none';
             this.currentEditSelection = null;
+            
+            if (editGridSystem) {
+              editGridSystem.cleanup();
+              editGridSystem = null;
+            }
           }
           if (e.target === document.getElementById('exportModal')) {
             document.getElementById('exportModal').style.display = 'none';
@@ -2194,12 +2843,13 @@
       }
       
       exportData(format) {
-        const dayFilter = document.querySelector('.day-filter-appointments')?.value || 'all';
+        const dateFilter = document.getElementById('dateFilter')?.value || '';
         const typeFilter = document.querySelector('.type-filter-appointments')?.value || 'all';
         const timeFilter = document.getElementById('timeFilterSerial')?.value || 'all';
         const searchTerm = document.querySelector('.search-appointments')?.value || '';
         
         const filteredAppointments = this.appointments.filter(app => {
+          // Search term filter
           if (searchTerm && !(
             (app.name && app.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (app.phone && app.phone.includes(searchTerm)) ||
@@ -2208,20 +2858,34 @@
             return false;
           }
           
-          if (dayFilter !== 'all' && app.day !== dayFilter) {
-            return false;
-          }
-          
-          if (typeFilter !== 'all') {
-            const patientType = app.patientType || app.type;
-            if (patientType !== typeFilter) {
+          // Date filter
+          if (dateFilter) {
+            if (app.appointmentDate) {
+              if (app.appointmentDate !== dateFilter) return false;
+            }
+            else if (app.timestamp) {
+              let appointmentDate;
+              if (app.timestamp.seconds) {
+                appointmentDate = new Date(app.timestamp.seconds * 1000);
+              } else {
+                return false;
+              }
+              const appointmentDateStr = appointmentDate.toISOString().split('T')[0];
+              if (appointmentDateStr !== dateFilter) return false;
+            }
+            else {
               return false;
             }
           }
           
-          if (timeFilter !== 'all' && app.time !== timeFilter) {
-            return false;
+          // Type filter
+          if (typeFilter !== 'all') {
+            const patientType = app.patientType || app.type;
+            if (patientType !== typeFilter) return false;
           }
+          
+          // Time filter
+          if (timeFilter !== 'all' && app.time !== timeFilter) return false;
           
           return true;
         });
@@ -2271,7 +2935,7 @@
           
           const summaryLines = [
             `• Total Appointments: ${sortedAppointments.length}`,
-            `• Day: ${document.querySelector('.day-filter-appointments').value === 'all' ? 'All Days' : document.querySelector('.day-filter-appointments').value}`,
+            `• Date Filter: ${document.getElementById('dateFilter').value || 'Current Week'}`,
             `• Type: ${document.querySelector('.type-filter-appointments').value === 'all' ? 'All Types' : document.querySelector('.type-filter-appointments').value}`,
             `• Filtered Time: ${document.getElementById('timeFilterSerial').value === 'all' ? 'All Times' : document.getElementById('timeFilterSerial').value}`
           ];
@@ -2282,7 +2946,7 @@
             yPosition += 6;
           });
           
-          const headers = [['Serial', 'Patient Name', 'Age', 'Phone', 'Day', 'Time', 'Type', 'Booking Date']];
+          const headers = [['Serial', 'Patient Name', 'Age', 'Phone', 'Day', 'Time', 'Type', 'Appointment Date']];
           
           const data = sortedAppointments.map(app => [
             app.serial.toString(),
@@ -2292,9 +2956,10 @@
             app.day === 'Thursday' ? 'Thursday' : 'Friday',
             app.time,
             (app.patientType || app.type) === 'new' ? 'New' : 'Old',
-            app.timestamp ? 
-              new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
-              new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit'}) : 'N/A'
+            app.appointmentDateDisplay || 
+              (app.timestamp ? 
+                new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
+                new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit'}) : 'N/A')
           ]);
           
           doc.autoTable({
@@ -2357,9 +3022,10 @@
             'Day': app.day === 'Thursday' ? 'Thursday' : 'Friday',
             'Time': app.time,
             'Type': (app.patientType || app.type) === 'new' ? 'New Patient' : 'Old Patient',
-            'Booking Date': app.timestamp ? 
-              new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
-              new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit'}) : 'N/A'
+            'Appointment Date': app.appointmentDateDisplay || 
+              (app.timestamp ? 
+                new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
+                new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit'}) : 'N/A')
           }));
           
           const ws = XLSX.utils.json_to_sheet(data);
@@ -2412,7 +3078,7 @@
       <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2563eb;">
         <strong>Summary:</strong><br>
         • Total Appointments: ${sortedAppointments.length}<br>
-        • Day: ${document.querySelector('.day-filter-appointments').value === 'all' ? 'All Days' : document.querySelector('.day-filter-appointments').value}<br>
+        • Date Filter: ${document.getElementById('dateFilter').value || 'Current Week'}<br>
         • Type: ${document.querySelector('.type-filter-appointments').value === 'all' ? 'All Types' : document.querySelector('.type-filter-appointments').value}<br>
         • Filtered Time: ${document.getElementById('timeFilterSerial').value === 'all' ? 'All Times' : document.getElementById('timeFilterSerial').value}
       </div>
@@ -2426,13 +3092,14 @@
           <th>Day</th>
           <th>Time</th>
           <th>Type</th>
-          <th>Booking Date</th>
+          <th>Appointment Date</th>
         </tr>
         ${sortedAppointments.map(app => {
           const age = app.age || 'N/A';
-          const bookingDate = app.timestamp ? 
-            new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
-            new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit'}) : 'N/A';
+          const appointmentDate = app.appointmentDateDisplay || 
+            (app.timestamp ? 
+              new Date(app.timestamp.seconds * 1000).toLocaleDateString('en-BD') + ' ' + 
+              new Date(app.timestamp.seconds * 1000).toLocaleTimeString('en-BD', {hour: '2-digit', minute: '2-digit'}) : 'N/A');
           
           return `
         <tr>
@@ -2443,7 +3110,7 @@
           <td>${app.day === 'Thursday' ? 'Thursday' : 'Friday'}</td>
           <td>${app.time}</td>
           <td>${(app.patientType || app.type) === 'new' ? 'New' : 'Old'}</td>
-          <td>${bookingDate}</td>
+          <td>${appointmentDate}</td>
         </tr>`;
         }).join('')}
       </table>
@@ -2521,7 +3188,7 @@
       <div style="background: #f8fafc; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #2563eb; font-size: 11px;">
         <strong>Summary:</strong><br>
         • Total Appointments: ${sortedAppointments.length}<br>
-        • Day: ${document.querySelector('.day-filter-appointments').value === 'all' ? 'All Days' : document.querySelector('.day-filter-appointments').value}<br>
+        • Date Filter: ${document.getElementById('dateFilter').value || 'Current Week'}<br>
         • Type: ${document.querySelector('.type-filter-appointments').value === 'all' ? 'All Types' : document.querySelector('.type-filter-appointments').value}<br>
         • Filtered Time: ${document.getElementById('timeFilterSerial').value === 'all' ? 'All Times' : document.getElementById('timeFilterSerial').value}
       </div>
@@ -2535,7 +3202,7 @@
           <th style="width: 10%">Day</th>
           <th style="width: 10%">Time</th>
           <th style="width: 10%">Type</th>
-          <th style="width: 15%">Booking Date</th>
+          <th style="width: 15%">Appointment Date</th>
         </tr>
         ${sortedAppointments.map(app => {
           let age = 'N/A';
@@ -2554,8 +3221,10 @@
             }
           }
           
-          let bookingDate = 'N/A';
-          if (app.timestamp) {
+          let appointmentDate = 'N/A';
+          if (app.appointmentDateDisplay) {
+            appointmentDate = app.appointmentDateDisplay;
+          } else if (app.timestamp) {
             let dateObj;
             
             if (app.timestamp.toDate && typeof app.timestamp.toDate === 'function') {
@@ -2574,7 +3243,7 @@
                 hour: '2-digit', 
                 minute: '2-digit'
               });
-              bookingDate = `${dateStr} ${timeStr}`;
+              appointmentDate = `${dateStr} ${timeStr}`;
             }
           }
           
@@ -2587,7 +3256,7 @@
           <td style="width: 10%">${app.day === 'Thursday' ? 'Thursday' : 'Friday'}</td>
           <td style="width: 10%">${app.time}</td>
           <td style="width: 10%">${(app.patientType || app.type) === 'new' ? 'New' : 'Old'}</td>
-          <td style="width: 15%">${bookingDate}</td>
+          <td style="width: 15%">${appointmentDate}</td>
         </tr>`;
         }).join('')}
       </table>
@@ -2644,6 +3313,11 @@
             unsubscribe();
           }
         });
+        
+        if (editGridSystem) {
+          editGridSystem.cleanup();
+          editGridSystem = null;
+        }
       }
     }
 
@@ -2679,15 +3353,20 @@
           appointmentsManager = new AppointmentsManagement();
           console.log('✅ Appointments Management initialized');
           
+          // বর্তমান সপ্তাহের তথ্য দেখান
           setTimeout(() => {
-            Swal.fire({
-              title: 'স্বাগতম!',
-              text: 'অ্যাপয়েন্টমেন্ট ম্যানেজমেন্ট সিস্টেমে স্বাগতম',
-              icon: 'success',
-              timer: 2000,
-              showConfirmButton: false
-            });
-          }, 1000);
+            displayCurrentWeekInfo();
+          }, 500);
+          
+          // setTimeout(() => {
+          //   Swal.fire({
+          //     title: 'স্বাগতম!',
+          //     text: 'অ্যাপয়েন্টমেন্ট ম্যানেজমেন্ট সিস্টেমে স্বাগতম',
+          //     icon: 'success',
+          //     timer: 2000,
+          //     showConfirmButton: false
+          //   });
+          // }, 1000);
         }, 100);
       }
     });
