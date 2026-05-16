@@ -6,6 +6,7 @@
   <title>ড্যাশবোর্ড</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 
@@ -1362,90 +1363,110 @@
 
   <div id="footer-container"></div>
   
-  <!-- কুইক সিরিয়াল মোডাল -->
-  <div class="modal" id="quickSerialModal">
-    <div class="modal-content">
-      <h2 style="margin-bottom: 20px; color: var(--dark);">সিরিয়াল যুক্ত করুন</h2>
-      <button class="close-btn" id="closeQuickModal">&times;</button>
+<!-- কুইক সিরিয়াল মোডাল -->
+<div class="modal" id="quickSerialModal">
+  <div class="modal-content">
+    <h2 style="margin-bottom: 20px; color: var(--dark);">সিরিয়াল যুক্ত করুন</h2>
+    <button class="close-btn" id="closeQuickModal">&times;</button>
+    
+    <form id="quickSerialForm">
+      <div class="form-group">
+        <label for="quickDay">দিন</label>
+        <select id="quickDay" required>
+          <option value="">দিন নির্বাচন করুন</option>
+          <option value="Thursday">বৃহস্পতিবার</option>
+          <option value="Friday">শুক্রবার</option>
+        </select>
+      </div>
       
-      <form id="quickSerialForm">
-        <div class="form-group">
-          <label for="quickDay">দিন</label>
-          <select id="quickDay" required>
-            <option value="">দিন নির্বাচন করুন</option>
-            <option value="Thursday">বৃহস্পতিবার</option>
-            <option value="Friday">শুক্রবার</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label for="quickTime">সময়</label>
-          <select id="quickTime" required>
-            <option value="">সময় নির্বাচন করুন</option>
-          </select>
-        </div>
-        
-        <!-- রোগীর ধরন -->
-        <div class="form-group">
-          <label>রোগীর ধরন</label>
-          <div class="serial-types">
-            <div class="serial-type-card selected" data-type="new">
-              <h4>নতুন রোগী</h4>
-            </div>
-            <div class="serial-type-card" data-type="old">
-              <h4>পুরাতন রোগী</h4>
-            </div>
+      <div class="form-group">
+        <label for="quickTime">সময়</label>
+        <select id="quickTime" required>
+          <option value="">সময় নির্বাচন করুন</option>
+        </select>
+      </div>
+      
+      <!-- রোগীর ধরন -->
+      <div class="form-group">
+        <label>রোগীর ধরন</label>
+        <div class="serial-types">
+          <div class="serial-type-card selected" data-type="new">
+            <h4>নতুন রোগী</h4>
           </div>
-          <input type="hidden" id="selectedPatientType" value="new">
-        </div>
-        
-        <!-- সিরিয়াল গ্রিড (grid.js দ্বারা পরিচালিত হবে) -->
-        <div class="form-group">
-          <label>সিরিয়াল নির্বাচন করুন</label>
-          <div class="serial-grid" id="serialGrid">
-            <!-- grid.js দ্বারা ডায়নামিকভাবে লোড হবে -->
+          <div class="serial-type-card" data-type="old">
+            <h4>পুরাতন রোগী</h4>
           </div>
-          <input type="hidden" id="serialInput" value="">
-          <small style="color: var(--gray); font-size: 12px; display: block; margin-top: 5px;">
-            খালি সিরিয়ালে ক্লিক করুন
-          </small>
         </div>
+        <input type="hidden" id="selectedPatientType" value="new">
+      </div>
+      
+      <!-- সিরিয়াল গ্রিড (grid.js দ্বারা পরিচালিত হবে) -->
+      <div class="form-group">
+        <label>সিরিয়াল নির্বাচন করুন</label>
+        <div class="serial-grid" id="serialGrid">
+          <!-- grid.js দ্বারা ডায়নামিকভাবে লোড হবে -->
+        </div>
+        <input type="hidden" id="serialInput" value="">
+        <small style="color: var(--gray); font-size: 12px; display: block; margin-top: 5px;">
+          💡 প্রতিটি রোগীর জন্য আলাদা সিরিয়ালে ক্লিক করুন
+        </small>
+      </div>
+      
+      <!-- 👥 একাধিক রোগীর তথ্য সেকশন -->
+      <div class="form-group">
+        <label style="display: flex; justify-content: space-between; align-items: center;">
+          <span>👥 রোগীর তথ্য</span>
+          <button type="button" id="addPatientBtn" class="btn-add-patient" style="padding: 5px 12px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+            <i class="fas fa-plus"></i> আরও রোগী যোগ করুন
+          </button>
+        </label>
         
-        <div class="form-group">
-          <label for="quickName">রোগীর নাম *</label>
-          <input type="text" id="quickName" required placeholder="রোগীর নাম লিখুন">
-        </div>
+        <div id="patientsContainer">
+  <div class="patient-card active" data-patient-index="0" style="background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 2px solid #3b82f6;">
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" class="patient-name" placeholder="রোগীর নাম *" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;" required>
         
-        <div class="form-group">
-          <label for="quickAge">বয়স</label>
-          <div class="age-inputs">
-            <div>
-              <input type="number" id="quickAgeYears" min="0" max="120" placeholder="বছর">
-            </div>
-            <div>
-              <input type="number" id="quickAgeMonths" min="0" max="11" placeholder="মাস">
-            </div>
-            <div>
-              <input type="number" id="quickAgeDays" min="0" max="30" placeholder="দিন">
-            </div>
-          </div>
-          <small style="color: var(--gray); font-size: 12px; display: block; margin-top: 5px;">
-            কমপক্ষে একটি ফিল্ড পূরণ করুন
-          </small>
-        </div>
-        
-        <div class="form-group">
-          <label for="quickPhone">ফোন নম্বর (ঐচ্ছিক)</label>
-          <input type="text" id="quickPhone" placeholder="01XXXXXXXXX">
-        </div>
-        
-        <div class="form-actions">
-          <button type="button" class="cancel-btn-modal" id="cancelQuickModal">বাতিল</button>
-          <button type="submit" class="submit-btn" id="submitQuickBtn">সিরিয়াল যুক্ত করুন</button>
-        </div>
-      </form>
+        <button type="button" class="remove-patient-btn" style="background: #ef4444; color: white; border: none; border-radius: 6px; width: 38px; height: 38px; cursor: pointer; display: none; align-items: center; justify-content: center;">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <input type="number" class="patient-age-years" min="0" max="120" placeholder="বছর" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+        <input type="number" class="patient-age-months" min="0" placeholder="মাস" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+        <input type="number" class="patient-age-days" min="0" placeholder="দিন" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+      </div>
+
+    </div>
+
+    <div class="selected-serial-display" style="margin-top: 12px; font-size: 12px; color: #2563eb; display: none; background: #dbeafe; padding: 6px 10px; border-radius: 6px;">
+      📍 সিলেক্টেড সিরিয়াল: <span class="serial-numbers">—</span>
     </div>
   </div>
+</div>
+      
+      <!-- ফোন ফিল্ড (একটি মাত্র, সব রোগীর জন্য কমন) -->
+      <div class="form-group">
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+          <input type="checkbox" id="skipPhoneCheckbox" style="width: 18px; height: 18px; cursor: pointer;">
+          <span>ফোন নম্বর ছাড়া বুকিং করুন</span>
+        </label>
+        <div id="phoneFieldContainer">
+          <input type="tel" id="quickPhone" placeholder="01XXXXXXXXX" pattern="01[0-9]{9}"
+            title="বাংলাদেশের ১১ ডিজিটের মোবাইল নম্বর লিখুন" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+          <small style="color: var(--gray); font-size: 12px;">📱 ফোন নম্বর দিন অথবা উপরের চেকবক্স টিক দিন</small>
+        </div>
+      </div>
+      
+      <div class="form-actions">
+        <button type="button" class="cancel-btn-modal" id="cancelQuickModal">বাতিল</button>
+        <button type="submit" class="submit-btn" id="submitQuickBtn">সিরিয়াল যুক্ত করুন</button>
+      </div>
+    </form>
+  </div>
+</div>
   
   <script>
 
@@ -1609,33 +1630,242 @@ if (!checkAuthentication()) {
       }).replace(/\d/g, toBengaliNumber);
     };
     
-    const getAgeDisplay = (data) => {
-      let ageDisplay = '';
+    // বয়স নরমালাইজেশনের জন্য ফাংশন
+function normalizeAge(years, months, days) {
+  let normalizedYears = years || 0;
+  let normalizedMonths = months || 0;
+  let normalizedDays = days || 0;
+  
+  // দিন থেকে মাস (30 দিন = 1 মাস)
+  if (normalizedDays >= 30) {
+    const extraMonths = Math.floor(normalizedDays / 30);
+    normalizedMonths += extraMonths;
+    normalizedDays = normalizedDays % 30;
+  }
+  
+  // মাস থেকে বছর (12 মাস = 1 বছর)
+  if (normalizedMonths >= 12) {
+    const extraYears = Math.floor(normalizedMonths / 12);
+    normalizedYears += extraYears;
+    normalizedMonths = normalizedMonths % 12;
+  }
+  
+  return {
+    years: normalizedYears,
+    months: normalizedMonths,
+    days: normalizedDays
+  };
+}
+
+    // =======================================================
+    // ✅ মাল্টি পেশেন্ট ফাংশন (এখানে যোগ করুন)
+    // =======================================================
+
+// রোগী যোগ করার ফাংশন
+function addPatientField() {
+  const container = document.getElementById('patientsContainer');
+  if (!container) return;
+  
+  const patientCount = container.children.length;
+  
+  const patientDiv = document.createElement('div');
+  patientDiv.className = 'patient-card';
+  patientDiv.setAttribute('data-patient-index', patientCount);
+  patientDiv.style.cssText = 'background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 1px solid #e5e7eb;';
+  
+  patientDiv.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 12px;">
       
-      if (data.ageYears || data.ageMonths || data.ageDays) {
-        const years = data.ageYears || 0;
-        const months = data.ageMonths || 0;
-        const days = data.ageDays || 0;
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <input type="text" class="patient-name" placeholder="রোগীর নাম *" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;" required>
         
-        if (years > 0) ageDisplay += `${toBengaliNumber(years)} বছর`;
-        if (months > 0) {
-          if (ageDisplay) ageDisplay += ', ';
-          ageDisplay += `${toBengaliNumber(months)} মাস`;
+        <button type="button" class="remove-patient-btn" style="background: #ef4444; color: white; border: none; border-radius: 6px; width: 38px; height: 38px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <input type="number" class="patient-age-years" min="0" max="120" placeholder="বছর" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+        <input type="number" class="patient-age-months" min="0" placeholder="মাস" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+        <input type="number" class="patient-age-days" min="0" placeholder="দিন" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
+      </div>
+
+    </div>
+
+    <div class="selected-serial-display" style="margin-top: 12px; font-size: 12px; color: #2563eb; display: none; background: #dbeafe; padding: 6px 10px; border-radius: 6px;">
+      📍 সিলেক্টেড সিরিয়াল: <span class="serial-numbers">—</span>
+    </div>
+  `;
+  
+  container.appendChild(patientDiv);
+  
+  // ডিলিট বাটনের ইভেন্ট লিসেনার
+  const removeBtn = patientDiv.querySelector('.remove-patient-btn');
+  removeBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // কার্ডের ক্লিক ইভেন্ট যেন বন্ধ থাকে
+    removePatientField(patientDiv);
+  });
+  
+  // কার্ডের বডিতে ক্লিক ইভেন্ট (অ্যাক্টিভ করার জন্য)
+  patientDiv.addEventListener('click', (e) => {
+    if (!e.target.closest('.remove-patient-btn')) {
+      setActivePatient(patientDiv);
+    }
+  });
+  
+  updatePatientIndices();
+}
+
+    // রোগী রিমুভ ফাংশন
+    function removePatientField(patientDiv) {
+      const patients = document.querySelectorAll('.patient-card');
+      if (patients.length === 1) {
+        showAlert('কমপক্ষে একজন রোগী থাকতে হবে', 'warning');
+        return;
+      }
+      patientDiv.remove();
+      updatePatientIndices();
+      
+      const firstPatient = document.querySelector('.patient-card');
+      if (firstPatient) {
+        setActivePatient(firstPatient);
+      }
+    }
+
+    // সক্রিয় রোগী সেট করুন
+    function setActivePatient(patientDiv) {
+      document.querySelectorAll('.patient-card').forEach(card => {
+        card.classList.remove('active');
+        card.style.background = '#f9fafb';
+        card.style.border = '1px solid #e5e7eb';
+      });
+      
+      patientDiv.classList.add('active');
+      patientDiv.style.background = '#eff6ff';
+      patientDiv.style.border = '2px solid #3b82f6';
+      
+      const patientIndex = parseInt(patientDiv.getAttribute('data-patient-index'));
+      if (gridSystem) {
+        gridSystem.setCurrentPatientIndex(patientIndex);
+        updateAllSerialDisplays();
+      }
+    }
+
+    // ইন্ডেক্স আপডেট
+    function updatePatientIndices() {
+      const patients = document.querySelectorAll('.patient-card');
+      patients.forEach((patient, index) => {
+        patient.setAttribute('data-patient-index', index);
+      });
+    }
+
+    // সব সিরিয়াল ডিসপ্লে আপডেট
+    function updateAllSerialDisplays() {
+      if (!gridSystem) return;
+      
+      const patients = document.querySelectorAll('.patient-card');
+      patients.forEach((patient, index) => {
+        const serials = gridSystem.getSerialsForPatient(index);
+        const displayDiv = patient.querySelector('.selected-serial-display');
+        const serialSpan = patient.querySelector('.serial-numbers');
+        
+        if (displayDiv && serialSpan) {
+          if (serials && serials.length > 0) {
+            serialSpan.textContent = serials.join(', ');
+            displayDiv.style.display = 'block';
+          } else {
+            serialSpan.textContent = '—';
+            displayDiv.style.display = 'none';
+          }
         }
-        if (days > 0) {
-          if (ageDisplay) ageDisplay += ', ';
-          ageDisplay += `${toBengaliNumber(days)} দিন`;
-        }
-      } else if (data.age) {
-        if (typeof data.age === 'number' && data.age > 0) {
-          ageDisplay = `${toBengaliNumber(data.age)} বছর`;
-        } else if (typeof data.age === 'string') {
-          ageDisplay = data.age;
-        }
+      });
+    }
+
+    // সব রোগীর ডাটা সংগ্রহ
+    function getAllPatientsData() {
+      const patients = document.querySelectorAll('.patient-card');
+      const patientsData = [];
+      
+      patients.forEach((patient, index) => {
+        const name = patient.querySelector('.patient-name').value.trim();
+        const years = parseInt(patient.querySelector('.patient-age-years').value) || 0;
+        const months = parseInt(patient.querySelector('.patient-age-months').value) || 0;
+        const days = parseInt(patient.querySelector('.patient-age-days').value) || 0;
+        
+        patientsData.push({
+          index: index,
+          name: name,
+          ageYears: years,
+          ageMonths: months,
+          ageDays: days
+        });
+      });
+      
+      return patientsData;
+    }
+
+    // একটি মাত্র ফোন নম্বর নেওয়ার ফাংশন
+    function getCommonPhoneNumber() {
+      const skipPhoneCheckbox = document.getElementById('skipPhoneCheckbox');
+      const skipPhone = skipPhoneCheckbox ? skipPhoneCheckbox.checked : false;
+      
+      if (skipPhone) {
+        return null;
       }
       
-      return ageDisplay || '—';
-    };
+      const phone = document.getElementById('quickPhone').value.trim();
+      if (!phone) {
+        return null;
+      }
+      
+      if (!/^01[0-9]{9}$/.test(phone)) {
+        return null;
+      }
+      
+      return phone;
+    }
+
+    // সক্রিয় রোগীর ইন্ডেক্স বের করুন
+    function getActivePatientIndex() {
+      const activePatient = document.querySelector('.patient-card.active');
+      if (activePatient) {
+        return parseInt(activePatient.getAttribute('data-patient-index'));
+      }
+      return 0;
+    }
+
+    // =======================================================
+    // এরপর getAgeDisplay ফাংশন
+    // =======================================================
+   const getAgeDisplay = (data) => {
+  let ageDisplay = '';
+  
+  // ✅ নরমালাইজড বয়স ফিল্ড ব্যবহার করুন
+  const years = data.ageYears || 0;
+  const months = data.ageMonths || 0;
+  const days = data.ageDays || 0;
+  
+  if (years > 0 || months > 0 || days > 0) {
+    if (years > 0) ageDisplay += `${toBengaliNumber(years)} বছর`;
+    if (months > 0) {
+      if (ageDisplay) ageDisplay += ', ';
+      ageDisplay += `${toBengaliNumber(months)} মাস`;
+    }
+    if (days > 0) {
+      if (ageDisplay) ageDisplay += ', ';
+      ageDisplay += `${toBengaliNumber(days)} দিন`;
+    }
+  } else if (data.age) {
+    // ব্যাকআপ: পুরনো ডাটার জন্য
+    if (typeof data.age === 'number' && data.age > 0) {
+      ageDisplay = `${toBengaliNumber(data.age)} বছর`;
+    } else if (typeof data.age === 'string') {
+      ageDisplay = data.age;
+    }
+  }
+  
+  return ageDisplay || '—';
+};
 
     // demo.html এর মত showAlert ফাংশন
     const showAlert = (message, type = 'info') => {
@@ -2486,126 +2716,97 @@ async function updateStatus(button) {
     }
     
     async function initializeGridSystem() {
-      console.log("🚀 initializeGridSystem শুরু...");
-      
-      if (!db) {
-        console.error("❌ Firebase DB নেই");
-        showAlert('Firebase সংযোগ নেই', 'error');
-        return;
-      }
-      
-      // DOM উপাদান চেক
-      if (!elements.serialGrid) {
-        console.error("❌ serialGrid উপাদান পাওয়া যায়নি");
-        console.log("serialGrid element:", document.getElementById('serialGrid'));
-        return;
-      }
-      
-      console.log("✅ DOM উপাদান পাওয়া গেছে:", {
-        serialGrid: elements.serialGrid,
-        quickDay: elements.quickDay.value,
-        quickTime: elements.quickTime.value,
-        selectedPatientType: elements.selectedPatientType.value
-      });
-      
-      // ✅ Grid সিস্টেম ক্লিনআপ (যদি আগে থেকে থাকে)
-      if (gridSystem) {
-        console.log("🧹 পুরানো Grid System ক্লিনআপ করা হচ্ছে");
-        try {
-          gridSystem.cleanup();
-        } catch (e) {
-          console.warn("⚠️ ক্লিনআপে সমস্যা:", e);
-        }
-        gridSystem = null;
-      }
-      
-      try {
-        // ✅ লোডিং মেসেজ দেখান
-        elements.serialGrid.innerHTML = '<div style="padding: 20px; text-align: center; color: #3b82f6;">গ্রিড লোড হচ্ছে...</div>';
-        
-        // ✅ প্রথমে serialRanges লোড করা হয়েছে কিনা চেক করুন
-        if (Object.keys(serialRanges).length === 0) {
-          console.log("🔄 serialRanges খালি, আবার লোড হচ্ছে...");
-          await loadSerialRanges();
-        }
-        
-        console.log("✅ serialRanges লোড হয়েছে:", serialRanges);
-        
-        // ✅ Grid System তৈরি
-        gridSystem = new RealTimeGridSystem({
-          db: db,
-          gridContainerId: 'serialGrid',
-          selectedSerialInputId: 'serialInput',
-          dayElementId: 'quickDay',
-          timeElementId: 'quickTime',
-          typeElementId: 'selectedPatientType',
-          mode: 'admin',
-          adminSessionId: adminSessionId,
-          adminPendingExpiry: 2 * 60 * 1000, // 2 minutes
-          
-          onSerialClick: function(data) {
-            console.log('Serial clicked:', data);
-            if (data.status === 'pending') {
-              console.log(`Serial ${data.serial} selected for admin`);
-            }
-          },
-          
-          onGridUpdate: function(type, data) {
-            console.log(`Grid updated: ${type}`, data);
-            
-            if (type === 'grid') {
-              console.log("✅ Grid successfully rendered");
-            }
-          },
-          
-          onPendingUpdate: function(pendingData) {
-            console.log('Pending selections updated:', pendingData);
-          }
-        });
-        
-        console.log("✅ Grid System তৈরি হয়েছে, init কল হচ্ছে...");
-        
-        // Grid সিস্টেম ইনিশিয়ালাইজ
-        const success = await gridSystem.init();
-        
-        if (success) {
-          console.log("✅ Grid System সফলভাবে ইনিশিয়ালাইজ হয়েছে");
-          
-          // সময় অপশন আপডেট
-          updateQuickTimeOptions();
-          
-          // প্রথমবারের মতো গ্রিড আপডেট
-          setTimeout(() => {
-            if (gridSystem) {
-              gridSystem.updateGrid();
-              console.log("✅ Grid update complete");
-            }
-          }, 100);
-          
-        } else {
-          console.error("❌ Grid System ইনিশিয়ালাইজ ব্যর্থ");
-          elements.serialGrid.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc2626;">গ্রিড লোড করতে সমস্যা হয়েছে</div>';
-          showAlert('গ্রিড সিস্টেম লোড করতে সমস্যা হয়েছে', 'error');
-        }
-        
-      } catch (error) {
-        console.error("❌ Grid System তৈরি/ইনিশিয়ালাইজ ত্রুটি:", error);
-        console.error("Error details:", error.stack);
-        
-        elements.serialGrid.innerHTML = `
-          <div style="padding: 20px; text-align: center; color: #dc2626;">
-            <strong>গ্রিড লোড করতে সমস্যা:</strong><br>
-            ${error.message}
-            <br><br>
-            <button onclick="location.reload()" style="padding: 8px 16px; background: #2563eb; color: white; border: none; border-radius: 4px;">
-              পৃষ্ঠা রিফ্রেশ করুন
-            </button>
-          </div>
-        `;
-        
-        showAlert('গ্রিড সিস্টেম লোড করতে সমস্যা হয়েছে', 'error');
-      }
+  console.log("🚀 অ্যাডমিন Grid System ইনিশিয়ালাইজ (মাল্টি সিলেক্ট)...");
+  
+  if (!db) {
+    console.error("❌ Firebase DB নেই");
+    showAlert('Firebase সংযোগ নেই', 'error');
+    return;
+  }
+  
+  if (!elements.serialGrid) {
+    console.error("❌ serialGrid উপাদান পাওয়া যায়নি");
+    return;
+  }
+  
+  if (gridSystem) {
+    try {
+      gridSystem.cleanup();
+    } catch (e) {
+      console.warn("⚠️ ক্লিনআপে সমস্যা:", e);
     }
+    gridSystem = null;
+  }
+  
+  try {
+   elements.serialGrid.innerHTML = '<div style="grid-column: 1 / -1; display: flex; justify-content: center; align-items: center; width: 100%; padding: 20px; text-align: center; color: #3b82f6; white-space: nowrap;">গ্রিড লোড হচ্ছে...</div>';
+    
+    if (Object.keys(serialRanges).length === 0) {
+      await loadSerialRanges();
+    }
+    
+    // ✅ মাল্টি সিলেক্ট সক্ষম করে Grid System তৈরি
+    gridSystem = new RealTimeGridSystem({
+      db: db,
+      gridContainerId: 'serialGrid',
+      selectedSerialInputId: 'serialInput',
+      dayElementId: 'quickDay',
+      timeElementId: 'quickTime',
+      typeElementId: 'selectedPatientType',
+      mode: 'admin',
+      adminSessionId: adminSessionId,
+      adminPendingExpiry: 5 * 60 * 1000,
+      multiSelect: true,
+      
+      onSerialClick: function(data) {
+        console.log('Serial clicked:', data);
+        const activeIndex = getActivePatientIndex();
+        if (gridSystem) {
+          gridSystem.setCurrentPatientIndex(activeIndex);
+          updateAllSerialDisplays();
+        }
+      },
+      
+      onGridUpdate: function(type, data) {
+        console.log(`Grid updated: ${type}`, data);
+      },
+      
+      onPendingUpdate: function(pendingData) {
+        console.log('Pending selections updated:', pendingData);
+        updateAllSerialDisplays();
+      }
+    });
+    
+    const success = await gridSystem.init();
+    
+    if (success) {
+      console.log("✅ অ্যাডমিন Grid System সফলভাবে ইনিশিয়ালাইজ হয়েছে");
+      updateQuickTimeOptions();
+      
+      setTimeout(() => {
+        if (gridSystem) {
+          gridSystem.updateGrid();
+        }
+      }, 100);
+    } else {
+      console.error("❌ Grid System ইনিশিয়ালাইজ ব্যর্থ");
+      elements.serialGrid.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc2626;">গ্রিড লোড করতে সমস্যা হয়েছে</div>';
+    }
+    
+  } catch (error) {
+    console.error("❌ Grid System তৈরি ত্রুটি:", error);
+    elements.serialGrid.innerHTML = `<div style="padding: 20px; text-align: center; color: #dc2626;">ত্রুটি: ${error.message}</div>`;
+  }
+}
+
+// সক্রিয় রোগীর ইন্ডেক্স বের করুন
+function getActivePatientIndex() {
+  const activePatient = document.querySelector('.patient-card.active');
+  if (activePatient) {
+    return parseInt(activePatient.getAttribute('data-patient-index'));
+  }
+  return 0;
+}
     
     function updateQuickTimeOptions() {
       const day = elements.quickDay.value;
@@ -2731,160 +2932,254 @@ function getNextDateByDay(targetDay) {
 }
     
 async function addQuickSerial() {
+  const startTime = Date.now();
+  console.log('🚀 সিরিয়াল বুকিং শুরু...');
+  
   if (!db) {
     showAlert('Firebase সংযোগ নেই', 'error');
     return;
   }
   
-  const name = elements.quickName.value.trim();
+  if (!gridSystem) {
+    showAlert('গ্রিড সিস্টেম লোড হয়নি', 'error');
+    return;
+  }
+  
   const day = elements.quickDay.value;
   const time = elements.quickTime.value;
   const type = elements.selectedPatientType.value;
-  const serial = parseInt(elements.serialInput.value);
-  const years = parseInt(elements.quickAgeYears.value) || 0;
-  const months = parseInt(elements.quickAgeMonths.value) || 0;
-  const days = parseInt(elements.quickAgeDays.value) || 0;
-  const phone = elements.quickPhone.value.trim();
-  
-  // ভ্যালিডেশন
-  if (!name) {
-    showAlert('রোগীর নাম প্রয়োজন', 'error');
-    return;
-  }
   
   if (!day || !time) {
     showAlert('দিন এবং সময় নির্বাচন করুন', 'error');
     return;
   }
   
-  if (!serial) {
-    showAlert('সিরিয়াল নির্বাচন করুন', 'error');
+  const allPatients = getAllPatientsData();
+  const phone = getCommonPhoneNumber();
+  
+  // ফোন চেক
+  const skipPhoneCheckbox = document.getElementById('skipPhoneCheckbox');
+  const skipPhone = skipPhoneCheckbox ? skipPhoneCheckbox.checked : false;
+  
+  if (!skipPhone && (!phone || !/^01[0-9]{9}$/.test(phone))) {
+    showAlert('সঠিক ফোন নম্বর দিন অথবা "ফোন ছাড়া বুকিং" চেকবক্স টিক করুন', 'error');
     return;
   }
   
-  if (years === 0 && months === 0 && days === 0) {
-    showAlert('বয়স দিন', 'error');
-    return;
-  }
+  // ভ্যালিডেশন
+  let hasError = false;
+  const selectedSerials = [];
   
-  // ✅ আসল অ্যাপয়েন্টমেন্ট তারিখ বের করুন
-  const appointmentDateInfo = getNextDateByDay(day);
-  
-  // চেক ১: একই দিন, সময়, টাইপ, সিরিয়াল এবং তারিখের জন্য বুকিং আছে কিনা
-  const appointmentDateStr = appointmentDateInfo.dateString; // "2024-01-22"
-  
-  const activeAppointment = appointments.find(app => {
-    const patientType = app.patientType || app.type;
+  for (let i = 0; i < allPatients.length; i++) {
+    const patient = allPatients[i];
     
-    // দিন, সময়, টাইপ, সিরিয়াল মিলছে কিনা
-    if (app.day === day && 
-        app.time === time && 
-        patientType === type &&
-        app.serial === serial) {
-      
-      // ✅ এখন তারিখও চেক করুন
-      if (app.appointmentDate) {
-        // যদি আগে থেকে appointmentDate থাকে
-        return app.appointmentDate === appointmentDateStr;
-      } else {
-        // পুরাতন রেকর্ডের জন্য (appointmentDate নেই)
-        // টাইমস্ট্যাম্প থেকে তারিখ বের করুন
-        if (app.timestamp && app.timestamp.toDate) {
-          const appDate = app.timestamp.toDate();
-          const appDateStr = `${appDate.getFullYear()}-${String(appDate.getMonth() + 1).padStart(2, '0')}-${String(appDate.getDate()).padStart(2, '0')}`;
-          return appDateStr === appointmentDateStr;
-        }
-        return true; // সাবধানতার জন্য true রিটার্ন
-      }
+    if (!patient.name) {
+      showAlert(`রোগী ${i + 1} এর নাম দিন`, 'error');
+      hasError = true;
     }
-    return false;
-  });
+    
+    const hasAge = patient.ageYears > 0 || patient.ageMonths > 0 || patient.ageDays > 0;
+    if (!hasAge) {
+      showAlert(`রোগী ${i + 1} (${patient.name || 'নাম নেই'}) এর বয়স দিন`, 'error');
+      hasError = true;
+    }
+    
+    const patientSerials = gridSystem.getSerialsForPatient(i);
+    if (patientSerials.length === 0) {
+      showAlert(`রোগী ${i + 1} (${patient.name || 'নাম নেই'}) এর জন্য সিরিয়াল সিলেক্ট করুন`, 'error');
+      hasError = true;
+    } else if (patientSerials.length > 1) {
+      showAlert(`রোগী ${i + 1} (${patient.name}) এর জন্য একাধিক সিরিয়াল সিলেক্ট করেছেন। প্রতিটি রোগীর জন্য একটি করে সিরিয়াল সিলেক্ট করুন।`, 'error');
+      hasError = true;
+    } else {
+      selectedSerials.push(patientSerials[0]);
+    }
+  }
   
-  if (activeAppointment) {
-    showAlert(`সিরিয়াল #${serial} ইতিমধ্যে ${appointmentDateInfo.displayDate} তারিখের জন্য বুক করা হয়েছে!`, 'error');
+  if (hasError) return;
+  
+  // ডুপ্লিকেট সিরিয়াল চেক
+  const uniqueSerials = [...new Set(selectedSerials)];
+  if (uniqueSerials.length !== selectedSerials.length) {
+    showAlert('একই সিরিয়াল একাধিক রোগীর জন্য সিলেক্ট করা যাবে না!', 'error');
     return;
   }
+  
+  // UI আপডেট
+  const submitBtn = document.getElementById('submitQuickBtn');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> যুক্ত করা হচ্ছে...';
+  submitBtn.disabled = true;
   
   try {
-    // বয়স স্ট্রিং তৈরি
-    let ageString = '';
-    if (years > 0) ageString += `${years} বছর`;
-    if (months > 0) {
-      if (ageString) ageString += ', ';
-      ageString += `${months} মাস`;
-    }
-    if (days > 0) {
-      if (ageString) ageString += ', ';
-      ageString += `${days} দিন`;
-    }
+    const appointmentDateInfo = getNextDateByDay(day);
+    const allSelectedDetails = gridSystem.getAllSelectedSerialsWithDetails();
     
-    // ✅ **সম্পূর্ণ আপডেটেড ডাটা**
-    const appointmentData = {
-      name: name,
-      age: ageString,
-      ageYears: years,
-      ageMonths: months,
-      ageDays: days,
-      phone: phone || null,
-      day: day,
-      time: time,
-      patientType: type,
-      type: type,
-      serial: serial,
-      called: false,
-      tokenGiven: false,
-      status: 'confirmed',
+    // ✅ BATCH WRITE - সব অপারেশন একসাথে
+    const batch = db.batch();
+    
+    for (let i = 0; i < allPatients.length; i++) {
+      const patient = allPatients[i];
+      const serial = selectedSerials[i];
+      const pendingDetail = allSelectedDetails.find(d => d.serial === serial && d.patientIndex === i);
       
-      // ✅ নতুন ফিল্ড যোগ করুন
-      appointmentDate: appointmentDateInfo.dateString, // "2024-01-22"
-      appointmentDateDisplay: appointmentDateInfo.displayDate, // "বৃহস্পতিবার, ২২ জানুয়ারী ২০২৪"
+      // বয়স নরমালাইজ করুন
+      const normalized = normalizeAge(patient.ageYears, patient.ageMonths, patient.ageDays);
+      let ageParts = [];
+      if (normalized.years > 0) ageParts.push(`${normalized.years} বছর`);
+      if (normalized.months > 0) ageParts.push(`${normalized.months} মাস`);
+      if (normalized.days > 0) ageParts.push(`${normalized.days} দিন`);
+      const ageString = ageParts.join(', ');
       
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    };
+      // নতুন ডকুমেন্ট রেফারেন্স তৈরি
+      const newDocRef = db.collection('appointments').doc();
+      batch.set(newDocRef, {
+        name: patient.name,
+        age: ageString,
+        ageYears: normalized.years,
+        ageMonths: normalized.months,
+        ageDays: normalized.days,
+        phone: phone || null,
+        day: day,
+        time: time,
+        patientType: type,
+        type: type,
+        serial: serial,
+        called: false,
+        tokenGiven: false,
+        status: 'confirmed',
+        appointmentDate: appointmentDateInfo.dateString,
+        appointmentDateDisplay: appointmentDateInfo.displayDate,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      
+      // পেন্ডিং সিলেকশন ডিলিট (যদি থাকে)
+      if (pendingDetail && pendingDetail.pendingId) {
+        const pendingRef = db.collection('pendingSelections').doc(pendingDetail.pendingId);
+        batch.delete(pendingRef);
+      }
+    }
     
-    // লোডিং স্টেট
-    const submitBtn = document.getElementById('submitQuickBtn');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> যুক্ত করা হচ্ছে...';
-    submitBtn.disabled = true;
-
-    await db.collection('appointments').add(appointmentData);
+    // ✅ একবারেই কমিট করুন (একটিমাত্র নেটওয়ার্ক কল)
+    await batch.commit();
     
-    // সফল মেসেজ
-    showAlert(`সিরিয়াল #${serial} ${appointmentDateInfo.displayDate} তারিখের জন্য সফলভাবে যুক্ত হয়েছে!`, 'success');
+    const elapsed = Date.now() - startTime;
+    console.log(`✅ বুকিং সম্পন্ন: ${elapsed}ms`);
     
-    // ফর্ম রিসেট
+    showAlert(`✅ ${allPatients.length} জন রোগী সফলভাবে বুক হয়েছে!\n📞 ফোন: ${phone || 'ছাড়া'}\n🎫 সিরিয়াল: ${selectedSerials.join(', ')}`, 'success');
+    
+    if (gridSystem) {
+      gridSystem.clearAllSelections();
+    }
     resetQuickSerialForm();
     elements.quickSerialModal.style.display = 'none';
     
-    // Grid System ক্লিনআপ
-    if (gridSystem) {
-      gridSystem.cleanup();
-      gridSystem = null;
-    }
-    
   } catch (error) {
-    console.error('❌ Error adding serial:', error);
-    showAlert('সিরিয়াল যুক্ত করতে সমস্যা হয়েছে', 'error');
+    console.error('❌ Batch write error:', error);
+    showAlert(`বুকিং করতে সমস্যা হয়েছে: ${error.message}`, 'error');
   } finally {
-    // বাটন রিসেট
-    const submitBtn = document.getElementById('submitQuickBtn');
-    if (submitBtn) {
-      submitBtn.innerHTML = 'সিরিয়াল যুক্ত করুন';
-      submitBtn.disabled = false;
-    }
+    submitBtn.innerHTML = originalText;
+    submitBtn.disabled = false;
   }
 }
   
-    function resetQuickSerialForm() {
-      elements.quickSerialForm.reset();
-      elements.serialInput.value = '';
-      document.querySelectorAll('.serial-type-card').forEach(card => {
-        card.classList.remove('selected');
-      });
-      document.querySelector('.serial-type-card[data-type="new"]').classList.add('selected');
-      elements.selectedPatientType.value = 'new';
-    }
+function resetQuickSerialForm() {
+  // ১. মেইন ফর্ম রিসেট
+  if (elements && elements.quickSerialForm) {
+    elements.quickSerialForm.reset();
+  } else {
+    const form = document.getElementById('quickSerialForm');
+    if (form) form.reset();
+  }
+
+  // ২. সিলেক্টেড সিরিয়াল ইনপুট খালি করা
+  if (elements && elements.serialInput) {
+    elements.serialInput.value = '';
+  } else {
+    const serialInput = document.getElementById('serialInput');
+    if (serialInput) serialInput.value = '';
+  }
+  
+  // ✅ ফোন চেকবক্স রিসেট করুন
+  const skipPhoneCheckbox = document.getElementById('skipPhoneCheckbox');
+  const phoneFieldContainer = document.getElementById('phoneFieldContainer');
+  const quickPhoneInput = document.getElementById('quickPhone');
+  
+  if (skipPhoneCheckbox) {
+    skipPhoneCheckbox.checked = false;
+  }
+  if (phoneFieldContainer) {
+    phoneFieldContainer.style.display = 'block';
+  }
+  if (quickPhoneInput) {
+    quickPhoneInput.setAttribute('required', 'required');
+    quickPhoneInput.value = '';
+  }
+  
+  // ✅ বয়স ফিল্ড রিসেট (যদি আপনার elements অবজেক্টে সরাসরি ম্যাপ করা থাকে)
+  if (elements) {
+    if (elements.quickAgeYears) elements.quickAgeYears.value = '';
+    if (elements.quickAgeMonths) elements.quickAgeMonths.value = '';
+    if (elements.quickAgeDays) elements.quickAgeDays.value = '';
+  }
+  
+  // রোগীর ধরন রিসেট
+  document.querySelectorAll('.serial-type-card').forEach(card => {
+    card.classList.remove('selected');
+  });
+  const newTypeCard = document.querySelector('.serial-type-card[data-type="new"]');
+  if (newTypeCard) newTypeCard.classList.add('selected');
+  
+  if (elements && elements.selectedPatientType) {
+    elements.selectedPatientType.value = 'new';
+  } else {
+    const selectedPatientType = document.getElementById('selectedPatientType');
+    if (selectedPatientType) selectedPatientType.value = 'new';
+  }
+
+  // ==========================================================
+  // ✅ ৩. 👥 অতিরিক্ত সব রোগীর ফর্ম ডিলিট করে ডিফল্ট ১টি রাখা
+  // ==========================================================
+  const container = document.getElementById('patientsContainer');
+  if (container) {
+    const patientCards = container.querySelectorAll('.patient-card');
+    
+    patientCards.forEach((card, index) => {
+      if (index === 0) {
+        // প্রথম (Default) কার্ডটি থাকবে, এটিকে সক্রিয় (Active) করে এর ভেতরের ইনপুট পরিষ্কার করা হচ্ছে
+        card.className = 'patient-card active';
+        card.style.cssText = 'background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 2px solid #3b82f6;';
+        
+        const nameInput = card.querySelector('.patient-name');
+        const ageYears = card.querySelector('.patient-age-years');
+        const ageMonths = card.querySelector('.patient-age-months');
+        const ageDays = card.querySelector('.patient-age-days');
+        const serialDisplay = card.querySelector('.selected-serial-display');
+        const serialNumbers = card.querySelector('.serial-numbers');
+        const removeBtn = card.querySelector('.remove-patient-btn');
+
+        if (nameInput) nameInput.value = '';
+        if (ageYears) ageYears.value = '';
+        if (ageMonths) ageMonths.value = '';
+        if (ageDays) ageDays.value = '';
+        
+        // আগের কোনো সিরিয়াল সিলেক্ট করা থাকলে তা হাইড করা
+        if (serialDisplay) serialDisplay.style.display = 'none';
+        if (serialNumbers) serialNumbers.textContent = '—';
+        if (removeBtn) removeBtn.style.display = 'none'; // ১ম কার্ডের ডিলিট বাটন হাইড থাকবে
+        
+      } else {
+        // বাকি ২য় বা ৩য় যত অতিরিক্ত রোগীর ফর্ম তৈরি হয়েছিল, ডম (DOM) থেকে রিমুভ করে দেওয়া হলো
+        card.remove();
+      }
+    });
+  }
+
+  // ইনডেক্স ঠিক করার গ্লোবাল ফাংশন থাকলে তা কল করা (ইনডেক্স আবার ০ থেকে শুরু হবে)
+  if (typeof updatePatientIndices === 'function') {
+    updatePatientIndices();
+  }
+}
 
     // =======================================================
     // ১০. ফিল্টার লিসেনার সেটআপ (ডেস্কটপ এবং মোবাইল উভয়ের জন্য)
@@ -3015,152 +3310,182 @@ async function addQuickSerial() {
       }
     }
 
-    // =======================================================
-    // ১১. রিয়েল-টাইম লিসেনার
-    // =======================================================
-    function setupRealtimeListener() {
-      if (!db) {
-        showAlert('Firebase সংযোগ নেই', 'error');
-        return;
-      }
+function setupRealtimeListener() {
+  if (!db) {
+    showAlert('Firebase সংযোগ নেই', 'error');
+    return () => {};
+  }
+  
+  // অ্যাপয়েন্টমেন্ট লিসেনার
+  const unsubscribeAppointments = db.collection('appointments')
+    .orderBy('timestamp', 'desc')
+    .onSnapshot(snapshot => {
+      console.log('🔄 Appointments update:', snapshot.size, 'appointments');
+      allAppointmentsSnapshot = snapshot;
       
-      // অ্যাপয়েন্টমেন্ট লিসেনার
-      const appointmentsListener = db.collection('appointments')
-        .orderBy('timestamp', 'desc')
-        .onSnapshot(snapshot => {
-          console.log('🔄 Appointments update:', snapshot.size, 'appointments');
-          allAppointmentsSnapshot = snapshot;
-          
-          // appointments array আপডেট
-          appointments = [];
-          snapshot.forEach(doc => {
-            appointments.push({
-              id: doc.id,
-              ...doc.data()
-            });
-          });
-          
-          // ড্যাশবোর্ড আপডেট
-          updateDashboardCards(snapshot);
-          
-          // ফিল্টার অপশন আপডেট
-          updateTimeOptions();
-          
-          // ডেটা রেন্ডার
-          renderAppointments();
-          
-          // সিরিয়াল স্ট্যাটস আপডেট
-          updateSerialStats();
-          
-          // লোডিং হাইড
-          elements.loadingMessage.style.display = 'none';
-        }, error => {
-          console.error('❌ Appointments listener error:', error);
-          elements.loadingMessage.textContent = 'ডেটা লোডে সমস্যা হয়েছে';
-          showAlert('রিয়েল-টাইম ডেটা লোডে সমস্যা হয়েছে', 'error');
+      appointments = [];
+      snapshot.forEach(doc => {
+        appointments.push({
+          id: doc.id,
+          ...doc.data()
         });
-      
-      // পেন্ডিং সিলেকশন লিসেনার (ইউজারের জন্য)
-      const pendingListener = db.collection('pendingSelections')
-        .where('expiresAt', '>', new Date())
-        .onSnapshot(snapshot => {
-          console.log('🔄 Pending selections update:', snapshot.size);
-          
-          // পেন্ডিং সিলেকশন প্রসেস
-          const now = new Date();
-          pendingSelections = {};
-          
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.expiresAt && data.expiresAt.toDate() > now) {
-              const key = `${data.day}_${data.time}_${data.type}`;
-              
-              if (!pendingSelections[key]) {
-                pendingSelections[key] = {
-                  user: []
-                };
-              }
-              
-              if (data.bookedBy === 'user') {
-                pendingSelections[key].user.push({
-                  serial: data.serial,
-                  id: doc.id,
-                  expiresAt: data.expiresAt
-                });
-              }
-            }
-          });
-          
-          // সিরিয়াল স্ট্যাটস আপডেট
-          updateSerialStats();
-        }, error => {
-          console.error('❌ Pending selections listener error:', error);
-        });
-      
-      // ক্লিনআপ ফাংশন
-      return () => {
-        appointmentsListener();
-        pendingListener();
-      };
-    }
-
-    // =======================================================
-    // ১২. ইনিশিয়ালাইজেশন
-    // =======================================================
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('DOM loaded, initializing...');
-      
-      // Firebase চেক
-      if (!db) {
-        elements.loadingMessage.textContent = 'Firebase সংযোগ নেই';
-        showAlert('Firebase সংযোগ নেই', 'error');
-        return;
-      }
-      
-      // লোডিং শো
-      elements.loadingMessage.style.display = 'block';
-      
-      // ফিল্টার লিসেনার
-      setupFilterListeners();
-      
-      // কুইক সিরিয়াল মোডাল
-      initializeQuickSerialModal();
-      
-      // প্রাথমিকভাবে serialRanges লোড করুন
-      loadSerialRanges().then(() => {
-        console.log("✅ Initial serial ranges loaded");
       });
       
-      // রিয়েল-টাইম লিসেনার
-      const cleanupListeners = setupRealtimeListener();
+      updateDashboardCards(snapshot);
+      updateTimeOptions();
+      renderAppointments();
+      updateSerialStats();
+      elements.loadingMessage.style.display = 'none';
+    }, error => {
+      console.error('❌ Appointments listener error:', error);
+      elements.loadingMessage.textContent = 'ডেটা লোডে সমস্যা হয়েছে';
+      showAlert('রিয়েল-টাইম ডেটা লোডে সমস্যা হয়েছে', 'error');
+    });
+  
+  // পেন্ডিং সিলেকশন লিসেনার
+  const unsubscribePending = db.collection('pendingSelections')
+    .where('expiresAt', '>', new Date())
+    .onSnapshot(snapshot => {
+      console.log('🔄 Pending selections update:', snapshot.size);
       
-      // উইন্ডো ক্লিক ইভেন্ট (মোডাল বন্ধ)
-      window.addEventListener('click', (event) => {
-        if (event.target === elements.quickSerialModal) {
-          elements.quickSerialModal.style.display = 'none';
-          resetQuickSerialForm();
+      const now = new Date();
+      pendingSelections = {};
+      
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.expiresAt && data.expiresAt.toDate() > now) {
+          const key = `${data.day}_${data.time}_${data.type}`;
           
-          // Grid System ক্লিনআপ
-          if (gridSystem) {
-            gridSystem.cleanup();
-            gridSystem = null;
+          if (!pendingSelections[key]) {
+            pendingSelections[key] = { user: [] };
+          }
+          
+          if (data.bookedBy === 'user') {
+            pendingSelections[key].user.push({
+              serial: data.serial,
+              id: doc.id,
+              expiresAt: data.expiresAt
+            });
           }
         }
       });
       
-      // বেফোর আনলোড ক্লিনআপ
-      window.addEventListener('beforeunload', () => {
-        if (typeof cleanupListeners === 'function') {
-          cleanupListeners();
-        }
-        
-        if (gridSystem) {
-          gridSystem.cleanup();
-        }
-      });
-      
-      console.log('Initialization complete');
+      updateSerialStats();
+    }, error => {
+      console.error('❌ Pending selections listener error:', error);
     });
-  </script>
+  
+  // ক্লিনআপ ফাংশন রিটার্ন
+  return () => {
+    unsubscribeAppointments();
+    unsubscribePending();
+  };
+}
+
+// =======================================================
+// ১২. ইনিশিয়ালাইজেশন (সংশোধিত ও ক্লিন)
+// =======================================================
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, initializing...');
+  
+  // Firebase চেক
+  if (!db) {
+    if (elements && elements.loadingMessage) {
+      elements.loadingMessage.textContent = 'Firebase সংযোগ নেই';
+    }
+    showAlert('Firebase সংযোগ নেই', 'error');
+    return;
+  }
+  
+  // লোডিং শো
+  if (elements && elements.loadingMessage) {
+    elements.loadingMessage.style.display = 'block';
+  }
+  
+  // ফিল্টার লিসেনার
+  setupFilterListeners();
+  
+  // কুইক সিরিয়াল মোডাল
+  initializeQuickSerialModal();
+  
+  // ✅ ফোন চেকবক্সের ইভেন্ট লিসেনার
+  const skipPhoneCheckbox = document.getElementById('skipPhoneCheckbox');
+  const phoneFieldContainer = document.getElementById('phoneFieldContainer');
+  const quickPhoneInput = document.getElementById('quickPhone');
+  
+  if (skipPhoneCheckbox && phoneFieldContainer) {
+    skipPhoneCheckbox.addEventListener('change', function() {
+      if (this.checked) {
+        phoneFieldContainer.style.display = 'none';
+        if (quickPhoneInput) {
+          quickPhoneInput.removeAttribute('required');
+          quickPhoneInput.value = '';
+        }
+      } else {
+        phoneFieldContainer.style.display = 'block';
+        if (quickPhoneInput) {
+          quickPhoneInput.setAttribute('required', 'required');
+        }
+      }
+    });
+  }
+  
+  // ✅ রোগী যোগ করার বাটন
+  const addPatientBtn = document.getElementById('addPatientBtn');
+  if (addPatientBtn) {
+    addPatientBtn.addEventListener('click', addPatientField);
+    console.log("✅ + বাটন ইভেন্ট যোগ হয়েছে");
+  }
+  
+  // ✅ পেশেন্ট কন্টেইনার ক্লিক ইভেন্ট
+  const patientsContainer = document.getElementById('patientsContainer');
+  if (patientsContainer) {
+    patientsContainer.addEventListener('click', function(e) {
+      const patientCard = e.target.closest('.patient-card');
+      if (patientCard && !e.target.closest('.remove-patient-btn')) {
+        setActivePatient(patientCard);
+      }
+    });
+  }
+  
+  // ✅ প্রথম পেশেন্ট অ্যাক্টিভ করুন
+  const firstPatient = document.querySelector('.patient-card');
+  if (firstPatient) {
+    setActivePatient(firstPatient);
+  }
+  
+  // ✅ সিরিয়াল রেঞ্জ লোড
+  loadSerialRanges().then(() => {
+    console.log("✅ Initial serial ranges loaded");
+  });
+  
+  // ✅ রিয়েল-টাইম লিসেনার সেটআপ
+  const cleanupListeners = setupRealtimeListener();
+  
+  // ✅ মোডালের বাইরে ক্লিক করলে বন্ধ
+  window.addEventListener('click', (event) => {
+    if (elements && event.target === elements.quickSerialModal) {
+      elements.quickSerialModal.style.display = 'none';
+      resetQuickSerialForm();
+      if (typeof gridSystem !== 'undefined' && gridSystem) {
+        gridSystem.cleanup();
+        gridSystem = null;
+      }
+    }
+  });
+  
+  // ✅ পেজ আনলোড হলে ক্লিনআপ
+  window.addEventListener('beforeunload', () => {
+    if (typeof cleanupListeners === 'function') {
+      cleanupListeners();
+    }
+    if (typeof gridSystem !== 'undefined' && gridSystem) {
+      gridSystem.cleanup();
+    }
+  });
+  
+  console.log('Initialization complete');
+});
+</script>
 </body>
 </html>
