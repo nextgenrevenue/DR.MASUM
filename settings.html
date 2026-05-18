@@ -1,11 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Settings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>সেটিংস - অ্যাডমিন প্যানেল</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <style>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+<style>
+    /* ==================== GLOBAL STYLES ==================== */
     :root {
       --primary: #2563eb;
       --primary-hover: #1d4ed8;
@@ -25,106 +28,54 @@
     }
     
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', 'Noto Sans Bengali', sans-serif;
       background-color: #f5f7fa;
       min-height: 100vh;
+      margin: 0;
+      padding: 0;
     }
     
-    /* Admin Header - Dashboard এর মতো */
-    .admin-header {
-      background-color: var(--dark);
-      color: var(--white);
-      padding: 15px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    /* ==================== COMPONENT CONTAINERS ==================== */
+    #header-container,
+    #sidebar-container,
+    #footer-container {
       position: relative;
+      z-index: 1000;
     }
     
-    .admin-header h1 {
-      font-size: 22px;
-    }
-    
-    .mobile-menu-btn {
-      display: none;
-      background: none;
-      border: none;
-      color: var(--white);
-      font-size: 24px;
-      cursor: pointer;
-      padding: 5px;
-    }
-    
-    .logout-btn {
-      padding: 8px 16px;
-      background-color: var(--danger);
-      color: var(--white);
-      border: none;
-      border-radius: 6px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-family: 'Inter', sans-serif;
-    }
-    
-    .logout-btn:hover {
-      background-color: #b91c1c;
-    }
-    
-    /* Admin Container */
-    .admin-container {
+    /* ==================== পেজ লেআউট - সাইডবার স্টিকি ফিক্স ==================== */
+    .page-content-wrapper {
       display: flex;
+      margin-top: 60px; /* হেডারের উচ্চতা ৬০ পিক্সেল */
       min-height: calc(100vh - 60px);
+      width: 100%;
     }
     
-    /* Sidebar - Dashboard এর মতো */
-    .admin-sidebar {
-      width: 250px;
-      background-color: var(--white);
-      border-right: 1px solid #e5e7eb;
-      padding: 20px 0;
-      transition: transform 0.3s ease;
+    /* সাইডবার ডেস্কটপে ফিক্সড রাখার জন্য */
+    #sidebar-container {
+      flex-shrink: 0;
+      width: 260px; /* ড্যাশবোর্ডের সাইডবারের প্রস্থ */
+      position: fixed;
+      top: 60px;
+      left: 0;
+      height: calc(100vh - 60px);
+      z-index: 999;
     }
     
-    .sidebar-menu {
-      list-style: none;
-    }
-    
-    .sidebar-menu li {
-      margin-bottom: 5px;
-    }
-    
-    .sidebar-menu a {
-      display: block;
-      padding: 12px 20px;
-      color: var(--dark);
-      text-decoration: none;
-      transition: all 0.2s ease;
-      font-weight: 500;
-    }
-    
-    .sidebar-menu a:hover, 
-    .sidebar-menu a.active {
-      background-color: var(--light-gray);
-      color: var(--primary);
-    }
-    
-    .sidebar-menu a i {
-      margin-right: 10px;
-      width: 20px;
-      text-align: center;
-    }
-    
-    /* Main Content */
-    .admin-main {
+    /* মেইন কন্টেন্ট এলাকা - সাইডবারকে জায়গা দেওয়ার জন্য বামে ২৬ко পিক্সেল সরানো হয়েছে */
+    .main-content-area {
       flex: 1;
+      margin-left: 260px; /* ডেস্কটপে কন্টেন্ট সাইডবারের ডানপাশে রাখার জন্য */
       padding: 30px;
       background-color: #f9fafb;
+      min-height: 100%;
+      box-sizing: border-box;
+      transition: margin-left 0.3s ease;
+      min-width: 0;
     }
-    
+    /* ==================== SETTINGS STYLES ==================== */
     .settings-container {
-      max-width: 600px;
+      max-width: 700px;
       margin: 0 auto;
     }
     
@@ -133,19 +84,31 @@
       padding: 30px;
       border-radius: 12px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      margin-bottom: 20px;
+      margin-bottom: 25px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .settings-card:hover {
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
     }
     
     .settings-card h2 {
       color: var(--dark);
       margin-bottom: 25px;
-      font-size: 24px;
+      font-size: 22px;
       border-bottom: 2px solid var(--light-gray);
-      padding-bottom: 10px;
+      padding-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .settings-card h2 i {
+      font-size: 24px;
     }
     
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: 22px;
     }
     
     .form-group label {
@@ -153,6 +116,12 @@
       margin-bottom: 8px;
       font-weight: 600;
       color: var(--dark);
+      font-size: 14px;
+    }
+    
+    .form-group label .required {
+      color: var(--danger);
+      margin-left: 4px;
     }
     
     .form-group input {
@@ -160,8 +129,8 @@
       padding: 12px 15px;
       border: 2px solid #e5e7eb;
       border-radius: 8px;
-      font-size: 16px;
-      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-family: 'Inter', 'Noto Sans Bengali', sans-serif;
       transition: all 0.3s ease;
     }
     
@@ -169,6 +138,27 @@
       outline: none;
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    .form-group input.error {
+      border-color: var(--danger);
+    }
+    
+    .password-strength {
+      margin-top: 8px;
+      font-size: 12px;
+    }
+    
+    .strength-weak {
+      color: var(--danger);
+    }
+    
+    .strength-medium {
+      color: var(--warning);
+    }
+    
+    .strength-strong {
+      color: var(--success);
     }
     
     .form-actions {
@@ -181,11 +171,15 @@
       padding: 12px 24px;
       border: none;
       border-radius: 8px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s ease;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', 'Noto Sans Bengali', sans-serif;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
     }
     
     .btn-primary {
@@ -195,6 +189,13 @@
     
     .btn-primary:hover {
       background-color: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
     }
     
     .btn-secondary {
@@ -202,69 +203,183 @@
       color: var(--dark);
     }
     
-    .alert {
-      padding: 12px 15px;
+    .btn-secondary:hover {
+      background-color: #e5e7eb;
+    }
+    
+    /* ==================== CURRENT INFO STYLES ==================== */
+    .current-info {
+      background-color: #f8f9fa;
       border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    
+    .info-label {
+      font-weight: 600;
+      color: var(--dark);
+    }
+    
+    .info-value {
+      color: var(--gray);
+      font-family: monospace;
+      font-size: 14px;
+    }
+    
+    .info-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #dcfce7;
+      color: var(--success);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    /* ==================== ALERT STYLES ==================== */
+    .alert {
+      padding: 14px 18px;
+      border-radius: 10px;
       margin-bottom: 20px;
       font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
     
     .alert-success {
       background-color: #dcfce7;
       color: var(--success);
-      border: 1px solid #bbf7d0;
+      border-left: 4px solid var(--success);
     }
     
     .alert-error {
       background-color: #fee2e2;
       color: var(--danger);
-      border: 1px solid #fecaca;
+      border-left: 4px solid var(--danger);
     }
     
-    .loading {
+    .alert-warning {
+      background-color: #fef3c7;
+      color: #92400e;
+      border-left: 4px solid var(--warning);
+    }
+    
+    .alert-info {
+      background-color: #dbeafe;
+      color: var(--primary);
+      border-left: 4px solid var(--primary);
+    }
+    
+    /* ==================== LOADING SPINNER ==================== */
+    .loading-spinner {
       display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255,255,255,.3);
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
       border-radius: 50%;
       border-top-color: #fff;
-      animation: spin 1s ease-in-out infinite;
+      animation: spin 0.8s linear infinite;
     }
     
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-
-    /* Mobile Responsive */
+    
+    /* ==================== TOGGLE SWITCH ==================== */
+    .toggle-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+    }
+    
+    .toggle-label {
+      font-weight: 500;
+      color: var(--dark);
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+      background-color: var(--success);
+    }
+    
+    input:checked + .toggle-slider:before {
+      transform: translateX(26px);
+    }
+    
+    /* ==================== MOBILE RESPONSIVE ==================== */
     @media (max-width: 768px) {
-      .mobile-menu-btn {
-        display: block;
-      }
-      
-      .admin-sidebar {
-        position: fixed;
-        top: 60px;
-        left: 0;
-        height: calc(100vh - 60px);
-        transform: translateX(-100%);
-        z-index: 100;
-        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-      }
-      
-      .admin-sidebar.mobile-open {
-        transform: translateX(0);
-      }
-      
-      .admin-container {
-        flex-direction: column;
-      }
-      
-      .admin-main {
+      .main-content-area {
         padding: 20px 15px;
       }
       
       .settings-card {
         padding: 20px;
+      }
+      
+      .settings-card h2 {
+        font-size: 20px;
       }
       
       .form-actions {
@@ -273,11 +388,18 @@
       
       .btn {
         width: 100%;
+        padding: 12px 20px;
+      }
+      
+      .info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
       }
     }
-
+    
     @media (max-width: 480px) {
-      .admin-main {
+      .main-content-area {
         padding: 15px 10px;
       }
       
@@ -285,286 +407,557 @@
         padding: 15px;
       }
       
-      .admin-header h1 {
+      .settings-card h2 {
         font-size: 18px;
       }
+      
+      .form-group input {
+        padding: 10px 12px;
+      }
+      
+      .btn {
+        padding: 10px 16px;
+      }
+    }
+    
+    /* ==================== DIVIDER ==================== */
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, #e5e7eb, transparent);
+      margin: 20px 0;
+    }
+    
+    /* ==================== ICON STYLES ==================== */
+    .icon {
+      font-size: 20px;
+    }
+    
+    /* ==================== HELPER TEXT ==================== */
+    .help-text {
+      font-size: 12px;
+      color: var(--gray);
+      margin-top: 5px;
+      display: block;
     }
   </style>
 </head>
-<body>
-  <!-- Admin Header - Dashboard এর মতো -->
-  <header class="admin-header">
-    <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
-    <h1>Admin Settings</h1>
-    <button class="logout-btn" id="logoutBtn">লগআউট</button>
-  </header>
+<body data-auto-load-components>
   
-  <!-- Admin Container -->
-  <div class="admin-container">
-    <!-- Sidebar - Dashboard এর মতো -->
-    <nav class="admin-sidebar" id="sidebar">
-      <ul class="sidebar-menu">
-        <li><a href="/dashboard"><i>📊</i> ড্যাশবোর্ড</a></li>
-        <li><a href="#"><i>📅</i> অ্যাপয়েন্টমেন্ট</a></li>
-        <li><a href="#"><i>👨‍⚕️</i> ডাক্তার</a></li>
-        <li><a href="#"><i>⏰</i> সিরিয়াল ম্যানেজমেন্ট</a></li>
-        <li><a href="/notice"><i>👥</i> নোটিস</a></li>
-        <li><a href="/settings" class="active"><i>⚙️</i> সেটিংস</a></li>
-      </ul>
-    </nav>
+  <!-- ==================== COMPONENT CONTAINERS ==================== -->
+  <div id="header-container"></div>
+  
+  <div class="page-content-wrapper">
+    <div id="sidebar-container"></div>
     
-    <!-- Main Content -->
-    <main class="admin-main">
+    <main class="main-content-area">
+      
+      <!-- Alert Messages Container -->
       <div id="alertContainer"></div>
       
       <div class="settings-container">
+        
+        <!-- Change Credentials Card -->
         <div class="settings-card">
-          <h2>Change Admin Credentials</h2>
+          <h2>
+            🔐 অ্যাডমিন ক্রেডেনশিয়াল পরিবর্তন করুন
+          </h2>
+          
           <form id="adminSettingsForm">
             <div class="form-group">
-              <label for="newUsername">New Username</label>
-              <input type="text" id="newUsername" placeholder="Enter new username" required>
+              <label for="newUsername">
+                নতুন ইউজারনেম <span class="required">*</span>
+              </label>
+              <input type="text" id="newUsername" placeholder="নতুন ইউজারনেম লিখুন" autocomplete="off">
+              <span class="help-text">নূন্যতম ৩ অক্ষর</span>
             </div>
             
             <div class="form-group">
-              <label for="newPassword">New Password</label>
-              <input type="password" id="newPassword" placeholder="Enter new password" required>
+              <label for="newPassword">
+                নতুন পাসওয়ার্ড <span class="required">*</span>
+              </label>
+              <input type="password" id="newPassword" placeholder="নতুন পাসওয়ার্ড লিখুন" autocomplete="off">
+              <div id="passwordStrength" class="password-strength"></div>
+              <span class="help-text">নূন্যতম ৬ অক্ষর, শক্তিশালী পাসওয়ার্ড ব্যবহার করুন</span>
             </div>
             
             <div class="form-group">
-              <label for="confirmPassword">Confirm Password</label>
-              <input type="password" id="confirmPassword" placeholder="Confirm new password" required>
+              <label for="confirmPassword">
+                পাসওয়ার্ড নিশ্চিত করুন <span class="required">*</span>
+              </label>
+              <input type="password" id="confirmPassword" placeholder="আবার পাসওয়ার্ড লিখুন" autocomplete="off">
+              <span id="passwordMatchMsg" class="help-text"></span>
             </div>
             
             <div class="form-actions">
-              <button type="button" class="btn btn-secondary" onclick="goToDashboard()">Back to Dashboard</button>
-              <button type="submit" class="btn btn-primary" id="saveSettingsBtn">Save Changes</button>
+              <button type="button" class="btn btn-secondary" id="backToDashboardBtn">
+                ◀ ড্যাশবোর্ডে ফিরুন
+              </button>
+              <button type="submit" class="btn btn-primary" id="saveSettingsBtn">
+                💾 পরিবর্তন সংরক্ষণ করুন
+              </button>
             </div>
           </form>
         </div>
         
+        <!-- Current Settings Card -->
         <div class="settings-card">
-          <h2>Current Settings</h2>
+          <h2>
+            📋 বর্তমান তথ্য
+          </h2>
+          
           <div id="currentSettings">
-            <p>Loading current credentials...</p>
+            <div style="text-align: center; padding: 20px;">
+              <div class="loading-spinner" style="border-top-color: var(--primary);"></div>
+              <p style="margin-top: 10px; color: var(--gray);">লোড হচ্ছে...</p>
+            </div>
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div class="toggle-container">
+            <span class="toggle-label">🔔 নোটিস দেখানোর স্থিতি</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="noticeStatusToggle" disabled>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          
+          <div class="help-text" style="margin-top: 15px; text-align: center;">
+            ⚡ শেষ লগইন: <span id="lastLoginInfo">-</span>
           </div>
         </div>
+        
+        <!-- Security Tips Card -->
+        <div class="settings-card">
+          <h2>
+            🛡️ নিরাপত্তা টিপস
+          </h2>
+          <ul style="padding-left: 20px; color: var(--gray); line-height: 1.8;">
+            <li>🔒 শক্তিশালী পাসওয়ার্ড ব্যবহার করুন (অক্ষর, সংখ্যা, চিহ্ন মিশ্রিত)</li>
+            <li>🚪 ব্যবহার শেষে লগআউট করুন</li>
+            <li>🔐 পাসওয়ার্ড কারো সাথে শেয়ার করবেন না</li>
+            <li>📱 অন্য ডিভাইস থেকে লগইন করলে সচেতন থাকুন</li>
+            <li>⏰ সেশন স্বয়ংক্রিয়ভাবে ২ ঘণ্টা পরে মেয়াদ শেষ হয়</li>
+          </ul>
+        </div>
+        
       </div>
+      
     </main>
   </div>
+  
+  <div id="footer-container"></div>
 
-  <!-- Firebase SDK -->
+  <!-- ==================== FIREBASE SDK ==================== -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  
+  <!-- Component Loader -->
+  <script src="components-inline.js"></script>
 
+  <!-- ==================== MAIN APPLICATION SCRIPT ==================== -->
   <script>
-    // Firebase Configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
-      authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
-      projectId: "doctor-appointment-syste-23828",
-      storageBucket: "doctor-appointment-syste-23828.appspot.com",
-      messagingSenderId: "79600391014",
-      appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
-    };
-
-    let db;
-
-    // Initialize Firebase
-    function initializeFirebase() {
-      try {
-        if (!firebase.apps.length) {
-          firebase.initializeApp(firebaseConfig);
+    (function() {
+      'use strict';
+      
+      // ==================== FIREBASE CONFIGURATION ====================
+      const firebaseConfig = {
+        apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+        authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+        projectId: "doctor-appointment-syste-23828",
+        storageBucket: "doctor-appointment-syste-23828.appspot.com",
+        messagingSenderId: "79600391014",
+        appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+      };
+      
+      let db;
+      
+      // ==================== INITIALIZATION ====================
+      function initializeFirebase() {
+        try {
+          if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+          }
+          db = firebase.firestore();
+          console.log("✅ Firebase initialized successfully");
+          return true;
+        } catch (error) {
+          console.error("❌ Firebase initialization error:", error);
+          showAlert('Firebase initialization failed: ' + error.message, 'error');
+          return false;
         }
-        db = firebase.firestore();
-        console.log("✅ Firebase initialized successfully");
+      }
+      
+      // ==================== UTILITY FUNCTIONS ====================
+      function showAlert(message, type = 'success') {
+        const alertContainer = document.getElementById('alertContainer');
+        if (!alertContainer) return;
+        
+        const icons = {
+          success: '✅',
+          error: '❌',
+          warning: '⚠️',
+          info: 'ℹ️'
+        };
+        
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type}`;
+        alert.innerHTML = `${icons[type] || '📢'} ${message}`;
+        alertContainer.appendChild(alert);
+        
+        setTimeout(() => {
+          alert.remove();
+        }, 5000);
+      }
+      
+      function checkDatabase() {
+        if (!db) {
+          showAlert('ডেটাবেস সংযোগ সমস্যা। পৃষ্ঠাটি রিফ্রেশ করুন।', 'error');
+          return false;
+        }
         return true;
-      } catch (error) {
-        console.error("❌ Firebase initialization error:", error);
-        showAlert('Firebase initialization failed', 'error');
-        return false;
       }
-    }
-
-    // Utility Functions
-    function showAlert(message, type = 'success') {
-      const alert = document.createElement('div');
-      alert.className = `alert alert-${type}`;
-      alert.textContent = message;
-      document.getElementById('alertContainer').appendChild(alert);
       
-      setTimeout(() => {
-        alert.remove();
-      }, 5000);
-    }
-
-    function checkDatabase() {
-      if (!db) {
-        showAlert('Database connection issue', 'error');
-        return false;
+      // ==================== PASSWORD STRENGTH CHECKER ====================
+      function checkPasswordStrength(password) {
+        let strength = 0;
+        let message = '';
+        let className = '';
+        
+        if (password.length >= 6) strength++;
+        if (password.length >= 10) strength++;
+        if (/[A-Z]/.test(password)) strength++;
+        if (/[0-9]/.test(password)) strength++;
+        if (/[^A-Za-z0-9]/.test(password)) strength++;
+        
+        if (password.length === 0) {
+          message = '';
+          className = '';
+        } else if (strength <= 2) {
+          message = '⚠️ দুর্বল পাসওয়ার্ড';
+          className = 'strength-weak';
+        } else if (strength <= 4) {
+          message = '📌 মাঝারি পাসওয়ার্ড';
+          className = 'strength-medium';
+        } else {
+          message = '✅ শক্তিশালী পাসওয়ার্ড';
+          className = 'strength-strong';
+        }
+        
+        return { message, className };
       }
-      return true;
-    }
-
-    // Navigation Functions
-    function goToDashboard() {
-      if (window.location.protocol === 'file:') {
-        window.location.href = 'dashboard.html';
-      } 
-    }
-
-    function handleLogout() {
-      if (confirm('Are you sure you want to logout?')) {
-        sessionStorage.clear();
-        if (window.location.protocol === 'file:') {
-          window.location.href = 'login.html';
-        } 
-      }
-    }
-
-    // Mobile Menu Toggle
-    function setupMobileMenu() {
-      const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-      const sidebar = document.getElementById('sidebar');
       
-      if (mobileMenuBtn && sidebar) {
-        mobileMenuBtn.addEventListener('click', () => {
-          sidebar.classList.toggle('mobile-open');
-        });
-
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', (e) => {
-          if (window.innerWidth <= 768) {
-            if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
-              sidebar.classList.remove('mobile-open');
+      // ==================== ADMIN CREDENTIALS MANAGEMENT ====================
+      async function saveAdminCredentials(newCredentials) {
+        if (!checkDatabase()) return false;
+        
+        try {
+          await db.collection('settings').doc('adminCredentials').set({
+            username: newCredentials.username,
+            password: newCredentials.password,
+            lastUpdated: new Date(),
+            updatedBy: sessionStorage.getItem('adminUser') || 'admin'
+          }, { merge: true });
+          
+          // Update session storage
+          sessionStorage.setItem('adminUser', newCredentials.username);
+          
+          return true;
+        } catch (error) {
+          console.error('❌ Error saving admin credentials:', error);
+          return false;
+        }
+      }
+      
+      async function loadAdminCredentials() {
+        if (!checkDatabase()) return null;
+        
+        try {
+          const doc = await db.collection('settings').doc('adminCredentials').get();
+          if (doc.exists) {
+            return doc.data();
+          }
+          return null;
+        } catch (error) {
+          console.error('❌ Error loading admin credentials:', error);
+          return null;
+        }
+      }
+      
+      async function displayCurrentSettings() {
+        const credentials = await loadAdminCredentials();
+        const currentSettingsDiv = document.getElementById('currentSettings');
+        
+        if (!currentSettingsDiv) return;
+        
+        if (credentials && credentials.username) {
+          currentSettingsDiv.innerHTML = `
+            <div class="current-info">
+              <div class="info-row">
+                <span class="info-label">👤 ইউজারনেম</span>
+                <span class="info-value"><strong>${escapeHtml(credentials.username)}</strong></span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">🕐 সর্বশেষ আপডেট</span>
+                <span class="info-value">${formatDateTime(credentials.lastUpdated)}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">✏️ আপডেট করেছেন</span>
+                <span class="info-value">${escapeHtml(credentials.updatedBy || 'admin')}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">🔐 পাসওয়ার্ড স্থিতি</span>
+                <span class="info-value"><span class="info-badge">সংরক্ষিত</span></span>
+              </div>
+            </div>
+          `;
+        } else {
+          currentSettingsDiv.innerHTML = `
+            <div class="current-info">
+              <div class="info-row">
+                <span class="info-label">👤 ইউজারনেম</span>
+                <span class="info-value"><strong>admin</strong> (ডিফল্ট)</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">🔐 পাসওয়ার্ড স্থিতি</span>
+                <span class="info-value"><span class="info-badge" style="background:#fef3c7; color:#92400e;">ডিফল্ট ব্যবহার করছেন</span></span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">💡 পরামর্শ</span>
+                <span class="info-value">নিরাপত্তার জন্য ক্রেডেনশিয়াল আপডেট করুন</span>
+              </div>
+            </div>
+          `;
+        }
+      }
+      
+      // ==================== LOAD NOTICE STATUS ====================
+      async function loadNoticeStatus() {
+        if (!checkDatabase()) return;
+        
+        try {
+          const doc = await db.collection('settings').doc('appointmentNotice').get();
+          const toggle = document.getElementById('noticeStatusToggle');
+          
+          if (toggle && doc.exists) {
+            const data = doc.data();
+            if (data.statusType === 'manual') {
+              toggle.checked = data.active === true;
+            } else if (data.statusType === 'scheduled') {
+              const now = new Date();
+              const startTime = data.startTime ? new Date(data.startTime) : null;
+              const endTime = data.endTime ? new Date(data.endTime) : null;
+              if (startTime && endTime) {
+                toggle.checked = now >= startTime && now <= endTime;
+              }
             }
+            toggle.disabled = false;
+          } else if (toggle) {
+            toggle.checked = false;
+            toggle.disabled = false;
+          }
+        } catch (error) {
+          console.error('Error loading notice status:', error);
+        }
+      }
+      
+      // ==================== HELPER FUNCTIONS ====================
+      function formatDateTime(date) {
+        if (!date) return 'N/A';
+        let dateObj = date;
+        if (date.toDate) {
+          dateObj = date.toDate();
+        }
+        return dateObj.toLocaleString('bn-BD', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+      
+      function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+      
+      function setLastLoginInfo() {
+        const loginTime = sessionStorage.getItem('loginTime');
+        const lastLoginSpan = document.getElementById('lastLoginInfo');
+        if (lastLoginSpan && loginTime) {
+          const date = new Date(parseInt(loginTime));
+          lastLoginSpan.textContent = date.toLocaleString('bn-BD');
+        } else if (lastLoginSpan) {
+          lastLoginSpan.textContent = 'এই সেশনে';
+        }
+      }
+      
+      // ==================== AUTHENTICATION CHECK ====================
+      function checkAuthentication() {
+        const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
+        const loginTime = sessionStorage.getItem('loginTime');
+        
+        if (!isLoggedIn || isLoggedIn !== 'true') {
+          alert('দয়া করে প্রথমে লগইন করুন!');
+          window.location.href = 'login.html';
+          return false;
+        }
+        
+        const currentTime = new Date().getTime();
+        const sessionDuration = 2 * 60 * 60 * 1000; // 2 hours
+        
+        if (currentTime - parseInt(loginTime) > sessionDuration) {
+          sessionStorage.clear();
+          alert('সেশন মেয়াদ শেষ! দয়া করে আবার লগইন করুন।');
+          window.location.href = 'login.html';
+          return false;
+        }
+        
+        return true;
+      }
+      
+      // ==================== FORM VALIDATION ====================
+      function validateForm(username, password, confirmPassword) {
+        if (username.length < 3) {
+          showAlert('ইউজারনেম কমপক্ষে ৩ অক্ষরের হতে হবে', 'error');
+          return false;
+        }
+        
+        if (password.length < 6) {
+          showAlert('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে', 'error');
+          return false;
+        }
+        
+        if (password !== confirmPassword) {
+          showAlert('পাসওয়ার্ড মিলছে না', 'error');
+          return false;
+        }
+        
+        return true;
+      }
+      
+      // ==================== FORM HANDLING ====================
+      function setupFormHandlers() {
+        const form = document.getElementById('adminSettingsForm');
+        if (!form) return;
+        
+        // Password strength checker
+        const passwordInput = document.getElementById('newPassword');
+        const confirmInput = document.getElementById('confirmPassword');
+        const strengthDiv = document.getElementById('passwordStrength');
+        const matchMsg = document.getElementById('passwordMatchMsg');
+        
+        if (passwordInput) {
+          passwordInput.addEventListener('input', function() {
+            const result = checkPasswordStrength(this.value);
+            if (strengthDiv) {
+              strengthDiv.innerHTML = `<span class="${result.className}">${result.message}</span>`;
+            }
+            
+            // Check match
+            if (confirmInput && confirmInput.value) {
+              if (this.value === confirmInput.value) {
+                matchMsg.innerHTML = '✅ পাসওয়ার্ড মিলেছে';
+                matchMsg.style.color = 'var(--success)';
+              } else {
+                matchMsg.innerHTML = '❌ পাসওয়ার্ড মিলছে না';
+                matchMsg.style.color = 'var(--danger)';
+              }
+            }
+          });
+        }
+        
+        if (confirmInput) {
+          confirmInput.addEventListener('input', function() {
+            if (passwordInput && passwordInput.value === this.value) {
+              matchMsg.innerHTML = '✅ পাসওয়ার্ড মিলেছে';
+              matchMsg.style.color = 'var(--success)';
+            } else {
+              matchMsg.innerHTML = '❌ পাসওয়ার্ড মিলছে না';
+              matchMsg.style.color = 'var(--danger)';
+            }
+          });
+        }
+        
+        // Form submit
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          
+          const newUsername = document.getElementById('newUsername').value.trim();
+          const newPassword = document.getElementById('newPassword').value;
+          const confirmPassword = document.getElementById('confirmPassword').value;
+          
+          if (!validateForm(newUsername, newPassword, confirmPassword)) {
+            return;
+          }
+          
+          const saveBtn = document.getElementById('saveSettingsBtn');
+          const originalText = saveBtn.innerHTML;
+          
+          try {
+            saveBtn.innerHTML = '<span class="loading-spinner"></span> সংরক্ষণ করা হচ্ছে...';
+            saveBtn.disabled = true;
+            
+            const success = await saveAdminCredentials({
+              username: newUsername,
+              password: newPassword
+            });
+            
+            if (success) {
+              showAlert('✅ অ্যাডমিন ক্রেডেনশিয়াল সফলভাবে আপডেট করা হয়েছে!', 'success');
+              form.reset();
+              if (strengthDiv) strengthDiv.innerHTML = '';
+              if (matchMsg) matchMsg.innerHTML = '';
+              await displayCurrentSettings();
+            } else {
+              showAlert('ক্রেডেনশিয়াল আপডেট করতে ব্যর্থ হয়েছে!', 'error');
+            }
+          } catch (error) {
+            console.error('Error saving credentials:', error);
+            showAlert('একটি ত্রুটি ঘটেছে!', 'error');
+          } finally {
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
           }
         });
       }
-    }
-
-    // Admin Credentials Management
-    async function saveAdminCredentials(newCredentials) {
-      if (!checkDatabase()) return false;
       
-      try {
-        await db.collection('settings').doc('adminCredentials').set({
-          username: newCredentials.username,
-          password: newCredentials.password,
-          lastUpdated: new Date(),
-          updatedBy: sessionStorage.getItem('adminUser') || 'admin'
-        }, { merge: true });
-        
-        return true;
-      } catch (error) {
-        console.error('❌ Error saving admin credentials:', error);
-        return false;
-      }
-    }
-
-    async function loadAdminCredentials() {
-      if (!checkDatabase()) return null;
-      
-      try {
-        const doc = await db.collection('settings').doc('adminCredentials').get();
-        if (doc.exists) {
-          return doc.data();
+      // ==================== NAVIGATION ====================
+      function setupNavigation() {
+        const backBtn = document.getElementById('backToDashboardBtn');
+        if (backBtn) {
+          backBtn.addEventListener('click', function() {
+            window.location.href = '/dashboard';
+          });
         }
-        return null;
-      } catch (error) {
-        console.error('❌ Error loading admin credentials:', error);
-        return null;
-      }
-    }
-
-    async function displayCurrentSettings() {
-      const credentials = await loadAdminCredentials();
-      const currentSettingsDiv = document.getElementById('currentSettings');
-      
-      if (credentials) {
-        currentSettingsDiv.innerHTML = `
-          <p><strong>Username:</strong> ${credentials.username}</p>
-          <p><strong>Last Updated:</strong> ${new Date(credentials.lastUpdated?.toDate()).toLocaleString()}</p>
-          <p><strong>Updated By:</strong> ${credentials.updatedBy || 'admin'}</p>
-        `;
-      } else {
-        currentSettingsDiv.innerHTML = `
-          <p><strong>Username:</strong> admin (default)</p>
-          <p><strong>Status:</strong> Using default credentials</p>
-        `;
-      }
-    }
-
-    // Form Handling
-    document.getElementById('adminSettingsForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const newUsername = document.getElementById('newUsername').value;
-      const newPassword = document.getElementById('newPassword').value;
-      const confirmPassword = document.getElementById('confirmPassword').value;
-      
-      if (newPassword !== confirmPassword) {
-        showAlert('Passwords do not match!', 'error');
-        return;
       }
       
-      if (newPassword.length < 6) {
-        showAlert('Password must be at least 6 characters!', 'error');
-        return;
-      }
-      
-      if (newUsername.length < 3) {
-        showAlert('Username must be at least 3 characters!', 'error');
-        return;
-      }
-      
-      const saveBtn = document.getElementById('saveSettingsBtn');
-      saveBtn.innerHTML = '<div class="loading"></div>';
-      saveBtn.disabled = true;
-      
-      const success = await saveAdminCredentials({
-        username: newUsername,
-        password: newPassword
+      // ==================== INITIALIZATION ====================
+      document.addEventListener('DOMContentLoaded', function() {
+        // Check authentication first
+        if (!checkAuthentication()) {
+          return;
+        }
+        
+        // Initialize Firebase
+        initializeFirebase();
+        
+        // Setup handlers
+        setupFormHandlers();
+        setupNavigation();
+        
+        // Wait a bit for components to load, then load data
+        setTimeout(async function() {
+          await displayCurrentSettings();
+          await loadNoticeStatus();
+          setLastLoginInfo();
+        }, 500);
       });
       
-      if (success) {
-        showAlert('Admin credentials updated successfully!', 'success');
-        document.getElementById('adminSettingsForm').reset();
-        displayCurrentSettings();
-      } else {
-        showAlert('Failed to update credentials!', 'error');
-      }
-      
-      saveBtn.innerHTML = 'Save Changes';
-      saveBtn.disabled = false;
-    });
-
-    // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
-      // Check authentication
-      const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
-      if (!isLoggedIn) {
-        alert('Please login first!');
-        if (window.location.protocol === 'file:') {
-          window.location.href = 'login.html';
-        } 
-        return;
-      }
-      
-      // Setup mobile menu
-      setupMobileMenu();
-      
-      // Setup logout button
-      const logoutBtn = document.getElementById('logoutBtn');
-      if (logoutBtn) {
-        logoutBtn.addEventListener('click', handleLogout);
-      }
-      
-      // Initialize Firebase and load settings
-      if (initializeFirebase()) {
-        displayCurrentSettings();
-      }
-    });
+    })();
   </script>
 </body>
 </html>

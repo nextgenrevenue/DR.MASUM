@@ -350,16 +350,28 @@ class RealTimeGridSystem {
     }
   }
 
-  // ==================== রিয়েল-টাইম লিসেনার ====================
+// ==================== রিয়েল-টাইম লিসেনার (অপ্টিমাইজড) ====================
   setupRealtimeListeners() {
     if (!this.config.db) return;
     
-    console.log("🔗 তারিখ-ভিত্তিক রিয়েল-টাইম লিসেনার সেটআপ হচ্ছে...");
+    console.log("🔗 তারিখ-ভিত্তিক অপ্টিমাইজড রিয়েল-টাইম লিসেনার সেটআপ হচ্ছে...");
     
+    // কোটা বাঁচাতে বিগত ৩ দিনের আগের সব ডেটা ফিল্টার আউট করে দিন
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const dateLimitString = this.formatDate(threeDaysAgo);
+    
+    // প্রথমে আগের কোনো লিসেনার সচল থাকলে তা বন্ধ করুন (মেমোরি লিক ও ডাবল রিড রোধে)
+    if (this.realtimeListeners && this.realtimeListeners.length > 0) {
+      this.realtimeListeners.forEach(unsub => { if(typeof unsub === 'function') unsub(); });
+      this.realtimeListeners = [];
+    }
+
     const appointmentsListener = this.config.db
       .collection(this.config.appointmentsCollection)
+      .where('appointmentDate', '>=', dateLimitString) // 🔥 কিলার ফিল্টার: পুরোনো ডেটা রিড হবে না
       .onSnapshot(snapshot => {
-        console.log("🔄 সকল অ্যাপয়েন্টমেন্ট আপডেট পাওয়া গেছে");
+        console.log("🔄 শুধুমাত্র একটি নির্দিষ্ট সীমার অ্যাপয়েন্টমেন্ট আপডেট পাওয়া গেছে");
         
         this.appointments = {};
         
@@ -382,7 +394,7 @@ class RealTimeGridSystem {
           }
         });
         
-        console.log(`📊 তারিখ ভিত্তিক গ্রুপিং সম্পন্ন: ${Object.keys(this.appointments).length} টি তারিখ`);
+        console.log(`📊 ফিল্টার্ড তারিখ ভিত্তিক গ্রুপিং সম্পন্ন: ${Object.keys(this.appointments).length} টি তারিখ`);
         this.safeUpdateGrid();
         
       }, error => {
@@ -391,6 +403,7 @@ class RealTimeGridSystem {
     
     this.realtimeListeners.push(appointmentsListener);
     
+    // পেন্ডিং সিলেকশনের জন্য লিসেনার
     const pendingListener = this.config.db
       .collection(this.config.pendingSelectionsCollection)
       .where('expiresAt', '>', new Date())
@@ -572,7 +585,7 @@ class RealTimeGridSystem {
     return status;
   }
 
-  // ==================== গ্রিড রেন্ডারিং ====================
+// ==================== গ্রিড রেন্ডারিং ====================
   safeUpdateGrid() {
     if (this.isProcessing) {
       setTimeout(() => this.safeUpdateGrid(), 100);
@@ -615,7 +628,41 @@ class RealTimeGridSystem {
       return;
     }
     
-    const [start, end] = range;
+    // ✅ সুরক্ষিত রেঞ্জ পার্সিং (ভেরিয়েবল বাইরে ডিক্লেয়ার করুন)
+    let start, end;
+    
+    if (Array.isArray(range)) {
+      [start, end] = range;
+      console.log('Range (array):', start, end);
+    } else if (typeof range === 'string') {
+      if (range.includes('-')) {
+        const parts = range.split('-');
+        start = parseInt(parts[0]);
+        end = parseInt(parts[1]);
+      } else if (range.includes(',')) {
+        const parts = range.split(',');
+        start = parseInt(parts[0]);
+        end = parseInt(parts[1]);
+      } else {
+        start = 1;
+        end = parseInt(range);
+      }
+      console.log('Range (string):', start, end);
+    } else {
+      console.error('Invalid range format:', range);
+      gridContainer.innerHTML = '<div class="grid-no-selection">সিরিয়াল রেঞ্জ ফরম্যাট সঠিক নয়</div>';
+      return;
+    }
+    
+    // ✅ start/end চেক করুন
+    if (isNaN(start) || isNaN(end) || start > end) {
+      console.error('Invalid range values:', start, end);
+      gridContainer.innerHTML = '<div class="grid-no-selection">সিরিয়াল রেঞ্জ সঠিক নয়</div>';
+      return;
+    }
+    
+    console.log(`📊 সিরিয়াল রেঞ্জ: ${start} - ${end}, মোট: ${end - start + 1} টি`);
+    
     const pendingKey = `${dateString}_${day}_${time}_${type}`;
     const pendingData = this.pendingSelections[pendingKey] || { user: [], admin: [] };
     
@@ -641,7 +688,6 @@ class RealTimeGridSystem {
       if (status.isBooked) {
         serialItem.classList.add('booked');
       }
-      // ✅ মাল্টি সিলেক্টের জন্য চেক
       else if (this.multiSelect && this.selectedSerials.some(s => s.serial === serial)) {
         serialItem.classList.add('selected');
       }

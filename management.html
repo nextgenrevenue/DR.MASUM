@@ -1066,32 +1066,62 @@
       }
       
       async loadSerialRanges() {
-        try {
-          if (!this.db) {
-            console.error('Firebase not initialized');
-            return;
+  try {
+    if (!this.db) return;
+    
+    const doc = await this.db.collection('settings').doc('serialRanges').get();
+    if (doc.exists) {
+      const rawData = doc.data();
+      
+      console.log('🔍 Raw data from Firebase:', JSON.stringify(rawData));
+      
+      // 🔧 কমা/হাইফেন কে অ্যারেতে রূপান্তর
+      for (const day in rawData) {
+        if (!rawData[day]) continue;
+        for (const type in rawData[day]) {
+          if (!rawData[day][type]) continue;
+          for (const time in rawData[day][type]) {
+            let val = rawData[day][type][time];
+            console.log(`📌 Before conversion: ${day} ${type} ${time} =`, val, typeof val);
+            
+            if (typeof val === 'string') {
+              if (val.includes('-')) {
+                const parts = val.split('-');
+                rawData[day][type][time] = [parseInt(parts[0]), parseInt(parts[1])];
+                console.log(`✅ Converted range: ${val} → [${parseInt(parts[0])}, ${parseInt(parts[1])}]`);
+              } 
+              else if (val.includes(',')) {
+                const parts = val.split(',');
+                rawData[day][type][time] = [parseInt(parts[0]), parseInt(parts[1])];
+                console.log(`✅ Converted comma: ${val} → [${parseInt(parts[0])}, ${parseInt(parts[1])}]`);
+              } 
+              else {
+                const single = parseInt(val);
+                rawData[day][type][time] = [1, single];
+                console.log(`✅ Converted single: ${val} → [1, ${single}]`);
+              }
+            }
+            else if (Array.isArray(val)) {
+              console.log(`✅ Already array: [${val[0]}, ${val[1]}]`);
+            }
+            
+            console.log(`📌 After conversion: ${day} ${type} ${time} =`, rawData[day][type][time]);
           }
-          
-          const doc = await this.db.collection('settings').doc('serialRanges').get();
-          if (doc.exists) {
-            this.serialRanges = doc.data();
-            console.log('Loaded serial ranges:', this.serialRanges);
-            if (!this.serialRanges.Thursday) this.serialRanges.Thursday = {};
-            if (!this.serialRanges.Friday) this.serialRanges.Friday = {};
-          } else {
-            // Create default if not exists
-            this.serialRanges = { Thursday: {}, Friday: {} };
-            await this.db.collection('settings').doc('serialRanges').set(this.serialRanges);
-            console.log('Created default serial ranges');
-          }
-          
-          this.updateTimeFilterOptions();
-          
-        } catch (error) {
-          console.error('Error loading serial ranges:', error);
-          this.showAlert('সিরিয়াল রেঞ্জ লোড করতে সমস্যা হয়েছে', 'error');
         }
       }
+      
+      this.serialRanges = rawData;
+      console.log('✅ Final serialRanges:', this.serialRanges);
+      this.updateTimeFilterOptions();
+    } else {
+      this.serialRanges = { Thursday: {}, Friday: {} };
+      await this.db.collection('settings').doc('serialRanges').set(this.serialRanges);
+    }
+  } catch (error) {
+    console.error('❌ Error loading serial ranges:', error);
+    this.showAlert('সিরিয়াল রেঞ্জ লোড করতে সমস্যা হয়েছে', 'error');
+  }
+}
       
       async loadAppointments() {
   try {
@@ -1476,8 +1506,8 @@
         document.getElementById('serialModal').style.display = 'flex';
       }
       
-      async deleteSerial(day, type, time) {
-        if (!confirm(`আপনি কি ${day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার'} ${time} সময়ের ${type === 'new' ? 'নতুন' : 'পুরাতন'} রোগীর সিরিয়াল মুছতে চান?`)) {
+async deleteSerial(day, type, time) {
+        if (!confirm(`আপনি কি ${day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার'} ${time} সময়ের ${type === 'new' ? 'নতুন' : 'পুরাতন'} রোগীর সিরিয়াল মুছতে চান?`)) {
           return;
         }
         
@@ -1507,10 +1537,11 @@
             delete this.disabledSlots[key];
             localStorage.setItem('disabledSerialSlots', JSON.stringify(this.disabledSlots));
             
-            // Also remove from Firebase
+            // Also remove from Firebase (মার্জ ট্রু সম্পূর্ণ বাদ দিয়ে)
             if (this.db) {
               try {
-                await this.db.collection('settings').doc('disabledSlots').set(this.disabledSlots, { merge: true });
+                await this.db.collection('settings').doc('disabledSlots').set(this.disabledSlots);
+                console.log('✅ স্লট সফলভাবে এনাবল হয়েছে');
               } catch (error) {
                 console.error('Error saving disabled slots:', error);
               }
@@ -1556,11 +1587,15 @@
         }
       }
       
+      // ✅ FIXED: প্যারামিটার সিকোয়েন্স এবং ফায়ারবেস আপডেট লুপ-ফ্রি ফিক্স
       async toggleSlot(day, type, time, enable) {
+        // প্যারামিটারের সাথে কি (Key) ফরমেট মিলানো হলো: দিন_সময়_টাইপ
         const key = `${day}_${time}_${type}`;
         
         if (enable) {
-          delete this.disabledSlots[key];
+          if (this.disabledSlots[key] !== undefined) {
+            delete this.disabledSlots[key];
+          }
           console.log('Enabled slot:', key);
           this.showAlert(`${day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার'} - ${time} (${type === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী'}) এনাবল করা হয়েছে`, 'success');
         } else {
@@ -1572,10 +1607,10 @@
         // Save to localStorage
         localStorage.setItem('disabledSerialSlots', JSON.stringify(this.disabledSlots));
         
-        // ✅ FIXED: Save to Firebase to persist across refreshes
+        // ✅ FIXED: { merge: true } সম্পূর্ণ বাদ দেওয়া হয়েছে যেন রিয়েল-টাইমে সচল/এনাবল কাজ করে
         if (this.db) {
           try {
-            await this.db.collection('settings').doc('disabledSlots').set(this.disabledSlots, { merge: true });
+            await this.db.collection('settings').doc('disabledSlots').set(this.disabledSlots);
             console.log('Saved disabled slots to Firebase:', this.disabledSlots);
           } catch (error) {
             console.error('Error saving disabled slots to Firebase:', error);
@@ -1647,7 +1682,7 @@
           // ✅ FIXED: Add/update new entry
           if (!this.serialRanges[day]) this.serialRanges[day] = {};
           if (!this.serialRanges[day][type]) this.serialRanges[day][type] = {};
-          this.serialRanges[day][type][time] = [start, end];
+          this.serialRanges[day][type][time] = `${start}-${end}`;
           
           console.log('Updated serialRanges:', this.serialRanges);
           
@@ -1800,18 +1835,19 @@
       }
     });
 
-    // ==================== CLEANUP ====================
-    window.addEventListener('beforeunload', function() {
-      if (serialManager) {
+// ==================== CLEANUP ====================
+    window.addEventListener('pagehide', function() {
+      if (serialManager && typeof serialManager.destroy === 'function') {
         serialManager.destroy();
       }
       
-      if (realtimeListeners.length > 0) {
+      if (typeof realtimeListeners !== 'undefined' && realtimeListeners.length > 0) {
         realtimeListeners.forEach(unsubscribe => {
           if (unsubscribe && typeof unsubscribe === 'function') {
             unsubscribe();
           }
         });
+        console.log("🛑 ম্যানেজমেন্ট পেজের সব লিসেনার বন্ধ করা হয়েছে");
       }
     });
   </script>

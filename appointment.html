@@ -751,6 +751,7 @@
     };
 
     let db;
+    let firebaseDisabledSlots = {}; // ✅ এখানে গ্লোবাল ভ্যারিয়েবলটি যোগ করা হলো
     let gridSystem = null;
     let serialRanges = {};
     let appointments = [];
@@ -812,15 +813,9 @@ function getNextDateByDay(targetDay) {
   const todayIndex = today.getDay();
   let daysToAdd = targetDayIndex - todayIndex;
   
-  // যদি আজই সেই দিন হয় (daysToAdd === 0), তাহলে আজকের তারিখ দেখাও
-  // যদি আগামী সপ্তাহে হয় (daysToAdd < 0), তাহলে ৭ দিন যোগ করো
-  // যদি এই সপ্তাহেই হয় (daysToAdd > 0), তাহলে শুধু দিন যোগ করো
-  
   if (daysToAdd < 0) {
     daysToAdd += 7;
   }
-  
-  // daysToAdd === 0 হলে, আজকের তারিখই দেখাবে
   
   const nextDate = new Date(today);
   nextDate.setDate(today.getDate() + daysToAdd);
@@ -851,7 +846,7 @@ function getNextDateByDay(targetDay) {
       day: 'numeric' 
     }),
     banglaDate: banglaDate,
-    isToday: daysToAdd === 0 // নতুন ফিল্ড যোগ করা হলো
+    isToday: daysToAdd === 0
   };
 }
 
@@ -863,6 +858,35 @@ function getNextDateByDay(targetDay) {
         }
         db = firebase.firestore();
         console.log("✅ Firebase initialized successfully");
+
+        // 🔥 এখানে রিয়েল-টাইম লিসেনারটি সঠিকভাবে যুক্ত করে দেওয়া হলো
+      // রিয়েল-টাইম ডিসেবল স্লট ট্র্যাকিং
+        db.collection('settings').doc('disabledSlots').onSnapshot((doc) => {
+          if (doc.exists) {
+            firebaseDisabledSlots = doc.data();
+            console.log('✅ রিয়েল-টাইম ডিসেবল স্লট লোড হয়েছে:', firebaseDisabledSlots);
+          } else {
+            firebaseDisabledSlots = {};
+          }
+          // ডাটাবেজে কোনো পরিবর্তন আসলেই যেন ড্রপডাউনটি সাথে সাথে রিফ্রেশ হয়
+          if (typeof updateTimeOptions === 'function' && daySelect.value) {
+            updateTimeOptions();
+          }
+        });
+
+        // 🔒 ✅ নতুন যোগ করা হলো: সিরিয়াল রেঞ্জের ওপর ভিত্তি করে দিন (Day) অটো-লক করা
+        db.collection('settings').doc('serialRanges').onSnapshot((doc) => {
+          if (doc.exists) {
+            serialRanges = doc.data();
+            console.log('✅ রিয়েল-টাইম সিরিয়াল রেঞ্জ লোড হয়েছে:', serialRanges);
+            
+            // ম্যানেজমেন্টে দিন বা সময় খালি থাকলে ড্রপডাউন থেকে দিন লক করার ফাংশন
+            if (typeof checkAvailableDays === 'function') {
+              checkAvailableDays();
+            }
+          }
+        });
+
         return true;
       } catch (error) {
         console.error("❌ Firebase initialization error:", error);
@@ -906,7 +930,6 @@ function getNextDateByDay(targetDay) {
           if (type === 'grid') {
             loadingMessage.style.display = 'none';
             
-            // DOM থেকে available সিরিয়াল গণনা
             const gridContainer = document.getElementById('serialGrid');
             let availableCount = 0;
             
@@ -915,7 +938,6 @@ function getNextDateByDay(targetDay) {
               availableCount = availableItems.length;
             }
             
-            // availableCount শূন্য হলে মেসেজ দেখান
             if (availableCount === 0) {
               noSlotsMessage.style.display = 'block';
             } else {
@@ -959,55 +981,131 @@ function getNextDateByDay(targetDay) {
       return hour24 * 100 + (minutes || 0);
     }
 
-    // সময় অপশন আপডেট
-    function updateTimeOptions() {
-      const day = daySelect.value;
-      const type = typeSelect.value;
-      
-      console.log('🕒 Updating time options for:', day, type);
-      
-      timeSelect.innerHTML = '<option value="">-- সময় নির্বাচন করুন --</option>';
-      serialGrid.innerHTML = '';
-      serialInput.value = '';
-      noSlotsMessage.style.display = 'none';
+// appointment.html এ এই ফাংশনটি আপডেট করুন
+function updateTimeOptions() {
+  const day = daySelect.value;
+  const type = typeSelect.value;
+  
+  console.log('🕒 Updating time options for:', day, type);
+  
+  timeSelect.innerHTML = '<option value="">-- সময় নির্বাচন করুন --</option>';
+  serialGrid.innerHTML = '';
+  serialInput.value = '';
+  noSlotsMessage.style.display = 'none';
 
-      let hasTimeSlots = false;
-      let timeSlots = [];
+  let hasTimeSlots = false;
+  const disabledSlots = firebaseDisabledSlots || {};
 
-      if(day && type && serialRanges[day] && serialRanges[day][type]) {
-        timeSlots = Object.keys(serialRanges[day][type]);
-        console.log('⏰ Available times:', timeSlots);
-        
-        if (timeSlots.length > 0) {
-          hasTimeSlots = true;
-          
-          const sortedTimes = timeSlots.sort((a, b) => {
-            const numA = extractTimeNumber(a);
-            const numB = extractTimeNumber(b);
-            return numA - numB;
-          });
-          
-          console.log('🕒 Sorted times:', sortedTimes);
-          
-          sortedTimes.forEach(time => {
-            const option = document.createElement('option');
-            option.value = time;
-            option.textContent = time;
-            timeSelect.appendChild(option);
-          });
+  if (day && type && serialRanges[day] && serialRanges[day][type]) {
+    const timeSlots = Object.keys(serialRanges[day][type]);
+    
+    if (timeSlots.length > 0) {
+      hasTimeSlots = true;
+      
+      const sortedTimes = timeSlots.sort((a, b) => {
+        return extractTimeNumber(a) - extractTimeNumber(b);
+      });
+      
+      const targetDateInfo = getNextDateByDay(day);
+      
+      sortedTimes.forEach(time => {
+        const option = document.createElement('option');
+        option.value = time;
+        option.textContent = time;
+
+        const slotKey = `${day}_${time}_${type}`;
+
+        // অ্যাডমিন ম্যানুয়ালি বন্ধ করলে
+        if (disabledSlots[slotKey] === true) {
+          option.disabled = true;
+          option.textContent += ' (বন্ধ)';
+          timeSelect.appendChild(option);
+          return;
         }
-      }
 
-      if (!hasTimeSlots) {
-        const dayText = day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
-        const typeText = type === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+        // ✅ সঠিক রেঞ্জ পার্সিং (অ্যারে ও স্ট্রিং দুটোই বুঝবে)
+        let startSerial = 1;
+        let endSerial = 0;
+        const rangeValue = serialRanges[day][type][time];
         
-        showPopup('warning', 'কোনো সময় উপলব্ধ নেই', 
-          `"${dayText}" এবং "${typeText}" এর জন্য কোনো সময় উপলব্ধ নেই। অনুগ্রহ করে অন্য দিন বা ধরন নির্বাচন করুন।`);
+        if (rangeValue) {
+          // যদি অ্যারে হয়
+          if (Array.isArray(rangeValue)) {
+            startSerial = rangeValue[0];
+            endSerial = rangeValue[1];
+          } 
+          // যদি স্ট্রিং হয়
+          else if (typeof rangeValue === 'string') {
+            const rangeStr = rangeValue.trim();
+            if (rangeStr.includes('-')) {
+              const parts = rangeStr.split('-');
+              startSerial = parseInt(parts[0]) || 1;
+              endSerial = parseInt(parts[parts.length - 1]) || 0;
+            } else if (rangeStr.includes(',')) {
+              const parts = rangeStr.split(',');
+              startSerial = parseInt(parts[0]) || 1;
+              endSerial = parseInt(parts[parts.length - 1]) || 0;
+            } else {
+              const singleNum = parseInt(rangeStr) || 0;
+              if (singleNum > 0) {
+                startSerial = 1;
+                endSerial = singleNum;
+              }
+            }
+          }
+        }
         
-        timeSelect.innerHTML = '<option value="">-- কোনো সময় উপলব্ধ নেই --</option>';
-      }
+        let totalSeatsAllowed = 0;
+        if (endSerial >= startSerial && startSerial > 0) {
+          totalSeatsAllowed = (endSerial - startSerial) + 1;
+        } else {
+          totalSeatsAllowed = 999;
+        }
+        
+        // বুকড কাউন্ট গণনা
+        let bookedCountInRange = 0;
+        if (appointments && appointments.length > 0) {
+          const matchedAppointments = appointments.filter(app => {
+            if (app.status !== 'confirmed' && app.status !== 'pending') return false;
+            const appDate = app.appointmentDate || app.date;
+            return app.day === day && 
+                   (app.patientType || app.type) === type && 
+                   (app.timeSlot || app.time) === time && 
+                   appDate === targetDateInfo.dateString;
+          });
+          
+          const uniquePatientIds = new Set();
+          matchedAppointments.forEach(app => {
+            if (app.id) uniquePatientIds.add(app.id);
+          });
+          bookedCountInRange = uniquePatientIds.size;
+        }
+        
+        console.log(`📊 স্লট: ${time} | রেঞ্জ: ${startSerial}-${endSerial} | সিট লিমিট: ${totalSeatsAllowed} | বুকড: ${bookedCountInRange}`);
+        
+        if (totalSeatsAllowed > 0 && totalSeatsAllowed < 999 && bookedCountInRange >= totalSeatsAllowed) {
+          option.disabled = true;
+          option.textContent = time + ' (খালি নেই)';
+        } else {
+          option.disabled = false;
+          const available = totalSeatsAllowed - bookedCountInRange;
+          if (available > 0 && available < totalSeatsAllowed) {
+            option.textContent = time + ` (${available}টি খালি)`;
+          }
+        }
+        
+        timeSelect.appendChild(option);
+      });
     }
+  }
+
+  if (!hasTimeSlots) {
+    const dayText = day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
+    const typeText = type === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+    showPopup('warning', 'কোনো সময় উপলব্ধ নেই', `"${dayText}" এবং "${typeText}" এর জন্য কোনো সময় উপলব্ধ নেই।`);
+    timeSelect.innerHTML = '<option value="">-- কোনো সময় উপলব্ধ নেই --</option>';
+  }
+}
 
     // বয়স প্রসেসিং ফাংশন
     function normalizeAgeInputs() {
@@ -1446,57 +1544,93 @@ function getNextDateByDay(targetDay) {
       }
     }
 
-    function loadAppointmentsFromFirebase() {
-      if (!db) {
-        console.error('❌ Database not initialized');
-        return;
+    // ✅ সিরিয়াল ম্যানেজমেন্টে দিন বা সময় না থাকলে ড্রপডাউন থেকে দিন বন্ধ করার ফাংশন
+    function checkAvailableDays() {
+      if (!daySelect || !serialRanges) return;
+      const dayOptions = daySelect.querySelectorAll('option');
+      
+      dayOptions.forEach(option => {
+        const dayValue = option.value;
+        if (!dayValue) return;
+
+        const hasNewTimes = serialRanges[dayValue] && serialRanges[dayValue]['new'] && Object.keys(serialRanges[dayValue]['new']).length > 0;
+        const hasOldTimes = serialRanges[dayValue] && serialRanges[dayValue]['old'] && Object.keys(serialRanges[dayValue]['old']).length > 0;
+
+        if (!hasNewTimes && !hasOldTimes) {
+          option.disabled = true;
+          if (!option.textContent.includes('(বন্ধ)')) option.textContent += ' (বন্ধ)';
+        } else {
+          option.disabled = false;
+          option.textContent = option.textContent.replace(' (বন্ধ)', '');
+        }
+      });
+    }
+
+// ==================== সম্পূর্ণ loadAppointmentsFromFirebase ফাংশন (সংশোধিত) ====================
+function loadAppointmentsFromFirebase() {
+  if (!db) return;
+  console.log('🔄 রোগীদের জন্য সপ্তাহের চক্র অনুযায়ী ডেটা লোড হচ্ছে...');
+  
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const lastSaturday = new Date(today);
+  const daysSinceSaturday = (dayOfWeek + 1) % 7; 
+  lastSaturday.setDate(today.getDate() - daysSinceSaturday);
+  lastSaturday.setHours(0, 0, 0, 0);
+
+  // অ্যাপয়েন্টমেন্ট লিসেনার
+  const appointmentsListener = db.collection('appointments')
+    .where('timestamp', '>=', firebase.firestore.Timestamp.fromDate(lastSaturday))
+    .onSnapshot(snapshot => {
+      appointments = [];  // ✅ অ্যারে হিসেবে রাখুন
+      
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        appointments.push({  // ✅ push ব্যবহার করুন
+          id: doc.id,
+          ...data
+        });
+      });
+      
+      console.log(`📊 এই সপ্তাহের চক্রে মোট ${appointments.length} টি অ্যাপয়েন্টমেন্ট প্রসেস করা হয়েছে`);
+      
+      // appointments আপডেট হলে time options রিফ্রেশ করুন
+      if (daySelect && daySelect.value && typeSelect && typeSelect.value) {
+        updateTimeOptions();
       }
       
-      realtimeListeners.forEach(unsubscribe => unsubscribe());
-      realtimeListeners = [];
+      if (gridSystem) {
+        gridSystem.updateGrid();
+      }
+    }, error => {
+      console.error('❌ Error loading appointments:', error);
+    });
 
-      const appointmentsListener = db.collection('appointments')
-        .onSnapshot(snapshot => {
-          console.log('📅 Appointments snapshot received');
-          appointments = [];
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            appointments.push({
-              id: doc.id,
-              ...data
-            });
-          });
-          console.log('📅 Appointments loaded:', appointments.length);
-        }, error => {
-          console.error('❌ Error loading appointments:', error);
-        });
+  realtimeListeners.push(appointmentsListener);
+}
+// ==================== রিয়েল-টাইম সেটিংস লিসেনার ফাংশন ====================
+function setupSettingsListeners() {
+  if (!db || !realtimeListeners) return;
 
-      realtimeListeners.push(appointmentsListener);
+  console.log('🔄 সিরিয়াল রেঞ্জের রিয়েল-টাইম লিসেনার চালু হচ্ছে...');
 
-      const serialRangesListener = db.collection('settings').doc('serialRanges')
-        .onSnapshot(doc => {
-          console.log('🔄 Serial ranges snapshot received');
-          if (doc.exists) {
-            serialRanges = doc.data();
-            console.log('🔄 Serial ranges updated:', serialRanges);
-            
-            if (!serialRanges.Thursday) serialRanges.Thursday = {};
-            if (!serialRanges.Friday) serialRanges.Friday = {};
-            if (!serialRanges.Thursday.new) serialRanges.Thursday.new = {};
-            if (!serialRanges.Thursday.old) serialRanges.Thursday.old = {};
-            if (!serialRanges.Friday.new) serialRanges.Friday.new = {};
-            if (!serialRanges.Friday.old) serialRanges.Friday.old = {};
-            
-            checkDayAvailability();
-          } else {
-            console.log('📭 No serial ranges document found');
-          }
-        }, error => {
-          console.error('❌ Error listening to serial ranges:', error);
-        });
+  // Serial Ranges লিসেনার তৈরি
+  const serialRangesListener = db.collection('settings').doc('serialRanges')
+    .onSnapshot(doc => {
+      if (doc.exists) {
+        serialRanges = doc.data();
+        if (typeof checkAvailableDays === 'function') checkAvailableDays();
+        if (typeof updateTimeOptions === 'function' && daySelect && daySelect.value && typeSelect && typeSelect.value) {
+          updateTimeOptions();
+        }
+      }
+    }, error => {
+      console.error('❌ Error listening to serial ranges:', error);
+    });
 
-      realtimeListeners.push(serialRangesListener);
-    }
+  // 💡 ফিক্স: সঠিকভাবে পুশ করা হলো যাতে pagehide এ বন্ধ হতে পারে
+  realtimeListeners.push(serialRangesListener);
+}
 
     // ==================== EVENT LISTENERS ====================
 
@@ -1562,152 +1696,150 @@ function getNextDateByDay(targetDay) {
       }
     });
 
-    // ==================== FORM SUBMISSION ====================
-    document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      if (!db) {
-        showPopup('error', 'ত্রুটি', 'ডেটাবেস সংযোগ সমস্যা। পৃষ্ঠাটি রিফ্রেশ করুন।');
-        return;
-      }
-      
-      let isValid = true;
-      
-      if(!nameInput.value.trim()) {
-        nameError.style.display = 'block';
-        nameInput.setCustomValidity('invalid');
-        isValid = false;
-      } else {
-        nameError.style.display = 'none';
-        nameInput.setCustomValidity('');
-      }
-      
-      const ageValidationData = getAgeData();
-      
-      if (!ageValidationData.isValid) {
-        isValid = false;
-      }
-      
-      if(!/^01[0-9]{9}$/.test(phoneInput.value)) {
-        phoneError.style.display = 'block';
-        phoneInput.setCustomValidity('invalid');
-        isValid = false;
-      } else {
-        phoneError.style.display = 'none';
-        phoneInput.setCustomValidity('');
-      }
-      
-      if(!serialInput.value) {
-        serialError.style.display = 'block';
-        serialInput.setCustomValidity('invalid');
-        isValid = false;
-      } else {
-        serialError.style.display = 'none';
-        serialInput.setCustomValidity('');
-      }
-      
-      if(!isValid) {
-        showPopup('error', 'ফর্ম ত্রুটি', 'অনুগ্রহ করে ফর্মের সকল আবশ্যক তথ্য সঠিকভাবে পূরণ করুন।');
-        return false;
-      }
-      
-      const patientName = nameInput.value.trim(); 
-      const selectedPhone = phoneInput.value;
-      const selectedDay = daySelect.value;
-      const selectedSerial = parseInt(serialInput.value);
-      const selectedTime = timeSelect.value;
-      const selectedType = typeSelect.value;
-      
-      // তারিখ বের করুন
-      const nextDateInfo = getNextDateByDay(selectedDay);
-      const appointmentDate = nextDateInfo.dateString;
-      const displayDate = nextDateInfo.banglaDate;
-      
-      const dayText = selectedDay === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
-      const typeText = selectedType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
-      
-      // কনফার্মেশন মেসেজে তারিখ যোগ করুন
-      const confirmed = await showPopup('confirm', 'কনফার্মেশন', 
-        `আপনি কি নিশ্চিত যে আপনি সিরিয়াল বুক করতে চান?<br><br>
-        <strong>বিস্তারিত:</strong><br>
-        • নাম: ${patientName}<br>
-        • দিন: ${displayDate}<br> 
-        • সময়: ${selectedTime}<br> 
-        • সিরিয়াল: ${selectedSerial} নং<br>
-        • ধরন: ${typeText}<br>
-        • ফোন: ${selectedPhone}`, 
-        { showConfirm: true });
-      
-      if(!confirmed) {
-        console.log('❌ User cancelled the appointment');
-        return false;
-      }
+    // ==================== সঠিক ফর্ম সাবমিশন ====================
+document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  if (!db) {
+    showPopup('error', 'ত্রুটি', 'ডেটাবেস সংযোগ সমস্যা। পৃষ্ঠাটি রিফ্রেশ করুন।');
+    return;
+  }
+  
+  // ভ্যালিডেশন চেক...
+  let isValid = true;
+  
+  if(!nameInput.value.trim()) {
+    nameError.style.display = 'block';
+    isValid = false;
+  } else {
+    nameError.style.display = 'none';
+  }
+  
+  const ageValidationData = getAgeData();
+  if (!ageValidationData.isValid) {
+    isValid = false;
+  }
+  
+  if(!/^01[0-9]{9}$/.test(phoneInput.value)) {
+    phoneError.style.display = 'block';
+    isValid = false;
+  } else {
+    phoneError.style.display = 'none';
+  }
+  
+  if(!serialInput.value) {
+    serialError.style.display = 'block';
+    isValid = false;
+  } else {
+    serialError.style.display = 'none';
+  }
+  
+  if(!isValid) {
+    showPopup('error', 'ফর্ম ত্রুটি', 'অনুগ্রহ করে ফর্মের সকল আবশ্যক তথ্য সঠিকভাবে পূরণ করুন।');
+    return;
+  }
+  
+  const patientName = nameInput.value.trim(); 
+  const selectedPhone = phoneInput.value;
+  const selectedDay = daySelect.value;
+  const selectedSerial = parseInt(serialInput.value);
+  const selectedTime = timeSelect.value;
+  const selectedType = typeSelect.value;
+  
+  const nextDateInfo = getNextDateByDay(selectedDay);
+  const appointmentDate = nextDateInfo.dateString;
+  const displayDate = nextDateInfo.banglaDate;
+  const typeText = selectedType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+  
+  // কনফার্মেশন ডায়ালগ
+  const confirmed = await showPopup('confirm', 'কনফার্মেশন', 
+    `আপনি কি নিশ্চিত যে আপনি সিরিয়াল বুক করতে চান?<br><br>
+    <strong>বিস্তারিত:</strong><br>
+    • নাম: ${patientName}<br>
+    • দিন: ${displayDate}<br> 
+    • সময়: ${selectedTime}<br> 
+    • সিরিয়াল: ${selectedSerial} নং<br>
+    • ধরন: ${typeText}<br>
+    • ফোন: ${selectedPhone}`, 
+    { showConfirm: true });
+  
+  if(!confirmed) {
+    return;
+  }
 
-      const finalAgeData = getAgeData();
+  const finalAgeData = getAgeData();
+  
+  if (!finalAgeData.isValid) {
+    showPopup('error', 'বয়স ত্রুটি', 'অনুগ্রহ করে সঠিক বয়স লিখুন।');
+    return;
+  }
+  
+  try {
+    submitBtn.classList.add('loading');
+    submitBtn.textContent = 'প্রসেসিং হচ্ছে...';
+
+    // ডুপ্লিকেট চেক
+    const duplicateCheck = await db.collection('appointments')
+      .where('appointmentDate', '==', appointmentDate)
+      .where('day', '==', selectedDay)
+      .where('timeSlot', '==', selectedTime)
+      .where('patientType', '==', selectedType)
+      .where('serial', '==', selectedSerial)
+      .get();
       
-      if (!finalAgeData.isValid) {
-        showPopup('error', 'বয়স ত্রুটি', 'অনুগ্রহ করে সঠিক বয়স লিখুন।');
-        return false;
-      }
-      
-      const appointmentData = {
-        name: patientName,
-        phone: selectedPhone,
-        ageYears: finalAgeData.dbYears,
-        ageMonths: finalAgeData.dbMonths,
-        ageDays: finalAgeData.dbDays,
-        ageString: finalAgeData.ageDisplay,
-        ageDisplay: finalAgeData.ageDisplay,
-        originalInput: finalAgeData.ageInputText,
-        patientType: selectedType,
-        day: selectedDay,
-        date: appointmentDate, // YYYY-MM-DD ফরম্যাট
-        appointmentDate: appointmentDate, // Firebase ফিল্ডের জন্য
-        appointmentDateDisplay: nextDateInfo.banglaDate,
-        time: selectedTime,
-        serial: selectedSerial,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 'confirmed',
-        age: finalAgeData.ageInMonths
-      };
+    if (!duplicateCheck.empty) {
+      showPopup('error', 'দুঃখিত!', 'এই সিরিয়ালটি এইমাত্র অন্য একজন বুক করে ফেলেছেন। অনুগ্রহ করে গ্রিড থেকে অন্য একটি সিরিয়াল বেছে নিন।');
+      submitBtn.classList.remove('loading');
+      submitBtn.textContent = 'সাবমিট করুন';
+      if(gridSystem) gridSystem.updateGrid();
+      return;
+    }
 
-      console.log('💾 Firebase ডাটা প্রস্তুত:', appointmentData);
-      currentAppointmentData = appointmentData;
+    // পেন্ডিং সিলেকশন রিমুভ করুন (সঠিক ভেরিয়েবল নাম ব্যবহার করে)
+    if (gridSystem && gridSystem.userPendingId) {
+      await gridSystem.removePendingSelection(gridSystem.userPendingId);
+    }
+    
+    const appointmentData = {
+      name: patientName,
+      phone: selectedPhone,
+      ageYears: finalAgeData.dbYears,
+      ageMonths: finalAgeData.dbMonths,
+      ageDays: finalAgeData.dbDays,
+      ageString: finalAgeData.ageDisplay,
+      ageDisplay: finalAgeData.ageDisplay,
+      originalInput: finalAgeData.ageInputText,
+      patientType: selectedType,
+      day: selectedDay,
+      date: appointmentDate,
+      appointmentDate: appointmentDate,
+      appointmentDateDisplay: nextDateInfo.banglaDate,
+      timeSlot: selectedTime,  // time না হয়ে timeSlot ব্যবহার করুন
+      time: selectedTime,
+      serial: selectedSerial,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      status: 'confirmed',
+      age: finalAgeData.ageInMonths
+    };
 
-      try {
-        submitBtn.classList.add('loading');
-        submitBtn.textContent = 'সাবমিট করা হচ্ছে...';
+    await db.collection('appointments').add(appointmentData);
+    currentAppointmentData = appointmentData;
 
-        // পেন্ডিং সিলেকশন রিমুভ করুন
-        if (currentUserPendingId) {
-          if (gridSystem) {
-            await gridSystem.removePendingSelection(currentUserPendingId);
-          }
-          currentUserPendingId = null;
-        }
-
-        console.log('💾 Saving appointment:', appointmentData);
-        
-        // Firebase এ ডাটা সেভ করুন
-        await db.collection('appointments').add(appointmentData);
-
-        // কনফার্মেশন পপআপে তারিখ যোগ করুন
-        showPopup('success', 'অ্যাপয়েন্টমেন্ট সফল হয়েছে!', 
-          `আপনার অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে!<br><br>
-          <strong>তারিখ:</strong> ${displayDate}<br>
-          <strong>সিরিয়াল:</strong> ${selectedSerial} নং<br><br>
-          আপনি চাইলে নিচের থেকে কনফার্মেশন স্লিপ ডাউনলোড করতে পারেন।`,
-          { showSlip: true });
-        
-        console.log('✅ Appointment saved successfully');
-        
-      } catch (error) {
-        console.error('❌ Error saving appointment:', error);
-        showPopup('error', 'ত্রুটি', 'দুঃখিত, একটি ত্রুটি হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
-        submitBtn.classList.remove('loading');
-        submitBtn.textContent = 'সাবমিট করুন';
-      }
-    });
+    showPopup('success', 'অ্যাপয়েন্টমেন্ট সফল হয়েছে!', 
+      `আপনার অ্যাপয়েন্টমেন্ট সফলভাবে বুক করা হয়েছে!<br><br>
+      <strong>তারিখ:</strong> ${displayDate}<br>
+      <strong>সিরিয়াল:</strong> ${selectedSerial} নং<br><br>
+      আপনি চাইলে নিচের থেকে কনফার্মেশন স্লিপ ডাউনলোড করতে পারেন।`,
+      { showSlip: true });
+    
+  } catch (error) {
+    console.error('❌ Error saving appointment:', error);
+    showPopup('error', 'ত্রুটি', 'দুঃখিত, একটি ত্রুটি হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
+  } finally {
+    submitBtn.classList.remove('loading');
+    submitBtn.textContent = 'সাবমিট করুন';
+  }
+});
 
     // ==================== INITIALIZATION ====================
     document.addEventListener('DOMContentLoaded', function() {
@@ -1725,11 +1857,17 @@ function getNextDateByDay(targetDay) {
       }, 1000);
     });
 
-    window.addEventListener('beforeunload', function() {
-      if (currentUserPendingId && gridSystem) {
-        gridSystem.removePendingSelection(currentUserPendingId);
-      }
-    });
+// ট্যাব বন্ধ বা মোবাইল মিনিমাইজ করার সাথে সাথে পেন্ডিং ডাটা রিমুভ ও লিসেনার বন্ধ করার জন্য
+window.addEventListener('pagehide', function() {
+  // 🔽 সংশোধন: সঠিক ভ্যারিয়েবল নাম ব্যবহার করা হলো
+  if (currentUserPendingSerial && gridSystem) {
+    gridSystem.removePendingSelection(currentUserPendingSerial);
+  }
+  if (gridSystem && typeof gridSystem.cleanup === 'function') {
+    gridSystem.cleanup();
+    console.log("🧹 অ্যাপয়েন্টমেন্ট গ্রিড লিসেনার বন্ধ করা হয়েছে");
+  }
+});
   </script>
 </body>
 </html>
