@@ -2,7 +2,7 @@
 <html lang="bn">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>সেটিংস - অ্যাডমিন প্যানেল</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -368,77 +368,78 @@
       transform: translateX(26px);
     }
     
-    /* ==================== MOBILE RESPONSIVE ==================== */
-    @media (max-width: 768px) {
-      .main-content-area {
-        padding: 20px 15px;
-      }
-      
-      .settings-card {
-        padding: 20px;
-      }
-      
-      .settings-card h2 {
-        font-size: 20px;
-      }
-      
-      .form-actions {
-        flex-direction: column;
-      }
-      
-      .btn {
-        width: 100%;
-        padding: 12px 20px;
-      }
-      
-      .info-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 5px;
-      }
-    }
-    
-    @media (max-width: 480px) {
-      .main-content-area {
-        padding: 15px 10px;
-      }
-      
-      .settings-card {
-        padding: 15px;
-      }
-      
-      .settings-card h2 {
-        font-size: 18px;
-      }
-      
-      .form-group input {
-        padding: 10px 12px;
-      }
-      
-      .btn {
-        padding: 10px 16px;
-      }
-    }
-    
-    /* ==================== DIVIDER ==================== */
-    .divider {
-      height: 1px;
-      background: linear-gradient(to right, transparent, #e5e7eb, transparent);
-      margin: 20px 0;
-    }
-    
-    /* ==================== ICON STYLES ==================== */
-    .icon {
-      font-size: 20px;
-    }
-    
-    /* ==================== HELPER TEXT ==================== */
-    .help-text {
-      font-size: 12px;
-      color: var(--gray);
-      margin-top: 5px;
-      display: block;
-    }
+/* ==================== MOBILE OVERRIDES ==================== */
+@media (max-width: 768px) {
+  /* মোবাইলে জোরপূর্বক জুম বা টেক্সট ইনফ্লেশন বন্ধ করার জন্য */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  .main-content-area {
+    margin-left: 0 !important; /* মোবাইলে সাইডবার হাইড থাকলে কন্টেন্ট ফুল স্ক্রিন হবে */
+    padding: 20px 15px;
+    width: 100%;
+    overflow-x: hidden; /* স্ক্রিন যেন ডানে-বামে অতিরিক্ত স্ক্রোল না হয় */
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  
+  .settings-card {
+    padding: 20px;
+    width: 100%;
+  }
+  
+  /* আইফোনে ইনপুট বক্সে ক্লিক করলে যেন অটো-জুম না হয় */
+  .form-group input {
+    font-size: 16px !important; 
+  }
+  
+  .card-actions {
+    flex-direction: column;
+  }
+  
+  .card-actions .btn {
+    width: 100%;
+  }
+  
+  /* মোবাইলে সাইডবার পজিশন */
+  #sidebar-container {
+    position: fixed;
+    top: 60px;
+    left: -260px;
+    width: 260px;
+    height: calc(100vh - 60px);
+    transition: left 0.3s ease;
+  }
+  
+  /* components-inline.js যখন .mobile-open ক্লাস এড করবে */
+  #sidebar-container.mobile-open {
+    left: 0 !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content-area {
+    padding: 15px 10px;
+  }
+  
+  .settings-card {
+    padding: 15px;
+  }
+
+  .form-actions {
+    flex-direction: column; /* ছোট ফোনে বাটনগুলো একটির নিচে আরেকটি আসবে */
+    gap: 10px;
+  }
+
+  .form-actions .btn {
+    width: 100%; /* বাটনগুলো ফুল স্ক্রিন চওড়া হবে */
+  }
+}
   </style>
 </head>
 <body data-auto-load-components>
