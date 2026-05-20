@@ -18,7 +18,6 @@
       --light-gray: #f3f4f6;
       --white: #ffffff;
       --dark: #1f2937;
-      --secondary-color: #ff6f91;
     }
     
     * {
@@ -293,13 +292,13 @@
             <label style="font-size: 16px; color: var(--primary);">✍️ আপনার নোটিস তালিকা (যেটি সচল করবেন সেটির রেডিও বাটনে টিক দিন):</label>
             
             <div id="dynamicNoticesContainer">
-            </div>
+              </div>
             
             <button type="button" class="add-notice-btn" id="addNoticeBoxBtn">➕ নতুন নোটিস বক্স যোগ করুন</button>
           </div>
           
           <div class="form-group">
-            <label for="noticeStatus">কন্টারল মোড সিলেক্ট করুন</label>
+            <label for="noticeStatus">কন্ট্রোল মোড সিলেক্ট করুন</label>
             <select id="noticeStatus">
               <option value="manual">ম্যানুয়াল কন্ট্রোল (সরাসরি অন/অফ)</option>
               <option value="scheduled">শিডিউলড (টাইম অনুযায়ী অটোমেটিক)</option>
@@ -353,21 +352,6 @@
               </div>
             </div>
           </div>
-
-          <div class="notice-card" style="border-top: 4px solid var(--secondary-color); padding: 20px 0 0 0; box-shadow: none; margin-bottom: 0;">
-            <h2>🎡 ওয়েবসাইট রানিং স্ক্রল (Marquee) কন্ট্রোল</h2>
-            <div class="form-group">
-              <label for="marqueeText">স্ক্রলিং নোটিস টেক্সট:</label>
-              <textarea id="marqueeText" placeholder="ওয়েবসাইটের উপর দিয়ে যে লেখাটি ভেসে যাবে তা এখানে লিখুন..."></textarea>
-            </div>
-            <div class="form-group">
-              <label for="marqueeStatus">মারকিউ স্ট্যাটাস:</label>
-              <select id="marqueeStatus">
-                <option value="true">🟢 সচল (ওয়েবসাইটে স্ক্রল করবে)</option>
-                <option value="false">🔴 বন্ধ (হাইড করে রাখুন)</option>
-              </select>
-            </div>
-          </div>
           
           <div class="form-actions">
             <button type="submit" class="submit-btn" id="submitNoticeBtn">💾 সেটিংস সংরক্ষণ করুন</button>
@@ -406,7 +390,6 @@
       let db;
       let checkScheduleInterval;
       let loadedNoticeData = { statusType: 'manual', active: true, message: '' }; 
-      let loadedMarqueeData = { floatingNotice: '', floatingNoticeActive: false };
       
       function initializeFirebase() {
         try {
@@ -559,7 +542,6 @@
       async function loadNotice() {
         if (!checkDatabase()) return;
         try {
-          // ১. অ্যাপয়েন্টমেন্ট নোটিস লোড করা
           const doc = await db.collection('settings').doc('appointmentNotice').get();
           const container = document.getElementById('dynamicNoticesContainer');
           container.innerHTML = ""; 
@@ -591,25 +573,13 @@
               document.getElementById('endDay1').value = noticeData.slot1.endDay;
               document.getElementById('endTime1').value = noticeData.slot1.endTime;
             }
+            updateNoticeDisplay();
           } else {
             createNoticeBoxHTML('notice_1', 'সাপ্তাহিক ছুটির জন্য ফর্ম সাময়িকভাবে বন্ধ আছে। আগামী শনিবার সকাল থেকে আবার সিরিয়াল নেওয়া যাবে। ধন্যবাদ।', true);
             createNoticeBoxHTML('notice_2', 'আজ বিশেষ কারণে চেম্বার বন্ধ থাকবে। সাময়িক অসুবিধার জন্য আমরা আন্তরিকভাবে দুঃখিত।', false);
             updateBoxHighlighting();
+            updateNoticeDisplayFromUI();
           }
-
-          // ২. আলাদা মারকিউ (dynamicContent) ডেটা লোড করা
-          const marqueeDoc = await db.collection('settings').doc('dynamicContent').get();
-          if (marqueeDoc.exists) {
-            const mData = marqueeDoc.data();
-            loadedMarqueeData.floatingNotice = mData.floatingNotice || '';
-            // আপনি যদি স্ট্যাটাস ফিল্ড আগে না বানিয়ে থাকেন তবে ডিফল্ট ট্রু হিসেবে লোড হবে
-            loadedMarqueeData.floatingNoticeActive = mData.floatingNoticeActive !== undefined ? mData.floatingNoticeActive : true;
-            
-            document.getElementById('marqueeText').value = loadedMarqueeData.floatingNotice;
-            document.getElementById('marqueeStatus').value = loadedMarqueeData.floatingNoticeActive ? 'true' : 'false';
-          }
-
-          updateNoticeDisplay();
         } catch (error) { console.error(error); }
       }
 
@@ -639,10 +609,6 @@
           loadedNoticeData.slot1 = { startDay, startTime, endDay, endTime };
           loadedNoticeData.active = isNowInSlot(now.getDay(), now.getHours()*60 + now.getMinutes(), Number(startDay), startTime, Number(endDay), endTime);
         }
-
-        // মারকিউ টেক্সট এর রিয়েলটাইম প্রিভিউ ভ্যালু আপডেট করা
-        loadedMarqueeData.floatingNotice = document.getElementById('marqueeText').value.trim();
-        loadedMarqueeData.floatingNoticeActive = document.getElementById('marqueeStatus').value === 'true';
         
         updateNoticeDisplay();
       }
@@ -663,18 +629,14 @@
           statusHtml += `<p><span class="time-badge">⏰ অটো শিডিউল: ${getDayNameBangla(loadedNoticeData.slot1.startDay)} (${loadedNoticeData.slot1.startTime}) থেকে ${getDayNameBangla(loadedNoticeData.slot1.endDay)} (${loadedNoticeData.slot1.endTime})</span></p>`;
         }
         
-        // লাইভ প্রিভিউ সেকশনে নতুন মারকিউ সেটিংস দেখানো
-        let marqueePreview = loadedMarqueeData.floatingNoticeActive && loadedMarqueeData.floatingNotice ? 
-          `<div class="live-marquee-preview"><marquee scrollamount="5">📢 রানিং স্ক্রল: ${escapeHtml(loadedMarqueeData.floatingNotice)}</marquee></div>` : 
-          '<p style="color:var(--gray); font-size:13px; margin-top:5px;">⚠️ বর্তমানে লাইভ মারকিউ স্ক্রলটি বন্ধ বা হাইড আছে।</p>';
+        // প্রিভিউতে মারকিউ অন-অফ কন্ট্রোল জেনারেটর
+        let marqueePreview = loadedNoticeData.active ? `<div class="live-marquee-preview"><marquee scrollamount="5">📢 নোটিস: ${escapeHtml(loadedNoticeData.message)}</marquee></div>` : '<p style="color:var(--gray); font-size:13px; margin-top:5px;">⚠️ বর্তমানে মার্কার বা স্লাইডারটি হাইড বা বন্ধ আছে।</p>';
 
         noticeDisplay.innerHTML = `
-          <p><strong>📝 লাইভ অ্যাপয়েন্টমেন্ট নোটিস:</strong> ${escapeHtml(loadedNoticeData.message)}</p>
+          <p><strong>📝 লাইভ টেক্সট:</strong> ${escapeHtml(loadedNoticeData.message)}</p>
           <div class="schedule-status"><p><strong>মোড স্ট্যাটাস:</strong> ${statusText}</p></div>
           ${statusHtml}
-          <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #ccc;">
-            <strong>🎡 লাইভ রানিং মারকিউ প্রিভিউ:</strong> ${marqueePreview}
-          </div>
+          <div style="margin-top:10px;"><strong>🎡 লাইভ মার্কার প্রিভিউ:</strong> ${marqueePreview}</div>
         `;
       }
       
@@ -725,33 +687,15 @@
           const now = new Date();
           noticeData.active = isNowInSlot(now.getDay(), now.getHours()*60 + now.getMinutes(), Number(noticeData.slot1.startDay), noticeData.slot1.startTime, Number(noticeData.slot1.endDay), noticeData.slot1.endTime);
         }
-
-        // মারকিউ ডেটা কালেকশন
-        const mText = document.getElementById('marqueeText').value.trim();
-        const mActive = document.getElementById('marqueeStatus').value === 'true';
         
         try {
           const submitBtn = document.getElementById('submitNoticeBtn');
           submitBtn.disabled = true;
-
-          // ১. অ্যাপয়েন্টমেন্ট নোটিস সেটিংস সেভ (পূর্বের ন্যায় অক্ষুণ্ণ)
           await db.collection('settings').doc('appointmentNotice').set(noticeData);
-
-          // ২. dynamicContent ডকুমেন্টে মারকিউ টেক্সট ও স্ট্যাটাস সেভ
-          await db.collection('settings').doc('dynamicContent').set({
-            floatingNotice: mText,
-            floatingNoticeActive: mActive,
-            updatedAt: new Date()
-          }, { merge: true }); // merge: true ব্যবহার করায় dynamicContent এর অন্য কোনো ফিল্ড থাকলে তা ডিলিট হবে না
-
-          showAlert('✅ সকল নোটিস, শিডিউল এবং মারকিউ সেটিংস সফলভাবে ডেটাবেসে সংরক্ষিত হয়েছে');
+          showAlert('✅ সকল ডায়নামিক নোটিস এবং শিডিউল সেটিংস সফলভাবে ডেটাবেসে সংরক্ষিত হয়েছে');
           await loadNotice();
-        } catch (error) { 
-          console.error(error);
-          showAlert('সংরক্ষণ করতে ব্যর্থ হয়েছে', 'error'); 
-        } finally { 
-          document.getElementById('submitNoticeBtn').disabled = false; 
-        }
+        } catch (error) { showAlert('সংরক্ষণ করতে ব্যর্থ হয়েছে', 'error'); }
+        finally { document.getElementById('submitNoticeBtn').disabled = false; }
       }
       
       function updateBoxHighlighting() {
@@ -806,8 +750,6 @@
             });
             
             document.getElementById('manualActiveStatus').addEventListener('change', updateNoticeDisplayFromUI);
-            document.getElementById('marqueeText').addEventListener('input', updateNoticeDisplayFromUI);
-            document.getElementById('marqueeStatus').addEventListener('change', updateNoticeDisplayFromUI);
             
             ['startDay1','startTime1','endDay1','endTime1'].forEach(id => {
                document.getElementById(id).addEventListener('change', updateNoticeDisplayFromUI);

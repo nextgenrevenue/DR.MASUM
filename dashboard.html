@@ -2144,52 +2144,71 @@ function getNoResultsMessage(dateRange) {
 }
 
 // =======================================================
-// ৫. সিরিয়াল স্ট্যাটস ক্যালকুলেশন - UPDATED
+// ৫. সিরিয়াল স্ট্যাটস ক্যালকুলেশন - FIXED (TIME FILTER সহ)
 // =======================================================
 async function updateSerialStats() {
   try {
     // লোড সিরিয়াল রেঞ্জ
     await loadSerialRanges();
     
-    // ক্যালকুলেট স্ট্যাটস
     let totalSerialCount = 0;
     
-    // ✅ মোট সিরিয়াল স্লট - শুধুমাত্র নির্বাচিত দিনের জন্য (যদি 'all' নয়)
-    const selectedDay = currentFilters.day;
+    // 🟢 গ্লোবাল filters অবজেক্ট অথবা ড্রপডাউন থেকে সিলেক্টেড দিন নেওয়া
+    let selectedDay = 'all';
+    if (typeof currentFilters !== 'undefined' && currentFilters && currentFilters.day) {
+      selectedDay = currentFilters.day;
+    } else {
+      const desktopDayFilter = document.getElementById('dayFilterSerial');
+      if (desktopDayFilter) selectedDay = desktopDayFilter.value;
+    }
     
+    let selectedType = 'all';
+    if (typeof currentFilters !== 'undefined' && currentFilters && currentFilters.type) {
+      selectedType = currentFilters.type;
+    } else {
+      const desktopTypeFilter = document.getElementById('typeFilterSerial');
+      if (desktopTypeFilter) selectedType = desktopTypeFilter.value;
+    }
+    
+    // ✅ মোট সিরিয়াল স্লট - শুধুমাত্র নির্বাচিত দিনের জন্য
     if (selectedDay === 'all') {
       // সব দিনের স্লট গণনা
       for (const day in serialRanges) {
         for (const type in serialRanges[day]) {
+          // টাইপ ফিল্টার চেক
+          if (selectedType !== 'all' && type !== selectedType) continue;
+          
           for (const time in serialRanges[day][type]) {
-            const [start, end] = serialRanges[day][type][time];
-            totalSerialCount += (end - start + 1);
+            const range = serialRanges[day][type][time];
+            if (Array.isArray(range) && range.length === 2) {
+              totalSerialCount += (range[1] - range[0] + 1);
+            }
           }
         }
       }
     } else {
       // শুধুমাত্র নির্বাচিত দিনের স্লট গণনা
-      if (serialRanges[selectedDay]) {
+      if (serialRanges && serialRanges[selectedDay]) {
         for (const type in serialRanges[selectedDay]) {
+          // টাইপ ফিল্টার চেক
+          if (selectedType !== 'all' && type !== selectedType) continue;
+          
           for (const time in serialRanges[selectedDay][type]) {
-            const [start, end] = serialRanges[selectedDay][type][time];
-            totalSerialCount += (end - start + 1);
+            const range = serialRanges[selectedDay][type][time];
+            if (Array.isArray(range) && range.length === 2) {
+              totalSerialCount += (range[1] - range[0] + 1);
+            }
           }
         }
       }
     }
     
-    // ✅ বর্তমান সপ্তাহের এক্টিভ বুকিং গণনা
-    const weekRange = getWeekDateRange();
-    
+    // ✅ বর্তমান সপ্তাহের একটিভ বুকিং গণনা
     let activeBookings = 0;
-    let totalBookings = 0;
     if (allAppointmentsSnapshot) {
       allAppointmentsSnapshot.forEach(doc => {
         const data = doc.data();
-        totalBookings++;
         
-        // তারিখ চেক
         let appointmentDate = null;
         if (data.appointmentDate) {
           appointmentDate = new Date(data.appointmentDate);
@@ -2197,24 +2216,44 @@ async function updateSerialStats() {
           appointmentDate = data.timestamp.toDate();
         }
         
-        // বর্তমান সপ্তাহের ডাটা
-        if (appointmentDate && isDateInCurrentWeek(appointmentDate)) {
-          // শুধুমাত্র নির্বাচিত দিনের বুকিং (যদি 'all' নয়)
+        // বর্তমান সপ্তাহের ডাটা এবং দিন মিললে কাউন্ট হবে
+        if (appointmentDate && typeof isDateInCurrentWeek === 'function' && isDateInCurrentWeek(appointmentDate)) {
           if (selectedDay === 'all' || data.day === selectedDay) {
-            activeBookings++;
+            // টাইপ ফিল্টার চেক
+            const type = data.patientType || data.type;
+            if (selectedType === 'all' || type === selectedType) {
+              activeBookings++;
+            }
           }
         }
       });
     }
     
-    // পেন্ডিং কাউন্ট - শুধুমাত্র নির্বাচিত দিনের জন্য
+    // ✅ পেন্ডিং কাউন্ট - সঠিকভাবে ফিল্টার সহ
     let pendingCount = 0;
-    for (const key in pendingSelections) {
-      if (pendingSelections[key]) {
-        // দিন ফিল্টার চেক
-        const dayFromKey = key.split('_')[0];
-        if (selectedDay === 'all' || dayFromKey === selectedDay) {
-          pendingCount += pendingSelections[key].user.length;
+    if (pendingSelections) {
+      for (const key in pendingSelections) {
+        if (Object.prototype.hasOwnProperty.call(pendingSelections, key) && pendingSelections[key]) {
+          const pending = pendingSelections[key];
+          
+          // পেন্ডিং ডেটা থেকে দিন বের করা
+          const pendingDay = pending.day || pending.daySlot || '';
+          const pendingType = pending.patientType || '';
+          
+          // দিন ফিল্টার
+          const dayMatches = (selectedDay === 'all' || pendingDay === selectedDay);
+          // টাইপ ফিল্টার
+          const typeMatches = (selectedType === 'all' || pendingType === selectedType);
+          
+          if (dayMatches && typeMatches) {
+            if (pending.user && Array.isArray(pending.user)) {
+              pendingCount += pending.user.length;
+            } else if (pending.user && typeof pending.user === 'object') {
+              pendingCount += Object.keys(pending.user).length;
+            } else if (pending.serial) {
+              pendingCount += 1;
+            }
+          }
         }
       }
     }
@@ -2222,77 +2261,122 @@ async function updateSerialStats() {
     // এভেইলেবল = মোট স্লট - এক্টিভ বুকিং - পেন্ডিং
     const availableSerials = Math.max(0, totalSerialCount - activeBookings - pendingCount);
     
-    // আপডেট কার্ড
-    elements.totalSerials.textContent = toBengaliNumber(totalSerialCount);
-    elements.availableSerials.textContent = toBengaliNumber(availableSerials);
-    elements.pendingSerials.textContent = toBengaliNumber(pendingCount);
+    // বাংলা নাম্বার কনভার্ট সহ টেক্সট আপডেট
+    const showBengali = typeof toBengaliNumber === 'function';
+    if (elements) {
+      if (elements.totalSerials) elements.totalSerials.textContent = showBengali ? toBengaliNumber(totalSerialCount) : totalSerialCount;
+      if (elements.availableSerials) elements.availableSerials.textContent = showBengali ? toBengaliNumber(availableSerials) : availableSerials;
+      if (elements.pendingSerials) elements.pendingSerials.textContent = showBengali ? toBengaliNumber(pendingCount) : pendingCount;
+    }
+    
+    console.log(`📊 Stats updated -> Day: ${selectedDay}, Type: ${selectedType}, Total: ${totalSerialCount}, Pending: ${pendingCount}, Active: ${activeBookings}`);
     
   } catch (error) {
     console.error('❌ Error updating serial stats:', error);
-    showAlert('সিরিয়াল স্ট্যাটস আপডেট করতে সমস্যা হয়েছে', 'error');
   }
 }
 
-    // =======================================================
-    // ৬. টাইম ফিল্টার অপশন আপডেট
-    // =======================================================
-    function updateTimeOptions() {
-      const selectedDay = currentFilters.day;
-      const selectedType = currentFilters.type;
-      const uniqueTimes = new Set();
-      
-      if (!allAppointmentsSnapshot) return;
-      
-      // শুধু ৪ দিনের ডাটা থেকে সময় বের করা
-      const fourDaysAgo = new Date();
-      fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
-      
-      allAppointmentsSnapshot.forEach(doc => {
-        const data = doc.data();
-        
-        // ৪ দিনের ডাটা চেক
-        if (data.timestamp && data.timestamp.toDate) {
-          const appointmentDate = data.timestamp.toDate();
-          if (appointmentDate < fourDaysAgo) {
-            return;
-          }
-        }
-        
-        const dayMatch = selectedDay === 'all' || data.day === selectedDay;
-        const typeMatch = selectedType === 'all' || (data.patientType || data.type) === selectedType;
-        
-        if (dayMatch && typeMatch && data.time) {
-          uniqueTimes.add(data.time);
-        }
-      });
-      
-      // সময় সাজানো
-      const sortedTimes = sortTimes(Array.from(uniqueTimes));
-      
-      const currentTime = elements.timeFilter.value;
+// =======================================================
+// ৬. টাইম ফিল্টার অপশন আপডেট - শুধু বুকিং আছে এমন সময় দেখাবে
+// =======================================================
+function updateTimeOptions() {
+  const selectedDay = currentFilters.day;
+  const selectedType = currentFilters.type;
+  const timesWithBookings = new Set();
+  
+  console.log("🕒 updateTimeOptions called - Day:", selectedDay, "Type:", selectedType);
+  
+  // চেক করুন appointments ডাটা আছে কিনা
+  if (!allAppointmentsSnapshot) {
+    console.log("⏳ No appointments data yet");
+    
+    // ডেস্কটপ টাইম ফিল্টার খালি রাখুন
+    if (elements.timeFilter) {
       elements.timeFilter.innerHTML = '<option value="all">সকল সময়</option>';
+    }
+    // মোবাইল টাইম ফিল্টার খালি রাখুন
+    if (elements.timeFilterMobile) {
+      elements.timeFilterMobile.innerHTML = '<option value="all">সকল সময়</option>';
+    }
+    return;
+  }
+  
+  // ✅ বর্তমান সপ্তাহের বুকিং থেকে সময় বের করুন
+  const weekRange = getWeekDateRange();
+  
+  allAppointmentsSnapshot.forEach(doc => {
+    const data = doc.data();
+    
+    // বর্তমান সপ্তাহের ডাটা চেক করুন
+    let appointmentDate = null;
+    if (data.appointmentDate) {
+      appointmentDate = new Date(data.appointmentDate);
+    } else if (data.timestamp && data.timestamp.toDate) {
+      appointmentDate = data.timestamp.toDate();
+    }
+    
+    if (appointmentDate && isDateInCurrentWeek(appointmentDate)) {
+      // দিন ফিল্টার
+      const dayMatch = selectedDay === 'all' || data.day === selectedDay;
+      // টাইপ ফিল্টার
+      const typeMatch = selectedType === 'all' || (data.patientType || data.type) === selectedType;
       
-      sortedTimes.forEach(time => {
-        const option = document.createElement('option');
-        option.value = time;
-        option.textContent = time;
-        if (time === currentTime) option.selected = true;
-        elements.timeFilter.appendChild(option);
-      });
-      
-      // মোবাইল সময় ফিল্টারও আপডেট করুন
-      if (elements.timeFilterMobile) {
-        elements.timeFilterMobile.innerHTML = '<option value="all">সকল সময়</option>';
-        sortedTimes.forEach(time => {
-          const option = document.createElement('option');
-          option.value = time;
-          option.textContent = time;
-          if (time === currentTime) option.selected = true;
-          elements.timeFilterMobile.appendChild(option);
-        });
+      // শুধু বুকিং আছে এমন সময় যোগ করুন
+      if (dayMatch && typeMatch && data.time) {
+        timesWithBookings.add(data.time);
+        console.log(`✅ বুকিং আছে: ${data.time} (${data.day}, ${data.patientType || data.type})`);
       }
     }
-
+  });
+  
+  // সময় সাজানো
+  const sortedTimes = sortTimes(Array.from(timesWithBookings));
+  console.log("🎯 সময় ফিল্টারে দেখানো হবে (যেখানে বুকিং আছে):", sortedTimes);
+  
+  const currentTime = currentFilters.time;
+  
+  // ✅ ডেস্কটপ টাইম ফিল্টার আপডেট
+  if (elements.timeFilter) {
+    elements.timeFilter.innerHTML = '<option value="all">সকল সময়</option>';
+    
+    sortedTimes.forEach(time => {
+      const option = document.createElement('option');
+      option.value = time;
+      option.textContent = time;
+      if (time === currentTime) option.selected = true;
+      elements.timeFilter.appendChild(option);
+    });
+    
+    // কোনো বুকিং না থাকলে ড্রপডাউন ডিজেবল করুন
+    if (sortedTimes.length === 0) {
+      elements.timeFilter.disabled = true;
+    } else {
+      elements.timeFilter.disabled = false;
+    }
+  }
+  
+  // ✅ মোবাইল টাইম ফিল্টার আপডেট
+  if (elements.timeFilterMobile) {
+    elements.timeFilterMobile.innerHTML = '<option value="all">সকল সময়</option>';
+    
+    sortedTimes.forEach(time => {
+      const option = document.createElement('option');
+      option.value = time;
+      option.textContent = time;
+      if (time === currentTime) option.selected = true;
+      elements.timeFilterMobile.appendChild(option);
+    });
+    
+    // কোনো বুকিং না থাকলে ড্রপডাউন ডিজেবল করুন
+    if (sortedTimes.length === 0) {
+      elements.timeFilterMobile.disabled = true;
+    } else {
+      elements.timeFilterMobile.disabled = false;
+    }
+  }
+  
+  console.log(`✅ টাইম ফিল্টার আপডেট: ${sortedTimes.length} টি সময় (যেখানে বুকিং আছে)`);
+}
 // =======================================================
 // ৭. অ্যাপয়েন্টমেন্ট রেন্ডার - UPDATED FOR SATURDAY TO FRIDAY
 // =======================================================
@@ -2566,29 +2650,46 @@ async function updateStatus(button) {
     // ৯. কুইক সিরিয়াল ম্যানেজমেন্ট (grid.js ব্যবহার করে)
     // =======================================================
     
-    // ✅ নতুন ফাংশন: serialRanges লোড
-    async function loadSerialRanges() {
-      try {
-        console.log("📊 Loading serial ranges from Firebase...");
-        const rangesDoc = await db.collection('settings').doc('serialRanges').get();
-        
-        if (rangesDoc.exists) {
-          serialRanges = rangesDoc.data();
-          console.log("✅ Serial ranges loaded successfully");
-          return serialRanges;
-        } else {
-          console.warn("⚠️ No serial ranges found in database");
-          serialRanges = {
-            Thursday: { new: {}, old: {} },
-            Friday: { new: {}, old: {} }
-          };
-          return serialRanges;
+async function loadSerialRanges() {
+  try {
+    console.log("📊 Loading serial ranges from Firebase...");
+    const rangesDoc = await db.collection('settings').doc('serialRanges').get();
+    
+    if (rangesDoc.exists) {
+      serialRanges = rangesDoc.data();
+      console.log("✅ Serial ranges loaded successfully:");
+      console.log("📋 Available days:", Object.keys(serialRanges));
+      
+      // প্রতিটি দিনের সময় দেখান
+      for (const day in serialRanges) {
+        console.log(`📅 ${day}:`);
+        for (const type in serialRanges[day]) {
+          const times = Object.keys(serialRanges[day][type]);
+          console.log(`   👤 ${type}: ${times.length} times -`, times);
         }
-      } catch (error) {
-        console.error("❌ Error loading serial ranges:", error);
-        return null;
       }
+      
+      // ✅ serialRanges লোড হওয়ার পর টাইম ফিল্টার আপডেট করুন
+      if (typeof updateTimeOptions === 'function') {
+        console.log("🔄 Updating time options after loading serialRanges");
+        updateTimeOptions();
+      }
+      
+      return serialRanges;
+    } else {
+      console.warn("⚠️ No serial ranges found in database");
+      console.warn("💡 Please create serialRanges in settings collection first!");
+      serialRanges = {
+        Thursday: { new: {}, old: {} },
+        Friday: { new: {}, old: {} }
+      };
+      return serialRanges;
     }
+  } catch (error) {
+    console.error("❌ Error loading serial ranges:", error);
+    return null;
+  }
+}
     
     function initializeQuickSerialModal() {
       console.log("🟢 initializeQuickSerialModal কল হয়েছে");
@@ -2808,85 +2909,81 @@ function getActivePatientIndex() {
   return 0;
 }
     
-    function updateQuickTimeOptions() {
-      const day = elements.quickDay.value;
-      const type = elements.selectedPatientType.value;
-      
-      console.log("🕒 Quick time options update:", { day, type });
-      console.log("Serial Ranges available:", serialRanges);
-      
-      if (!day) {
-        elements.quickTime.innerHTML = '<option value="">দিন নির্বাচন করুন</option>';
-        if (elements.serialGrid) {
-          elements.serialGrid.innerHTML = '<div style="padding: 20px; text-align: center; color: #6b7280;">দিন নির্বাচন করুন</div>';
-        }
-        return;
-      }
-      
-      // ✅ সিরিয়াল রেঞ্জ থেকে সময় অপশন গুলো নেওয়া
-      const times = [];
-      
-      console.log("Checking serialRanges for:", {day, type});
-      console.log("serialRanges[day]:", serialRanges[day]);
-      console.log("serialRanges[day][type]:", serialRanges[day] ? serialRanges[day][type] : "undefined");
-      
-      if (serialRanges[day] && serialRanges[day][type]) {
-        Object.keys(serialRanges[day][type]).forEach(time => {
-          if (time && time.trim() !== '') {
-            times.push(time);
-          }
-        });
-        console.log("✅ Found times in serialRanges:", times);
-      } else {
-        console.warn("❌ No serial ranges found for", day, type);
-        console.log("Available days in serialRanges:", Object.keys(serialRanges));
-        console.log("Available types for", day, ":", serialRanges[day] ? Object.keys(serialRanges[day]) : "none");
-      }
-      
-      // সময় সাজানো
-      const sortedTimes = sortTimes(times);
-      
-      const currentSelectedTime = elements.quickTime.value;
-      elements.quickTime.innerHTML = '<option value="">সময় নির্বাচন করুন</option>';
-      
-      if (sortedTimes.length === 0) {
-        console.warn("⚠️ No time slots found for", day, type);
-        elements.quickTime.innerHTML = '<option value="">কোনো সময় স্লট নেই</option>';
-        
-        if (gridSystem) {
-          gridSystem.updateGrid();
-        }
-        
-        // গ্রিডে মেসেজ দেখান
-        if (elements.serialGrid) {
-          elements.serialGrid.innerHTML =  '<div class="grid-no-selection">এই দিন/ধরনের জন্য কোনো সময় স্লট নেই</div>';
-        }
-        return;
-      }
-      
-      sortedTimes.forEach(time => {
-        const option = document.createElement('option');
-        option.value = time;
-        option.textContent = time;
-        
-        // আগে সিলেক্ট করা থাকলে সেটি রাখা
-        if (time === currentSelectedTime) {
-          option.selected = true;
-        }
-        
-        elements.quickTime.appendChild(option);
-      });
-      
-      console.log("✅ Time options updated:", sortedTimes.length, "options");
-      
-      // ✅ Grid System আপডেট
-      if (gridSystem) {
-        console.log("🔄 Updating grid with new time selection");
-        setTimeout(() => {
-          gridSystem.updateGrid();
-        }, 100);
-      }
+   function updateQuickTimeOptions() {
+  const day = elements.quickDay.value;
+  const type = elements.selectedPatientType.value;
+  
+  console.log("🕒 Quick time options update:", { day, type });
+  console.log("Serial Ranges available:", serialRanges);
+  
+  if (!day) {
+    elements.quickTime.innerHTML = '<option value="">দিন নির্বাচন করুন</option>';
+    if (elements.serialGrid) {
+      elements.serialGrid.innerHTML = '<div style="padding: 20px; text-align: center; color: #6b7280;">দিন নির্বাচন করুন</div>';
     }
+    return;
+  }
+  
+  // ✅ সিরিয়াল রেঞ্জ থেকে সময় অপশন গুলো নেওয়া
+  const times = [];
+  
+  if (serialRanges && serialRanges[day] && serialRanges[day][type]) {
+    Object.keys(serialRanges[day][type]).forEach(time => {
+      if (time && time.trim() !== '') {
+        times.push(time);
+      }
+    });
+    console.log("✅ Found times in serialRanges:", times);
+  } else {
+    console.warn("❌ No serial ranges found for", day, type);
+    console.log("Available days in serialRanges:", Object.keys(serialRanges));
+    console.log("Available types for", day, ":", serialRanges[day] ? Object.keys(serialRanges[day]) : "none");
+  }
+  
+  // সময় সাজানো
+  const sortedTimes = sortTimes(times);
+  
+  const currentSelectedTime = elements.quickTime.value;
+  elements.quickTime.innerHTML = '<option value="">সময় নির্বাচন করুন</option>';
+  
+  if (sortedTimes.length === 0) {
+    console.warn("⚠️ No time slots found for", day, type);
+    elements.quickTime.innerHTML = '<option value="">কোনো সময় স্লট নেই</option>';
+    
+    if (gridSystem) {
+      gridSystem.updateGrid();
+    }
+    
+    // গ্রিডে মেসেজ দেখান
+    if (elements.serialGrid) {
+      elements.serialGrid.innerHTML = '<div class="grid-no-selection">এই দিন/ধরনের জন্য কোনো সময় স্লট নেই</div>';
+    }
+    return;
+  }
+  
+  sortedTimes.forEach(time => {
+    const option = document.createElement('option');
+    option.value = time;
+    option.textContent = time;
+    
+    // আগে সিলেক্ট করা থাকলে সেটি রাখা
+    if (time === currentSelectedTime) {
+      option.selected = true;
+    }
+    
+    elements.quickTime.appendChild(option);
+  });
+  
+  console.log("✅ Time options updated:", sortedTimes.length, "options");
+  
+  // ✅ Grid System আপডেট
+  if (gridSystem) {
+    console.log("🔄 Updating grid with new time selection");
+    setTimeout(() => {
+      gridSystem.updateGrid();
+    }, 100);
+  }
+}
 
     // =======================================================
 // তারিখ গণনা ফাংশন যোগ করুন (search.html থেকে)
@@ -3196,24 +3293,24 @@ function resetQuickSerialForm() {
       let searchTimeout;
       
       // ডেস্কটপ ফিল্টার ইভেন্ট
-      elements.dayFilter.addEventListener('change', (e) => {
-        const value = e.target.value;
-        currentFilters.day = value;
-        if (elements.dayFilterMobile) elements.dayFilterMobile.value = value;
-        updateTimeOptions();
-        renderAppointments();
-        updateDashboardCards(allAppointmentsSnapshot);
-        updateSerialStats();
-      });
-      
-      elements.typeFilter.addEventListener('change', (e) => {
-        const value = e.target.value;
-        currentFilters.type = value;
-        if (elements.typeFilterMobile) elements.typeFilterMobile.value = value;
-        updateTimeOptions();
-        renderAppointments();
-        updateDashboardCards(allAppointmentsSnapshot);
-      });
+elements.dayFilter.addEventListener('change', (e) => {
+  const value = e.target.value;
+  currentFilters.day = value;
+  if (elements.dayFilterMobile) elements.dayFilterMobile.value = value;
+  updateTimeOptions();  // ✅ এই লাইনটি থাকতে হবে
+  renderAppointments();
+  updateDashboardCards(allAppointmentsSnapshot);
+  updateSerialStats();
+});
+
+elements.typeFilter.addEventListener('change', (e) => {
+  const value = e.target.value;
+  currentFilters.type = value;
+  if (elements.typeFilterMobile) elements.typeFilterMobile.value = value;
+  updateTimeOptions();  // ✅ এই লাইনটি থাকতে হবে
+  renderAppointments();
+  updateDashboardCards(allAppointmentsSnapshot);
+});
       
       elements.timeFilter.addEventListener('change', (e) => {
         const value = e.target.value;
@@ -3440,6 +3537,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // ✅ সিরিয়াল রেঞ্জ লোড
   loadSerialRanges().then(() => {
     console.log("✅ Initial serial ranges loaded");
+    updateTimeOptions();
   });
   
   // সংশোধন: const কেটে গ্লোবাল ভ্যারিয়েবল সেট করা হলো
