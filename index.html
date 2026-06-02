@@ -343,7 +343,7 @@
       font-weight: 600;
       transition: all 0.3s ease;
       box-shadow: var(--shadow);
-      animation: slideInUp 0.8s ease-out 2s both;
+      animation: slideInUp 0.8s ease-out 1s both;
     }
     
     button:hover {
@@ -476,7 +476,9 @@
      line-height: 1.4;
      padding: 0.2rem 0;
    }
-    
+    .notice-slider-container {
+  display: none; /* শুরুতে এটি অদৃশ্য থাকবে */
+}
     /* Notice Slider */
     /*.notice-slider-container {
       background: rgba(255, 111, 145, 0.1);
@@ -879,7 +881,7 @@
       <div class="hero-content">
         <div class="notice-slider-container" id="noticeSlider">
           <div class="notice-slider-content">
-            <marquee class="floating-notice-text" id="dynamicNoticeText"></marquee>
+            <marquee class="floating-notice-text" id="dynamicNoticeText" scrollamount="6" behavior="scroll" direction="left"></marquee>
           </div>
         </div>
         
@@ -998,46 +1000,48 @@
     }
 
     // Dynamic Content Loading
-    async function loadDynamicContent() {
-      try {
-        if (!firebaseApp) {
-          if (!initializeFirebase()) return;
-        }
-        
-        // Load floating notice
-        const doc = await db.collection('settings').doc('dynamicContent').get();
-        
-        if (doc.exists) {
-          const data = doc.data();
-          
-          // Update floating notice
-          const noticeText = document.getElementById('dynamicNoticeText');
-          if (noticeText && data.floatingNotice && data.floatingNotice.trim() !== '') {
-            noticeText.textContent = data.floatingNotice;
-          } else {
-            // Hide notice slider if no content
-            const noticeSlider = document.getElementById('noticeSlider');
-            if (noticeSlider) {
-              noticeSlider.style.display = 'none';
-            }
-          }
-        } else {
-          // Hide notice slider if no document exists
-          const noticeSlider = document.getElementById('noticeSlider');
-          if (noticeSlider) {
-            noticeSlider.style.display = 'none';
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error loading dynamic content:', error);
-        
-        // Hide sections on error
-        const noticeSlider = document.getElementById('noticeSlider');
-        if (noticeSlider) {
-          noticeSlider.style.display = 'none';
-        }
-      }
+async function loadDynamicContent() {
+  try {
+    if (!firebaseApp) {
+      if (!initializeFirebase()) return;
     }
+    
+    // Load floating notice
+    const doc = await db.collection('settings').doc('dynamicContent').get();
+    
+    const noticeText = document.getElementById('dynamicNoticeText');
+    const noticeSlider = document.getElementById('noticeSlider');
+    
+    if (doc.exists) {
+      const data = doc.data();
+      
+      const isMarqueeActive = data.floatingNoticeActive !== false; 
+      const hasText = data.floatingNotice && data.floatingNotice.trim() !== '';
+      
+      if (noticeText && isMarqueeActive && hasText) {
+        // 💡 ট্রিকস: প্রথমে মারকিউ টেক্সট সেট করবো
+        noticeText.textContent = data.floatingNotice;
+        
+        // 💡 টেক্সট সেট করার ঠিক পর মেইন কন্টেইনার স্লাইডারটিকে অন করে দেবো
+        if (noticeSlider) noticeSlider.style.display = 'block';
+        
+        // মারকিউ যেন স্মুথলি একদম শুরু থেকে শেষ পর্যন্ত একটানা চলতে থাকে
+        noticeText.start();
+        
+      } else {
+        if (noticeSlider) noticeSlider.style.display = 'none';
+      }
+    } else {
+      if (noticeSlider) noticeSlider.style.display = 'none';
+    }
+  } catch (error) {
+    console.error('❌ Error loading dynamic content:', error);
+    const noticeSlider = document.getElementById('noticeSlider');
+    if (noticeSlider) {
+      noticeSlider.style.display = 'none';
+    }
+  }
+}
 
     // Beautiful Popup Functions
     function showNoticePopup(message, updateTime) {
@@ -1161,33 +1165,29 @@
       }
     });
 
-    // Initialize Firebase when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-      // Load Firebase SDK if not already loaded
-      if (typeof firebase === 'undefined') {
-        const firebaseScript = document.createElement('script');
-        firebaseScript.src = 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js';
-        firebaseScript.onload = function() {
-          const firestoreScript = document.createElement('script');
-          firestoreScript.src = 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js';
-          firestoreScript.onload = function() {
-            initializeFirebase();
-            // Load dynamic content after Firebase is ready
-            setTimeout(() => {
-              loadDynamicContent();
-            }, 1000);
-          };
-          document.head.appendChild(firestoreScript);
-        };
-        document.head.appendChild(firebaseScript);
-      } else {
+// Initialize Firebase when page loads
+document.addEventListener('DOMContentLoaded', function() {
+  // Load Firebase SDK if not already loaded
+  if (typeof firebase === 'undefined') {
+    const firebaseScript = document.createElement('script');
+    firebaseScript.src = 'https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js';
+    firebaseScript.onload = function() {
+      const firestoreScript = document.createElement('script');
+      firestoreScript.src = 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js';
+      firestoreScript.onload = function() {
         initializeFirebase();
-        // Load dynamic content
-        setTimeout(() => {
-          loadDynamicContent();
-        }, 1000);
-      }
-    });
+        // 🔥 টাইমার ছাড়া সরাসরি ফাংশন কল করা হলো
+        loadDynamicContent(); 
+      };
+      document.head.appendChild(firestoreScript);
+    };
+    document.head.appendChild(firebaseScript);
+  } else {
+    initializeFirebase();
+    // 🔥 টাইমার ছাড়া সরাসরি ফাংশন কল করা হলো
+    loadDynamicContent(); 
+  }
+});
   </script>
   
   <!-- Firebase SDK -->
