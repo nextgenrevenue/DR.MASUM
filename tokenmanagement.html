@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>টোকেন ম্যানেজমেন্ট</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Noto Sans Bengali', sans-serif;
+    }
+
+    body {
+      background: #f5f7fa;
+    }
+    
+    .admin-container {
+      display: flex;
+      min-height: 100vh;
+      padding-top: 60px;
+    }
+    
+    .admin-main {
+      flex: 1;
+      background: #f5f7fa;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .page-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+    }
+
+    .page-header h1 {
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+
+    .page-header p {
+      opacity: 0.9;
+      font-size: 14px;
+    }
+
+    .filter-section {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .desktop-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: flex-end;
+    }
+    
+    .mobile-filters {
+      display: none;
+    }
+    
+    .filter-group {
+      flex: 1;
+      min-width: 140px;
+    }
+    
+    .filter-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #374151;
+    }
+    
+    .filter-group input,
+    .filter-group select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    
+    .filter-group input:focus,
+    .filter-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .search-box {
+      position: relative;
+    }
+    
+    .search-box input {
+      padding-left: 40px;
+    }
+    
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      width: 18px;
+      height: 18px;
+    }
+
+    .stats-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      transition: transform 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+    }
+
+    .stat-card h3 {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 10px;
+    }
+
+    .stat-card .number {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1f2937;
+    }
+
+    .stat-card.fee-dynamic .number {
+      color: #8b5cf6;
+    }
+    
+    .stat-card.total-patients .number { color: #3b82f6; }
+    .stat-card.total-amount .number { color: #ef4444; }
+    .stat-card.total-due .number { color: #f59e0b; }
+
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 500px;
+      min-height: 400px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 800px;
+    }
+
+    th {
+      background: #f9fafb;
+      padding: 14px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+      color: #374151;
+      border-bottom: 2px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      background: #f9fafb;
+      z-index: 10;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+    }
+
+    tr:hover {
+      background: #f9fafb;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-paid {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .status-due {
+      background: #fed7aa;
+      color: #92400e;
+    }
+
+    .btn-view, .btn-token-give {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .btn-token-give {
+      background: #10b981;
+    }
+
+    .btn-token-give:hover {
+      background: #059669;
+    }
+
+    .btn-view:hover {
+      background: #2563eb;
+    }
+
+    .btn-delete {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+
+    .btn-delete:hover {
+      background: #dc2626;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: white;
+      width: 90%;
+      max-width: 500px;
+      border-radius: 16px;
+      padding: 25px;
+      position: relative;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .modal-header h2 {
+      font-size: 20px;
+      color: #1f2937;
+    }
+
+    .close-modal {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #9ca3af;
+    }
+
+    .token-detail {
+      background: #f3f4f6;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .token-detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px dashed #e5e7eb;
+    }
+
+    .token-detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .token-detail-label {
+      font-weight: 600;
+      color: #4b5563;
+    }
+
+    .token-detail-value {
+      color: #1f2937;
+    }
+
+    .token-detail-value input, .token-detail-value select {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+    }
+
+    .payment-history {
+      margin: 15px 0;
+    }
+
+    .payment-item {
+      background: #fef3c7;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .modal-actions button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-save {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-print {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .btn-cancel {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-print-range {
+      background: #8b5cf6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+
+    .btn-print-range:hover {
+      background: #7c3aed;
+    }
+
+    @media print {
+      .no-print { display: none !important; }
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+    
+    @media (max-width: 768px) {
+      .admin-main {
+        padding: 15px;
+      }
+      
+      .desktop-filters {
+        display: none;
+      }
+      
+      .mobile-filters {
+        display: block;
+      }
+      
+      .filter-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      
+      .filter-row-full {
+        grid-column: span 2;
+      }
+      
+      .stats-cards {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      
+      .stat-card {
+        padding: 12px;
+      }
+      
+      .stat-card .number {
+        font-size: 22px;
+      }
+      
+      th, td {
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+      
+      .table-wrapper {
+        max-height: 400px;
+      }
+    }
+    
+    @media (min-width: 769px) {
+      .mobile-filters {
+        display: none;
+      }
+      .desktop-filters {
+        display: flex;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="header-container"></div>
+  
+  <div class="admin-container">
+    <div id="sidebar-container"></div>
+    
+    <main class="admin-main">
+      <div class="container">
+        <div class="page-header no-print">
+          <h1><i class="fas fa-ticket-alt"></i> টোকেন ম্যানেজমেন্ট</h1>
+        </div>
+
+        <div class="filter-section no-print">
+          <div class="desktop-filters">
+            <div class="filter-group">
+              <label>তারিখ থেকে</label>
+              <input type="date" id="dateFrom">
+            </div>
+            <div class="filter-group">
+              <label>তারিখ পর্যন্ত</label>
+              <input type="date" id="dateTo">
+            </div>
+            <div class="filter-group">
+              <select id="patientTypeFilter">
+                <option value="all">সকল ধরন</option>
+                <option value="new">নতুন রোগী</option>
+                <option value="old">পুরাতন রোগী</option>
+              </select>
+            </div>
+            <div class="filter-group search-box">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input type="text" id="searchInput" placeholder="নাম, ফোন, টোকেন বা সিরিয়াল...">
+            </div>
+          </div>
+          
+          <div class="mobile-filters">
+            <div class="filter-row">
+              <div class="filter-group">
+                <label>তারিখ থেকে</label>
+                <input type="date" id="dateFromMobile">
+              </div>
+              <div class="filter-group">
+                <label>তারিখ পর্যন্ত</label>
+                <input type="date" id="dateToMobile">
+              </div>
+            </div>
+            <div class="filter-row">
+              <div class="filter-group">
+                <select id="patientTypeFilterMobile">
+                  <option value="all">সকল ধরন</option>
+                  <option value="new">নতুন রোগী</option>
+                  <option value="old">পুরাতন রোগী</option>
+                </select>
+              </div>
+              <div class="filter-group search-box">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input type="text" id="searchInputMobile" placeholder="খুঁজুন...">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-cards no-print" id="statsCards">
+          <div class="stat-card total-patients">
+            <h3>মোট রোগী</h3>
+            <div class="number" id="totalPatients">0</div>
+          </div>
+          <div class="stat-card total-amount">
+            <h3>মোট প্রাপ্ত টাকা</h3>
+            <div class="number" id="totalAmount">০ টাকা</div>
+          </div>
+          <div class="stat-card total-due">
+            <h3>বাকি টাকার রোগী</h3>
+            <div class="number" id="totalDuePatients">0</div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;" class="no-print">
+          <button class="btn-token-give" onclick="openTokenGiveForAllModal()" style="background: #10b981; padding: 10px 20px; font-size: 14px;">
+            <i class="fas fa-ticket-alt"></i> টোকেন দিন
+          </button>
+          <button class="btn-print-range" onclick="printFilteredTokens()">
+            <i class="fas fa-print"></i> প্রিন্ট করুন
+          </button>
+        </div>
+
+        <div class="table-container">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>তারিখ</th>
+                  <th>টোকেন নাম্বার</th>
+                  <th>সিরিয়াল</th>
+                  <th>রোগীর নাম</th>
+                  <th>বয়স</th>
+                  <th>ফোন</th>
+                  <th>ধরন</th>
+                  <th>ফি</th>
+                  <th>পরিশোধ</th>
+                  <th>বাকি</th>
+                  <th>স্ট্যাটাস</th>
+                  <th>অ্যাকশন</th>
+                </tr>
+              </thead>
+              <tbody id="tokenTableBody">
+                <tr><td colspan="12" style="text-align: center; padding: 40px;">লোডিং...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  
+  <div id="footer-container"></div>
+
+  <!-- টোকেন বিস্তারিত মোডাল -->
+  <div id="tokenModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2><i class="fas fa-ticket-alt"></i> টোকেন বিস্তারিত</h2>
+        <button class="close-modal" onclick="closeTokenModal()">&times;</button>
+      </div>
+      <div id="modalContent"></div>
+      <div class="modal-actions">
+        <button class="btn-save" onclick="saveTokenDetails()"><i class="fas fa-save"></i> সংরক্ষণ করুন</button>
+        <button class="btn-print" onclick="printToken()"><i class="fas fa-print"></i> প্রিন্ট করুন</button>
+        <button class="btn-cancel" onclick="closeTokenModal()"><i class="fas fa-times"></i> বাতিল</button>
+      </div>
+    </div>
+  </div>
+  
+  <script src="components-inline.js"></script>
+<script>
+  // ==================== অথেন্টিকেশন ====================
+  function checkAuthentication() {
+    const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
+    const loginTime = sessionStorage.getItem('loginTime');
+    if (!isLoggedIn || isLoggedIn !== 'true') {
+      alert('দয়া করে লগইন করুন!!');
+      window.location.href = '/login';
+      return false;
+    }
+    const currentTime = new Date().getTime();
+    if (currentTime - parseInt(loginTime) > 2 * 60 * 60 * 1000) {
+      sessionStorage.clear();
+      alert('সেশন শেষ! আবার লগইন করুন।');
+      window.location.href = '/login';
+      return false;
+    }
+    return true;
+  }
+  if (!checkAuthentication()) throw new Error('Authentication failed');
+
+  // ==================== ফায়ারবেস কনফিগার ====================
+  const firebaseConfig = {
+    apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+    authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+    projectId: "doctor-appointment-syste-23828",
+    storageBucket: "doctor-appointment-syste-23828.appspot.com",
+    messagingSenderId: "79600391014",
+    appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+  };
+
+  let db, currentTokenDoc = null, currentTokenId = null;
+
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    console.log("✅ Firebase connected");
+  } catch (e) {
+    console.error("Firebase error:", e);
+  }
+
+  // ==================== ইউটিলিটি ফাংশন ====================
+  function toBengaliNumber(num) {
+    if (num === null || num === undefined) return '০';
+    const bengaliMap = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+    return String(num).replace(/\d/g, d => bengaliMap[d]);
+  }
+
+  function formatDate(date) {
+    if (!date) return '—';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleDateString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  
+  function formatDateTime(date) {
+    if (!date) return '—';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleString('bn-BD', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function showAlert(msg, type = 'info') {
+    const div = document.createElement('div');
+    div.style.cssText = `position:fixed;top:80px;right:20px;padding:12px 20px;background:${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};color:white;border-radius:8px;z-index:2000;animation:slideIn 0.3s ease`;
+    div.textContent = msg;
+    document.body.appendChild(div);
+    setTimeout(() => { div.style.animation = 'slideOut 0.3s ease'; setTimeout(() => div.remove(), 300); }, 3000);
+  }
+  
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+  }
+
+  // ==================== টোকেন নাম্বার জেনারেট (paymentHistories থেকে) ====================
+  async function generateNextTokenNumber() {
+  const today = new Date();
+  const yy = String(today.getFullYear()).slice(-2);
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const datePrefix = `${yy}${mm}${dd}`;
+  
+  // 🔥 paymentHistories কালেকশন থেকে আজকের সর্বশেষ সিরিয়াল বের করুন
+  const paymentHistoriesRef = db.collection('paymentHistories');
+  const todayTokensQuery = await paymentHistoriesRef
+    .where('tokenDatePrefix', '==', datePrefix)
+    .orderBy('serial', 'desc')
+    .limit(1)
+    .get();
+  
+  let lastSerial = 0;
+  if (!todayTokensQuery.empty) {
+    lastSerial = todayTokensQuery.docs[0].data().serial || 0;
+  }
+  
+  const newSerial = lastSerial + 1;
+  
+  return {
+    tokenNumber: `T-${datePrefix}-${String(newSerial).padStart(2, '0')}`,
+    serial: newSerial,
+    datePrefix: datePrefix
+  };
+}
+
+  // ==================== স্ট্যাটস আপডেট ====================
+  function updateStats(tokens) {
+    const feeMap = new Map();
+    let totalAmount = 0;
+    let duePatientsCount = 0;
+    
+    tokens.forEach(token => {
+      const fee = token.tokenFee || 0;
+      const paid = token.tokenPaid || 0;
+      const due = fee - paid;
+      feeMap.set(fee, (feeMap.get(fee) || 0) + 1);
+      totalAmount += paid;
+      if (due > 0) duePatientsCount++;
+    });
+    
+    const container = document.getElementById('statsCards');
+    const oldCards = container.querySelectorAll('.stat-card:not(.total-patients):not(.total-amount):not(.total-due)');
+    oldCards.forEach(c => c.remove());
+    
+    const sortedFees = Array.from(feeMap.keys()).sort((a,b) => b - a);
+    
+    for (let fee of sortedFees) {
+      const card = document.createElement('div');
+      card.className = 'stat-card fee-dynamic';
+      card.innerHTML = `<h3>${toBengaliNumber(fee)} টাকার টোকেন</h3><div class="number">${toBengaliNumber(feeMap.get(fee))}</div>`;
+      container.insertBefore(card, container.querySelector('.total-due'));
+    }
+    
+    document.getElementById('totalPatients').textContent = toBengaliNumber(tokens.length);
+    document.getElementById('totalAmount').innerHTML = toBengaliNumber(totalAmount) + ' টাকা';
+    document.getElementById('totalDuePatients').textContent = toBengaliNumber(duePatientsCount);
+  }
+
+  // ==================== টোকেন ডাটা লোড (paymentHistories থেকে) ====================
+  async function loadTokenData() {
+    if (!db) return;
+    
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    const patientType = document.getElementById('patientTypeFilter').value;
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    
+    try {
+      // 🔥 paymentHistories কালেকশন থেকে লোড করুন (paymentTokens না)
+      let query = db.collection('paymentHistories').orderBy('tokenTimestamp', 'desc');
+      
+      if (dateFrom) {
+        const from = new Date(dateFrom);
+        from.setHours(0,0,0,0);
+        query = query.where('tokenTimestamp', '>=', firebase.firestore.Timestamp.fromDate(from));
+      }
+      if (dateTo) {
+        const to = new Date(dateTo);
+        to.setHours(23,59,59,999);
+        query = query.where('tokenTimestamp', '<=', firebase.firestore.Timestamp.fromDate(to));
+      }
+      
+      const snapshot = await query.get();
+      let tokens = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        tokens.push({ 
+          id: doc.id, 
+          ...data,
+          name: data.patientName,
+          age: data.patientAge,
+          phone: data.patientPhone
+        });
+      });
+      
+      if (patientType !== 'all') {
+        tokens = tokens.filter(t => t.patientType === patientType);
+      }
+      
+      if (search) {
+        tokens = tokens.filter(t => {
+          return (t.patientName && t.patientName.toLowerCase().includes(search)) ||
+                 (t.patientPhone && t.patientPhone.includes(search)) ||
+                 (t.tokenNumber && t.tokenNumber.toLowerCase().includes(search)) ||
+                 (t.serial && String(t.serial).includes(search));
+        });
+      }
+      
+      updateStats(tokens);
+      renderTokenTable(tokens);
+      
+    } catch (err) {
+      console.error('লোড করতে সমস্যা:', err);
+      showAlert('ডাটা লোড করতে সমস্যা হয়েছে', 'error');
+    }
+  }
+
+  // ==================== টোকেন টেবিল রেন্ডার ====================
+  function renderTokenTable(tokens) {
+    const tbody = document.getElementById('tokenTableBody');
+    if (tokens.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;">কোনো টোকেন পাওয়া যায়নি</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = tokens.map(token => {
+      const fee = token.tokenFee || 0;
+      const paid = token.tokenPaid || 0;
+      const due = fee - paid;
+      const status = due === 0 ? 'paid' : 'due';
+      const tokenNumber = token.tokenNumber || '—';
+      const serialNumber = token.serial || '—';
+      
+      return `
+        <tr>
+          <td>${formatDate(token.tokenTimestamp)}</td>
+          <td><strong>${tokenNumber}</strong></td>
+          <td>${toBengaliNumber(serialNumber)}</td>
+          <td><strong>${escapeHtml(token.patientName || '—')}</strong></td>
+          <td>${token.patientAge || '—'}</td>
+          <td>${token.patientPhone || '—'}</td>
+          <td>${token.patientType === 'new' ? 'নতুন' : 'পুরাতন'}</td>
+          <td>${toBengaliNumber(fee)} টাকা</td>
+          <td>${toBengaliNumber(paid)} টাকা</td>
+          <td>${toBengaliNumber(due)} টাকা</td>
+          <td><span class="status-badge ${status === 'paid' ? 'status-paid' : 'status-due'}">${status === 'paid' ? 'পরিশোধিত' : 'বাকি'}</span></td>
+          <td>
+            <div class="action-buttons">
+              <button class="btn-view" onclick="viewTokenDetails('${token.id}')">
+                <i class="fas fa-eye"></i> বিস্তারিত
+              </button>
+              <button class="btn-delete" onclick="deleteToken('${token.id}', '${escapeHtml(token.patientName || 'এই টোকেন')}')">
+                <i class="fas fa-trash"></i> ডিলিট
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ==================== টোকেন দিন (শুধু paymentHistories এ সেভ) ====================
+  async function openTokenGiveForAllModal() {
+    const modalHtml = `
+      <div id="tokenGiveBlankModal" class="modal" style="display: flex;">
+        <div class="modal-content" style="max-width: 450px;">
+          <div class="modal-header">
+            <h2><i class="fas fa-ticket-alt"></i> নতুন টোকেন দিন</h2>
+            <button class="close-modal" onclick="closeTokenGiveBlankModal()">&times;</button>
+          </div>
+          <div class="token-detail">
+            <div class="token-detail-row">
+              <span class="token-detail-label">রোগীর নাম:</span>
+              <span class="token-detail-value"><input type="text" id="newTokenName" placeholder="রোগীর নাম লিখুন" style="width:100%;"></span>
+            </div>
+            <div class="token-detail-row">
+              <span class="token-detail-label">বয়স:</span>
+              <span class="token-detail-value"><input type="text" id="newTokenAge" placeholder="বয়স" style="width:100%;"></span>
+            </div>
+            <div class="token-detail-row">
+              <span class="token-detail-label">ফোন:</span>
+              <span class="token-detail-value"><input type="text" id="newTokenPhone" placeholder="ফোন নম্বর" style="width:100%;"></span>
+            </div>
+            <div class="token-detail-row">
+              <span class="token-detail-label">রোগীর ধরন:</span>
+              <span class="token-detail-value">
+                <select id="newTokenPatientType" style="width:100%;">
+                  <option value="new">নতুন</option>
+                  <option value="old">পুরাতন</option>
+                </select>
+              </span>
+            </div>
+            <div class="token-detail-row">
+              <span class="token-detail-label">টোকেন ফি:</span>
+              <span class="token-detail-value">
+                <input type="number" id="newTokenFee" value="800" style="width:100%;">
+              </span>
+            </div>
+            <div class="token-detail-row">
+              <span class="token-detail-label">পরিশোধ:</span>
+              <span class="token-detail-value">
+                <input type="number" id="newTokenPaid" value="0" style="width:100%;">
+              </span>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-save" onclick="saveNewToken()">টোকেন সংরক্ষণ করুন</button>
+            <button class="btn-cancel" onclick="closeTokenGiveBlankModal()">বাতিল</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    const existingModal = document.getElementById('tokenGiveBlankModal');
+    if (existingModal) existingModal.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    const patientTypeSelect = document.getElementById('newTokenPatientType');
+    const feeInput = document.getElementById('newTokenFee');
+    
+    if (patientTypeSelect && feeInput) {
+      patientTypeSelect.addEventListener('change', function() {
+        if (this.value === 'new') {
+          feeInput.value = '800';
+        } else {
+          feeInput.value = '600';
+        }
+      });
+    }
+  }
+
+  function closeTokenGiveBlankModal() {
+    const modal = document.getElementById('tokenGiveBlankModal');
+    if (modal) modal.remove();
+  }
+
+async function saveNewToken() {
+  const name = document.getElementById('newTokenName')?.value;
+  if (!name) {
+    showAlert('রোগীর নাম লিখুন', 'error');
+    return;
+  }
+  
+  const saveBtn = document.querySelector('#tokenGiveBlankModal .btn-save');
+  const originalText = saveBtn?.innerHTML;
+  if (saveBtn) {
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> সংরক্ষণ হচ্ছে...';
+    saveBtn.disabled = true;
+  }
+  
+  try {
+    const tokenInfo = await generateNextTokenNumber();
+    const patientType = document.getElementById('newTokenPatientType').value;
+    const fee = parseInt(document.getElementById('newTokenFee').value) || (patientType === 'new' ? 800 : 600);
+    const paid = parseInt(document.getElementById('newTokenPaid').value) || 0;
+    const age = document.getElementById('newTokenAge').value;
+    const phone = document.getElementById('newTokenPhone').value;
+    const due = fee - paid;
+    
+    // 🔥 paymentHistories কালেকশনে টোকেন সেভ করুন
+    await db.collection('paymentHistories').add({
+      tokenNumber: tokenInfo.tokenNumber,
+      serial: null,                    
+      hasSerial: false,                
+      tokenDatePrefix: tokenInfo.datePrefix,
+      tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      patientName: name,
+      patientAge: age,
+      patientPhone: phone,
+      patientType: patientType,
+      tokenFee: fee,
+      tokenPaid: paid,
+      tokenDue: due,
+      amount: paid,
+      method: 'নগদ',
+      type: 'payment',
+      note: `টোকেন প্রদান - ${tokenInfo.tokenNumber}`,
+      status: due === 0 ? 'paid' : 'due',
+      source: 'tokenmanagement',
+      hasSerial: false,       
+      serial: null,  
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: sessionStorage.getItem('adminEmail') || 'admin'
+    });
+    
+    showAlert(`✅ টোকেন ${tokenInfo.tokenNumber} সফলভাবে দেওয়া হয়েছে!`, 'success');
+    
+    // 🔥 সেভ হওয়ার পর প্রিন্ট করুন
+    printNewToken(tokenInfo.tokenNumber, name, age, phone, patientType, fee, paid);
+    
+    closeTokenGiveBlankModal();
+    loadTokenData();
+    
+  } catch (err) {
+    console.error('Save error:', err);
+    showAlert('❌ টোকেন সংরক্ষণে সমস্যা: ' + err.message, 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.innerHTML = originalText;
+      saveBtn.disabled = false;
+    }
+  }
+}
+
+// 🔥 নতুন টোকেন প্রিন্ট ফাংশন
+function printNewToken(tokenNumber, name, age, phone, patientType, fee, paid) {
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>টোকেন প্রিন্ট</title>
+      <meta charset="UTF-8">
+      <style>
+        @page { size: 80mm auto; margin: 0; }
+        body { font-family: 'Noto Sans Bengali', sans-serif; width: 80mm; padding: 10px; margin: 0 auto; }
+        .card { border: 1px dashed #2563eb; border-radius: 8px; padding: 12px; text-align: center; }
+        .header { border-bottom: 1px dashed #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; }
+        .header h2 { font-size: 16px; color: #2563eb; margin: 0 0 3px 0; }
+        .header p { font-size: 11px; color: #6b7280; margin: 0; }
+        .token-num { font-size: 22px; font-weight: bold; color: #2563eb; margin: 8px 0; letter-spacing: 1px; }
+        .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e5e7eb; font-size: 12px; }
+        .info-label { font-weight: 600; color: #4b5563; }
+        .info-value { color: #1f2937; }
+        .footer { margin-top: 10px; font-size: 9px; color: #9ca3af; text-align: center; }
+        @media print { body { margin: 0; padding: 5px; } .no-print { display: none; } }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="header">
+          <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
+          <p>টোকেন নাম্বার</p>
+        </div>
+        <div class="token-num">${tokenNumber}</div>
+        <div class="info-row"><span class="info-label">রোগীর নাম:</span><span class="info-value">${escapeHtml(name) || '—'}</span></div>
+        <div class="info-row"><span class="info-label">বয়স:</span><span class="info-value">${age || '—'}</span></div>
+        <div class="info-row"><span class="info-label">ফোন:</span><span class="info-value">${phone || '—'}</span></div>
+        <div class="info-row"><span class="info-label">ধরন:</span><span class="info-value">${patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী'}</span></div>
+        <div class="info-row"><span class="info-label">মোট ফি:</span><span class="info-value">${toBengaliNumber(fee)} টাকা</span></div>
+        <div class="info-row"><span class="info-label">পরিশোধ:</span><span class="info-value">${toBengaliNumber(paid)} টাকা</span></div>
+        <div class="info-row"><span class="info-label">বাকি:</span><span class="info-value">${toBengaliNumber(fee - paid)} টাকা</span></div>
+        <div class="footer">
+          <p>ধন্যবাদ 🙏 সুস্থ থাকুন</p>
+          <p>${new Date().toLocaleString('bn-BD')}</p>
+        </div>
+      </div>
+      <div class="no-print" style="text-align:center; margin-top:20px;">
+        <button onclick="window.print()" style="padding:10px 20px; background:#2563eb; color:white; border:none; border-radius:8px; cursor:pointer;">🖨️ প্রিন্ট করুন</button>
+      </div>
+      <script>window.onload = function() { setTimeout(() => window.print(), 500); }<\/script>
+    </body>
+    </html>
+  `);
+  win.document.close();
+}
+  // ==================== টোকেন ডিলিট (paymentHistories থেকে) ====================
+  async function deleteToken(tokenId, tokenName) {
+    const confirmDelete = confirm(`"${tokenName}" টোকেনটি ডিলিট করতে চান?`);
+    if (!confirmDelete) return;
+    
+    try {
+      await db.collection('paymentHistories').doc(tokenId).delete();
+      showAlert('✅ টোকেন ডিলিট করা হয়েছে!', 'success');
+      loadTokenData();
+    } catch (err) {
+      console.error('Delete error:', err);
+      showAlert('❌ ডিলিট করতে সমস্যা হয়েছে: ' + err.message, 'error');
+    }
+  }
+
+  // ==================== টোকেন বিস্তারিত (paymentHistories থেকে) ====================
+  async function viewTokenDetails(id) {
+    if (!db) return;
+    currentTokenId = id;
+    const doc = await db.collection('paymentHistories').doc(id).get();
+    if (!doc.exists) {
+      showAlert('টোকেন পাওয়া যায়নি', 'error');
+      return;
+    }
+    
+    currentTokenDoc = { id: doc.id, ...doc.data() };
+    const token = currentTokenDoc;
+    const fee = token.tokenFee || 0;
+    const paid = token.tokenPaid || 0;
+    const due = fee - paid;
+    const tokenNumber = token.tokenNumber || '—';
+    
+    // পেমেন্ট ইতিহাস দেখান (যেহেতু সব একই ডকুমেন্টে আছে)
+    let paymentHistoryHtml = '';
+    
+    // চেক করুন এই টোকেনের সাথে আরো পেমেন্ট আছে কিনা (একই tokenNumber সহ অন্য ডকুমেন্ট)
+    try {
+      const historySnapshot = await db.collection('paymentHistories')
+        .where('tokenNumber', '==', tokenNumber)
+        .orderBy('tokenTimestamp', 'desc')
+        .get();
+      
+      if (historySnapshot.size > 1) {
+        const paymentItems = historySnapshot.docs.map(p => {
+          const pData = p.data();
+          return `
+            <div class="payment-item" style="background: #dbeafe; padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+              <div><strong>${formatDateTime(pData.tokenTimestamp)}</strong></div>
+              <div>পরিমাণ: ${toBengaliNumber(pData.amount || pData.tokenPaid || 0)} টাকা</div>
+              <div>পদ্ধতি: ${pData.method || 'নগদ'}</div>
+              ${pData.note ? `<div>📝 ${pData.note}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+        
+        paymentHistoryHtml = `
+          <div class="payment-history">
+            <h4>💳 পেমেন্ট ইতিহাস:</h4>
+            <div style="max-height: 300px; overflow-y: auto;">
+              ${paymentItems}
+            </div>
+          </div>
+        `;
+      }
+    } catch (err) {
+      console.error('পেমেন্ট ইতিহাস লোড করতে সমস্যা:', err);
+    }
+    
+    if (!paymentHistoryHtml) {
+      paymentHistoryHtml = '<div class="payment-history"><p style="color:#9ca3af; padding: 20px; text-align: center;">📭 কোনো পেমেন্ট ইতিহাস নেই</p></div>';
+    }
+    
+    document.getElementById('modalContent').innerHTML = `
+      <div class="token-detail">
+        <div class="token-detail-row"><span class="token-detail-label">টোকেন নাম্বার:</span><span class="token-detail-value"><strong style="color:#2563eb;font-size:16px;">${tokenNumber}</strong></span></div>
+        <div class="token-detail-row"><span class="token-detail-label">সিরিয়াল:</span><span class="token-detail-value">${toBengaliNumber(token.serial)}</span></div>
+        <div class="token-detail-row"><span class="token-detail-label">তারিখ:</span><span class="token-detail-value">${formatDateTime(token.tokenTimestamp)}</span></div>
+        <div class="token-detail-row"><span class="token-detail-label">রোগীর নাম:</span><span class="token-detail-value"><input type="text" id="editName" value="${escapeHtml(token.patientName || '')}"></span></div>
+        <div class="token-detail-row"><span class="token-detail-label">বয়স:</span><span class="token-detail-value"><input type="text" id="editAge" value="${token.patientAge || ''}"></span></div>
+        <div class="token-detail-row"><span class="token-detail-label">ফোন:</span><span class="token-detail-value"><input type="text" id="editPhone" value="${token.patientPhone || ''}"></span></div>
+        <div class="token-detail-row"><span class="token-detail-label">ধরন:</span><span class="token-detail-value"><select id="editPatientType"><option value="new" ${token.patientType === 'new' ? 'selected' : ''}>নতুন</option><option value="old" ${token.patientType === 'old' ? 'selected' : ''}>পুরাতন</option></select></span></div>
+        <div class="token-detail-row"><span class="token-detail-label">ফি:</span><span class="token-detail-value"><input type="number" id="editFee" value="${fee}" onchange="calculateDue()"></span></div>
+        <div class="token-detail-row"><span class="token-detail-label">পরিশোধিত:</span><span class="token-detail-value"><input type="number" id="editPaid" value="${paid}" onchange="calculateDue()"><br><small id="dueAmount" style="color: ${due > 0 ? '#ef4444' : '#10b981'}">বাকি: ${due > 0 ? toBengaliNumber(due) : '০'} টাকা</small></span></div>
+      </div>
+      ${paymentHistoryHtml}
+    `;
+    document.getElementById('tokenModal').style.display = 'flex';
+  }
+
+  function calculateDue() {
+    const fee = parseInt(document.getElementById('editFee')?.value) || 0;
+    const paid = parseInt(document.getElementById('editPaid')?.value) || 0;
+    const due = fee - paid;
+    const dueElement = document.getElementById('dueAmount');
+    if (dueElement) {
+      dueElement.textContent = `বাকি: ${due > 0 ? toBengaliNumber(due) : '০'} টাকা`;
+      dueElement.style.color = due > 0 ? '#ef4444' : '#10b981';
+    }
+  }
+
+  async function saveTokenDetails() {
+    if (!currentTokenId || !currentTokenDoc) {
+      showAlert('টোকেন তথ্য পাওয়া যায়নি', 'error');
+      return;
+    }
+    
+    const newName = document.getElementById('editName')?.value || '';
+    const newAge = document.getElementById('editAge')?.value || '';
+    const newPhone = document.getElementById('editPhone')?.value || '';
+    const newPatientType = document.getElementById('editPatientType')?.value || 'new';
+    const newFee = parseInt(document.getElementById('editFee')?.value) || (newPatientType === 'new' ? 800 : 600);
+    const newPaid = parseInt(document.getElementById('editPaid')?.value) || 0;
+    
+    const oldPaid = currentTokenDoc.tokenPaid || 0;
+    const newDue = newFee - newPaid;
+    
+    try {
+      // paymentHistories আপডেট করুন
+      await db.collection('paymentHistories').doc(currentTokenId).update({
+        patientName: newName,
+        patientAge: newAge,
+        patientPhone: newPhone,
+        patientType: newPatientType,
+        tokenFee: newFee,
+        tokenPaid: newPaid,
+        tokenDue: newDue,
+        status: newDue === 0 ? 'paid' : 'due',
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      
+      // পেমেন্ট পরিবর্তন হলে নতুন এন্ট্রি তৈরি করুন
+      if (newPaid !== oldPaid) {
+        const difference = newPaid - oldPaid;
+        await db.collection('paymentHistories').add({
+          tokenNumber: currentTokenDoc.tokenNumber,
+          serial: currentTokenDoc.serial,
+          tokenDatePrefix: currentTokenDoc.tokenDatePrefix,
+          tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          patientName: newName,
+          patientAge: newAge,
+          patientPhone: newPhone,
+          patientType: newPatientType,
+          tokenFee: newFee,
+          tokenPaid: difference,
+          tokenDue: newDue,
+          amount: difference,
+          method: difference > 0 ? 'নগদ' : 'ফেরত',
+          type: difference > 0 ? 'payment' : 'refund',
+          note: difference > 0 ? `অতিরিক্ত পরিশোধ: ${difference} টাকা` : `ফেরত: ${Math.abs(difference)} টাকা`,
+          status: newDue === 0 ? 'paid' : 'due',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdBy: sessionStorage.getItem('adminEmail') || 'admin'
+        });
+      }
+      
+      showAlert('টোকেন তথ্য আপডেট হয়েছে', 'success');
+      closeTokenModal();
+      loadTokenData();
+      
+    } catch (err) {
+      console.error('Save error:', err);
+      showAlert('সংরক্ষণ করতে সমস্যা হয়েছে: ' + err.message, 'error');
+    }
+  }
+
+  function printToken() {
+    if (!currentTokenDoc) return;
+    const t = currentTokenDoc;
+    const tokenNumber = t.tokenNumber || '—';
+    
+    const win = window.open('', '_blank');
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>টোকেন প্রিন্ট</title>
+        <meta charset="UTF-8">
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          body { font-family: 'Noto Sans Bengali', sans-serif; width: 80mm; padding: 10px; margin: 0 auto; }
+          .card { border: 1px dashed #2563eb; border-radius: 8px; padding: 12px; text-align: center; }
+          .header { border-bottom: 1px dashed #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; }
+          .header h2 { font-size: 16px; color: #2563eb; margin: 0 0 3px 0; }
+          .header p { font-size: 11px; color: #6b7280; margin: 0; }
+          .token-num { font-size: 22px; font-weight: bold; color: #2563eb; margin: 8px 0; letter-spacing: 1px; }
+          .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e5e7eb; font-size: 12px; }
+          .footer { margin-top: 10px; font-size: 9px; color: #9ca3af; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="header">
+            <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
+            <p>টোকেন নাম্বার</p>
+          </div>
+          <div class="token-num">${tokenNumber}</div>
+          <div class="info-row"><span>রোগীর নাম:</span><span>${escapeHtml(t.patientName || '—')}</span></div>
+          <div class="info-row"><span>বয়স:</span><span>${t.patientAge || '—'}</span></div>
+          <div class="info-row"><span>ধরন:</span><span>${t.patientType === 'new' ? 'নতুন' : 'পুরাতন'}</span></div>
+          <div class="info-row"><span>ফি:</span><span>${toBengaliNumber(t.tokenFee)} টাকা</span></div>
+          <div class="footer">
+            <p>ধন্যবাদ 🙏 সুস্থ থাকুন</p>
+            <p>${new Date().toLocaleString('bn-BD')}</p>
+          </div>
+        </div>
+        <div class="no-print" style="text-align:center;margin-top:20px;">
+          <button onclick="window.print()" style="padding:10px 20px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer;">🖨️ প্রিন্ট করুন</button>
+        </div>
+        <script>window.onload = function() { setTimeout(() => window.print(), 500); }<\/script>
+      </body>
+      </html>
+    `);
+    win.document.close();
+  }
+
+  function closeTokenModal() {
+    document.getElementById('tokenModal').style.display = 'none';
+    currentTokenDoc = null;
+    currentTokenId = null;
+  }
+
+  // ==================== প্রিন্ট ফাংশন ====================
+  function printFilteredTokens() {
+    const tableRows = document.querySelectorAll('#tokenTableBody tr');
+    const tokens = [];
+    
+    tableRows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length >= 10 && cells[0]?.innerText !== 'কোনো টোকেন পাওয়া যায়নি') {
+        tokens.push({
+          tokenNumber: cells[1]?.innerText?.trim() || '—',
+          name: cells[3]?.innerText?.trim() || '—',
+          age: cells[4]?.innerText?.trim() || '—',
+          phone: cells[5]?.innerText?.trim() || '—',
+          type: cells[6]?.innerText?.trim() || '—',
+          fee: cells[7]?.innerText?.trim() || '—',
+          paid: cells[8]?.innerText?.trim() || '—',
+          due: cells[9]?.innerText?.trim() || '—'
+        });
+      }
+    });
+    
+    if (tokens.length === 0) {
+      showAlert('প্রিন্ট করার মতো কোনো টোকেন নেই!', 'warning');
+      return;
+    }
+    
+    const printHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>টোকেন প্রিন্ট</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          body { font-family: 'Noto Sans Bengali', sans-serif; width: 80mm; margin: 0 auto; padding: 10px; }
+          .print-header { text-align: center; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+          .print-header h2 { font-size: 16px; margin: 0; }
+          .print-header p { font-size: 11px; margin: 5px 0 0; color: #666; }
+          .print-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+          .token-card { border: 1px solid #2563eb; border-radius: 6px; padding: 8px; text-align: center; font-size: 10px; page-break-inside: avoid; }
+          .token-card .token-num { font-size: 12px; font-weight: bold; color: #2563eb; background: #e0e7ff; padding: 2px 6px; border-radius: 12px; display: inline-block; margin-bottom: 6px; }
+          .token-card .name { font-weight: bold; margin: 5px 0; font-size: 11px; }
+          .token-card hr { margin: 6px 0; border-color: #ddd; }
+          .footer { text-align: center; font-size: 8px; margin-top: 15px; color: #999; }
+          @media print { body { margin: 0; padding: 5px; } .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="print-header">
+          <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
+          <p>টোকেন তালিকা - ${new Date().toLocaleDateString('bn-BD')}</p>
+        </div>
+        <div class="print-grid">
+          ${tokens.map(t => `
+            <div class="token-card">
+              <div class="token-num">${escapeHtml(t.tokenNumber)}</div>
+              <div class="name">${escapeHtml(t.name.slice(0, 15))}</div>
+              <div>বয়স: ${t.age} | ${t.type}</div>
+              <div>ফি: ${t.fee} | পরিশোধ: ${t.paid}</div>
+              <hr>
+              <div style="font-size: 8px;">সিরিয়াল: ${t.tokenNumber.split('-').pop()}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="footer">মোট টোকেন: ${tokens.length}টি | প্রিন্টের তারিখ: ${new Date().toLocaleString('bn-BD')}</div>
+        <div class="no-print" style="text-align:center; margin-top:20px;">
+          <button onclick="window.print()" style="padding:10px 20px; background:#2563eb; color:white; border:none; border-radius:8px;">🖨️ প্রিন্ট করুন</button>
+        </div>
+        <script>window.onload = function() { setTimeout(() => window.print(), 300); }<\/script>
+      </body>
+      </html>
+    `;
+    
+    const win = window.open('', '_blank');
+    win.document.write(printHtml);
+    win.document.close();
+  }
+
+  function syncMobileFilters() {
+    const mDateFrom = document.getElementById('dateFromMobile');
+    const mDateTo = document.getElementById('dateToMobile');
+    const mPatientType = document.getElementById('patientTypeFilterMobile');
+    const mSearch = document.getElementById('searchInputMobile');
+    if (mDateFrom) mDateFrom.value = document.getElementById('dateFrom').value;
+    if (mDateTo) mDateTo.value = document.getElementById('dateTo').value;
+    if (mPatientType) mPatientType.value = document.getElementById('patientTypeFilter').value;
+    if (mSearch) mSearch.value = document.getElementById('searchInput').value;
+  }
+
+  // ==================== ইভেন্ট লিসেনার ====================
+  document.getElementById('dateFrom').addEventListener('change', () => { syncMobileFilters(); loadTokenData(); });
+  document.getElementById('dateTo').addEventListener('change', () => { syncMobileFilters(); loadTokenData(); });
+  document.getElementById('patientTypeFilter').addEventListener('change', () => { syncMobileFilters(); loadTokenData(); });
+  document.getElementById('searchInput').addEventListener('input', () => { syncMobileFilters(); loadTokenData(); });
+  
+  const today = new Date();
+  const fiveDaysAgo = new Date(today);
+  fiveDaysAgo.setDate(today.getDate() - 5);
+  document.getElementById('dateFrom').value = fiveDaysAgo.toISOString().split('T')[0];
+  document.getElementById('dateTo').value = today.toISOString().split('T')[0];
+  syncMobileFilters();
+  
+  setTimeout(() => loadTokenData(), 500);
+
+  document.addEventListener('DOMContentLoaded', function() {
+    if (window.ComponentLoader) {
+      window.ComponentLoader.loadAllComponents('টোকেন ম্যানেজমেন্ট');
+    } else {
+      console.error('ComponentLoader পাওয়া যায়নি!');
+    }
+  });
+</script>
+</body>
+</html>

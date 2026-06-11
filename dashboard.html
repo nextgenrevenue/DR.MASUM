@@ -872,15 +872,107 @@
     .btn-token:hover {
       background-color: #eab308;
     }
+
+    /* টোকেন মোডাল স্টাইল */
+.token-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex; /* এটি মোডালটিকে মাঝখানে দেখাবে */
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+}
+
+.token-modal-container {
+  background: white;
+  width: 90%;
+  max-width: 450px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  animation: modalScaleUp 0.3s ease;
+  overflow: hidden;
+}
+
+.token-modal-header {
+  background: #2563eb;
+  color: white;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.token-modal-body {
+  padding: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.token-form-group {
+  margin-bottom: 15px;
+}
+
+.token-form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.token-form-group input, .token-form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.token-modal-actions {
+  padding: 16px;
+  background: #f9fafb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-save-print {
+  background: #16a34a;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-cancel-modal {
+  background: #9ca3af;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+@keyframes modalScaleUp {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
     
-    .btn-token-undo {
+/*    .btn-token-undo {
       background-color: var(--info);
       color: white;
     }
     
     .btn-token-undo:hover {
       background-color: #0284c7;
-    }
+    }*/
     
     /* লোডিং মেসেজ */
     #loadingMessage {
@@ -2535,117 +2627,311 @@ function renderAppointments() {
       <td>${dateDisplay || 'N/A'}, ${data.time || 'N/A'}</td>
       <td>${typeText}</td>
       <td>${formatTimestamp(data.timestamp)}</td>
-      <td><button class="action-btn ${callButtonClass}" data-id="${id}" data-field="called" data-status="${isCalled}">${callButtonText}</button></td>
-      <td><button class="action-btn ${tokenButtonClass}" data-id="${id}" data-field="tokenGiven" data-status="${isTokenGiven}">${tokenButtonText}</button></td>
-    `;
-    
-    // ইভেন্ট লিসেনার
-    row.querySelectorAll('.action-btn').forEach(btn => {
-      btn.addEventListener('click', () => updateStatus(btn));
-    });
-  });
+          <td><button class="action-btn ${callButtonClass}" data-id="${id}" data-field="called" data-status="${isCalled}">${callButtonText}</button></td>
+          <td>
+    ${isTokenGiven ? 
+      `<button class="action-btn btn-token-details" data-id="${id}" onclick="showTokenDetailsModal(this)">
+        <i class="fas fa-print"></i> বিস্তারিত
+      </button>` :
+      `<button class="action-btn btn-token" data-id="${id}" onclick="showTokenDetailsModal(this)">
+        <i class="fas fa-plus"></i> ${data.name || 'টোকেন দিন'}
+      </button>`
+    }
+  </td>
+        `;
+        
+// ১. কল বাটনের লিসেনার (যা আগে থেকেই ছিল)
+const callBtn = row.querySelector(`button[data-field="called"]`);
+if (callBtn) {
+  callBtn.addEventListener('click', () => updateCallStatus(callBtn));
 }
+
+// ২. টোকেন বাটনের লিসেনার (নতুন যুক্ত করা হলো)
+const tokenBtn = row.querySelector(`button[data-field="token"]`);
+if (tokenBtn) {
+  tokenBtn.addEventListener('click', () => showTokenDetailsModal(tokenBtn));
+}
+      });
+    }
 
    // =======================================================
 // ৮. স্ট্যাটাস আপডেট - FINAL SIMPLE VERSION
 // =======================================================
-async function updateStatus(button) {
-  if (!db) return;
-  
-  const docId = button.getAttribute('data-id');
-  const field = button.getAttribute('data-field');
-  const currentStatus = button.getAttribute('data-status') === 'true';
-  const newStatus = !currentStatus;
-  
-  // রোগীর নাম বের করুন (সারি থেকে)
-  const row = button.closest('tr');
-  const patientNameCell = row.querySelector('td:nth-child(4)');
-  const patientName = patientNameCell ? patientNameCell.textContent : '';
-  
-  // মেসেজ এবং বাটন ইনফো
-  const messages = {
-    called: {
-      true: { 
-        success: `${patientName} - কল করা হয়েছে`, 
-        button: 'কল বাতিল', 
-        class: 'btn-call-undo' 
-      },
-      false: { 
-        success: `${patientName} - কল বাতিল করা হয়েছে`, 
-        button: patientName || 'কল করুন', 
-        class: 'btn-call' 
-      }
-    },
-    tokenGiven: {
-      true: { 
-        success: `${patientName} - টোকেন দেওয়া হয়েছে`,
-        button: 'টোকেন বাতিল', 
-        class: 'btn-token-undo' 
-      },
-      false: { 
-        success: `${patientName} -  টোকেন বাতিল করা হয়েছে`,
-        button: 'টোকেন দিন', 
-        class: 'btn-token' 
-      }
-    }
-  };
-  
-  const fieldInfo = messages[field];
-  const messageInfo = fieldInfo[newStatus];
-  
-  if (!messageInfo) {
-    showAlert('স্ট্যাটাস আপডেটে সমস্যা হয়েছে', 'error');
-    return;
-  }
-  
-  const originalText = button.textContent;
-  button.textContent = 'আপডেট হচ্ছে...';
-  button.disabled = true;
-  
-  try {
-    await db.collection('appointments').doc(docId).update({
-      [field]: newStatus,
-      [`${field}Timestamp`]: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    
-    // সফল মেসেজ
-    showAlert(messageInfo.success, 'success');
-    
-    // বাটন আপডেট
-    button.textContent = messageInfo.button;
-    button.className = `action-btn ${messageInfo.class}`;
-    button.setAttribute('data-status', newStatus);
-    button.disabled = false;
-    
-    // স্ট্যাটাস ব্যাজ আপডেট
-    if (field === 'called') {
-      const statusBadge = row.querySelector('td:nth-child(2) .status-badge');
-      if (statusBadge) {
-        statusBadge.textContent = newStatus ? 'কল করা হয়েছে' : 'কল করা হয়নি';
-        statusBadge.className = newStatus ? 'status-badge status-called' : 'status-badge status-not-called';
-      }
-    } else if (field === 'tokenGiven') {
-      const statusBadge = row.querySelector('td:nth-child(3) .status-badge');
-      if (statusBadge) {
-        statusBadge.textContent = newStatus ? 'টোকেন দেওয়া হয়েছে' : 'টোকেন দেওয়া হয়নি';
-        statusBadge.className = newStatus ? 'status-badge status-token-given' : 'status-badge status-token-not-given';
+    async function updateCallStatus(button) {
+      if (!db) return;
+      
+      const docId = button.getAttribute('data-id');
+      const currentStatus = button.getAttribute('data-status') === 'true';
+      const newStatus = !currentStatus;
+      
+      const row = button.closest('tr');
+      const patientNameCell = row.querySelector('td:nth-child(4)');
+      const patientName = patientNameCell ? patientNameCell.textContent : '';
+      
+      const originalText = button.textContent;
+      button.textContent = 'আপডেট হচ্ছে...';
+      button.disabled = true;
+      
+      try {
+        await db.collection('appointments').doc(docId).update({
+          called: newStatus,
+          calledTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showAlert(newStatus ? `${patientName} - কল করা হয়েছে` : `${patientName} - কল বাতিল করা হয়েছে`, 'success');
+        
+        button.textContent = newStatus ? 'কল বাতিল' : (patientName || 'কল করুন');
+        button.className = newStatus ? 'action-btn btn-call-undo' : 'action-btn btn-call';
+        button.setAttribute('data-status', newStatus);
+        button.disabled = false;
+        
+        const statusBadge = row.querySelector('td:nth-child(2) .status-badge');
+        if (statusBadge) {
+          statusBadge.textContent = newStatus ? 'কল করা হয়েছে' : 'কল করা হয়নি';
+          statusBadge.className = newStatus ? 'status-badge status-called' : 'status-badge status-not-called';
+        }
+        
+      } catch (error) {
+        console.error('Error updating call status:', error);
+        showAlert('কল আপডেট করতে সমস্যা হয়েছে', 'error');
+        button.textContent = originalText;
+        button.disabled = false;
       }
     }
+
+    // =======================================================
+    // টোকেন বিস্তারিত মোডাল দেখানো (নতুন ফিচার)
+    // =======================================================
+    async function showTokenDetailsModal(button) {
+      const docId = button.getAttribute('data-id');
+      const doc = await db.collection('appointments').doc(docId).get();
+      const data = doc.data();
+      
+      currentTokenId = docId;
+      currentTokenData = { id: docId, ...data };
+      
+      const defaultFee = data.patientType === 'new' ? 800 : 600;
+      const currentFee = data.tokenFee || defaultFee;
+      const currentPaid = data.tokenPaid || 0;
+      const due = currentFee - currentPaid;
+      
+      const paymentHistory = data.paymentHistory || [];
+      
+      const modalHtml = `
+        <div class="token-modal-overlay" id="tokenModalOverlay">
+          <div class="token-modal-container">
+            <div class="token-modal-header">
+              <h3><i class="fas fa-ticket-alt"></i> টোকেন বিস্তারিত</h3>
+              <button class="token-modal-close" onclick="closeTokenModal()">&times;</button>
+            </div>
+            <div class="token-modal-body">
+              <div class="token-form-group">
+                <label>রোগীর নাম</label>
+                <input type="text" id="tokenName" value="${(data.name || '').replace(/"/g, '&quot;')}" placeholder="রোগীর নাম">
+              </div>
+              <div class="token-form-group">
+  <div class="token-form-group">
+  <label>বয়স</label>
+  <input type="text" id="tokenAge" value="${getAgeDisplay(data)}" placeholder="বয়স">
+</div>
+              <div class="token-form-group">
+  <label>রোগীর ধরন</label>
+  <select id="tokenType" onchange="updateFeeByPatientType(this.value)">
+    <option value="new" ${data.patientType === 'new' ? 'selected' : ''}>নতুন রোগী</option>
+    <option value="old" ${data.patientType === 'old' ? 'selected' : ''}>পুরাতন রোগী</option>
+  </select>
+</div>
+<div class="token-form-group">
+  <label>ফি (টাকা)</label>
+  <input type="number" id="tokenFee" value="${currentFee}" placeholder="ফি" oninput="updateDueAmount()">
+</div>
+              <div class="token-form-group">
+                <label>পরিশোধিত টাকা</label>
+                <input type="number" id="tokenPaid" value="${currentPaid}" placeholder="পরিশোধিত টাকা" oninput="updateDueAmount()">
+                <div class="due-amount" id="dueAmount">বাকি: ${due} টাকা</div>
+              </div>
+              ${paymentHistory.length > 0 ? `
+                <div class="payment-history">
+                  <h4>পেমেন্ট ইতিহাস:</h4>
+                  ${paymentHistory.map(p => `
+                    <div class="payment-item">
+                      <strong>${new Date(p.date?.toDate?.() || p.timestamp || Date.now()).toLocaleDateString('bn-BD')}</strong> - 
+                      ${p.amount} টাকা (${p.method || 'নগদ'}) - ${p.note || ''}
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+            <div class="token-modal-actions">
+              <button class="btn-save-print" onclick="saveAndPrintToken()"><i class="fas fa-save"></i> সংরক্ষণ ও প্রিন্ট</button>
+              <button class="btn-cancel-modal" onclick="closeTokenModal()"><i class="fas fa-times"></i> বাতিল</button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
     
-  } catch (error) {
-    console.error(`❌ Error updating ${field}:`, error);
+    function updateDueAmount() {
+      const fee = parseInt(document.getElementById('tokenFee')?.value) || 0;
+      const paid = parseInt(document.getElementById('tokenPaid')?.value) || 0;
+      const due = fee - paid;
+      const dueElement = document.getElementById('dueAmount');
+      if (dueElement) {
+        dueElement.textContent = `বাকি: ${due} টাকা`;
+        dueElement.style.color = due > 0 ? '#dc2626' : '#10b981';
+      }
+    }
+
+    function updateFeeByPatientType(type) {
+  const feeInput = document.getElementById('tokenFee');
+  
+  if (feeInput) {
+    // নতুন রোগী হলে ৮০০ টাকা, পুরাতন রোগী হলে ৬০০ টাকা অটোমেটিক সেট হবে
+    if (type === 'new') {
+      feeInput.value = 800;
+    } else if (type === 'old') {
+      feeInput.value = 600;
+    }
     
-    // ইরর মেসেজ
-    const errorMessages = {
-      called: newStatus ? 'কল করতে সমস্যা হয়েছে' : 'কল বাতিল করতে সমস্যা হয়েছে',
-      tokenGiven: newStatus ? 'টোকেন দিতে সমস্যা হয়েছে' : 'টোকেন বাতিল করতে সমস্যা হয়েছে'
-    };
-    
-    showAlert(errorMessages[field] || 'আপডেটে সমস্যা হয়েছে', 'error');
-    button.textContent = originalText;
-    button.disabled = false;
+    // ফি পরিবর্তন হওয়ার পর "বাকি থাকবে কত টাকা" সেটার হিসাবও যেন সাথে সাথে আপডেট হয়
+    if (typeof updateDueAmount === 'function') {
+      updateDueAmount();
+    }
   }
 }
+    
+async function saveAndPrintToken() {
+  if (!currentTokenId) return;
+  
+  const name = document.getElementById('tokenName')?.value || '';
+  const age = document.getElementById('tokenAge')?.value || '';
+  const patientType = document.getElementById('tokenType')?.value;
+  const fee = parseInt(document.getElementById('tokenFee')?.value) || (patientType === 'new' ? 800 : 600);
+  const paid = parseInt(document.getElementById('tokenPaid')?.value) || 0;
+  
+  try {
+    // 🔥 আজকের সর্বশেষ সিরিয়াল দেখে টোকেন নাম্বার জেনারেট করুন
+    const today = new Date();
+    const yy = String(today.getFullYear()).slice(-2);
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const datePrefix = `${yy}${mm}${dd}`;
+    
+    const paymentHistoriesRef = db.collection('paymentHistories');
+    const todayTokensQuery = await paymentHistoriesRef
+      .where('tokenDatePrefix', '==', datePrefix)
+      .orderBy('serial', 'desc')
+      .limit(1)
+      .get();
+    
+    let lastSerial = 0;
+    if (!todayTokensQuery.empty) {
+      lastSerial = todayTokensQuery.docs[0].data().serial || 0;
+    }
+    
+    const newSerial = lastSerial + 1;
+    const finalTokenNumber = `T-${datePrefix}-${String(newSerial).padStart(2, '0')}`;
+    
+    // 🔥 paymentHistories এ টোকেন সেভ করুন
+    await db.collection('paymentHistories').add({
+      tokenNumber: finalTokenNumber,
+      serial: newSerial,
+      tokenDatePrefix: datePrefix,
+      tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      
+      patientName: name,
+      patientAge: age,
+      patientPhone: document.getElementById('tokenPhone')?.value || '',
+      patientType: patientType,
+      
+      tokenFee: fee,
+      tokenPaid: paid,
+      tokenDue: fee - paid,
+      
+      amount: paid,
+      method: 'নগদ',
+      type: 'payment',
+      note: `টোকেন প্রদান - ${finalTokenNumber}`,
+      
+      status: (fee - paid) === 0 ? 'paid' : 'due',
+      
+      source: 'dashboard',  // 🔥 উৎস: ড্যাশবোর্ড
+      
+      appointmentId: currentTokenId,  // appointments ডকের সাথে সম্পর্ক
+      
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: sessionStorage.getItem('adminEmail') || 'admin'
+    });
+    
+    // 🔥 appointments আপডেট করুন (টোকেন তথ্য)
+    await db.collection('appointments').doc(currentTokenId).update({
+      tokenGiven: true,
+      tokenNumber: finalTokenNumber,
+      tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      tokenFee: fee,
+      tokenPaid: paid,
+      lastTokenUpdate: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    showAlert(`✅ টোকেন ${finalTokenNumber} সফলভাবে দেওয়া হয়েছে!`, 'success');
+    closeTokenModal();
+    
+    // প্রিন্ট করুন
+    printTokenReceipt(finalTokenNumber, name, age, patientType, fee, paid);
+    
+  } catch (error) {
+    console.error("❌ Error saving token:", error);
+    showAlert("সংরক্ষণ করতে সমস্যা হয়েছে", "error");
+  }
+}
+
+function printTokenReceipt(tokenNumber, name, age, patientType, fee, paid) {
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>টোকেন প্রিন্ট</title>
+      <meta charset="UTF-8">
+      <style>
+        @page { size: 80mm auto; margin: 0; }
+        body { font-family: 'Noto Sans Bengali', sans-serif; width: 80mm; padding: 10px; margin: 0 auto; }
+        .card { border: 1px dashed #2563eb; border-radius: 8px; padding: 12px; text-align: center; }
+        .header { border-bottom: 1px dashed #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; }
+        .header h2 { font-size: 16px; color: #2563eb; margin: 0 0 3px 0; }
+        .token-num { font-size: 22px; font-weight: bold; color: #2563eb; margin: 8px 0; }
+        .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e5e7eb; font-size: 12px; }
+        .footer { margin-top: 10px; font-size: 9px; color: #9ca3af; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="header"><h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2><p>টোকেন নাম্বার</p></div>
+        <div class="token-num">${tokenNumber}</div>
+        <div class="info-row"><span>রোগীর নাম:</span><span>${name || '—'}</span></div>
+        <div class="info-row"><span>বয়স:</span><span>${age || '—'}</span></div>
+        <div class="info-row"><span>ধরন:</span><span>${patientType === 'new' ? 'নতুন' : 'পুরাতন'}</span></div>
+        <div class="info-row"><span>ফি:</span><span>${fee} টাকা</span></div>
+        <div class="footer"><p>ধন্যবাদ 🙏 সুস্থ থাকুন</p><p>${new Date().toLocaleString('bn-BD')}</p></div>
+      </div>
+      <div class="no-print" style="text-align:center;margin-top:20px;">
+        <button onclick="window.print()" style="padding:10px 20px;background:#2563eb;color:white;border:none;border-radius:8px;">🖨️ প্রিন্ট করুন</button>
+      </div>
+      <script>window.onload = function() { setTimeout(() => window.print(), 500); }<\/script>
+    </body>
+    </html>
+  `);
+  win.document.close();
+}
+    
+    function closeTokenModal() {
+      const overlay = document.getElementById('tokenModalOverlay');
+      if (overlay) overlay.remove();
+      currentTokenId = null;
+      currentTokenData = null;
+    }
     // =======================================================
     // ৯. কুইক সিরিয়াল ম্যানেজমেন্ট (grid.js ব্যবহার করে)
     // =======================================================

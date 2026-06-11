@@ -161,7 +161,7 @@
     <ul class="sidebar-menu">
       <li><a href="/dashboard" class="sidebar-link" data-page="dashboard"><i>📊</i> ড্যাশবোর্ড</a></li>
       <li><a href="/allserial" class="sidebar-link" data-page="allserial"><i>📅</i> অ্যাপয়েন্টমেন্ট</a></li>
-      <li><a href="/livechat" class="sidebar-link" data-page="livechat"><i>👨‍⚕️</i> লাইভ অ্যাটেনডেন্স</a></li>
+      <li><a href="/tokenmanagement" class="sidebar-link" data-page="tokenmanagement"><i>👨‍⚕️</i> টোকেন ম্যানেজমেন্ট</a></li>
       <li><a href="/management" class="sidebar-link" data-page="management"><i>⏰</i> সিরিয়াল ম্যানেজমেন্ট</a></li>
       <li><a href="/notice" class="sidebar-link" data-page="notice"><i>👥</i> নোটিস</a></li>
       <li><a href="/settings" class="sidebar-link" data-page="settings"><i>⚙️</i> সেটিংস</a></li>
@@ -472,7 +472,7 @@
       if (path.includes('/settings') || path.endsWith('/settings')) return 'settings';
       if (path.includes('/notice') || path.endsWith('/notice')) return 'notice';
       if (path.includes('/management') || path.endsWith('/management')) return 'management';
-      if (path.includes('/livechat') || path.endsWith('/livechat')) return 'livechat';
+      if (path.includes('/tokenmanagement') || path.endsWith('/tokenmanagement')) return 'tokenmanagement';
       if (path.includes('/allserial') || path.endsWith('/allserial')) return 'allserial';
       if (path.includes('/dashboard') || path === '/' || path === '' || path.endsWith('/')) return 'dashboard';
       
