@@ -558,6 +558,10 @@
         </div>
 
         <div class="stats-cards no-print" id="statsCards">
+          <div class="stat-card total-due">
+            <h3>বাকি টাকার রোগী</h3>
+            <div class="number" id="totalDuePatients">0</div>
+          </div>
           <div class="stat-card total-patients">
             <h3>মোট রোগী</h3>
             <div class="number" id="totalPatients">0</div>
@@ -566,17 +570,13 @@
             <h3>মোট প্রাপ্ত টাকা</h3>
             <div class="number" id="totalAmount">০ টাকা</div>
           </div>
-          <div class="stat-card total-due">
-            <h3>বাকি টাকার রোগী</h3>
-            <div class="number" id="totalDuePatients">0</div>
-          </div>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;" class="no-print">
           <button class="btn-token-give" onclick="openTokenGiveForAllModal()" style="background: #10b981; padding: 10px 20px; font-size: 14px;">
             <i class="fas fa-ticket-alt"></i> টোকেন দিন
           </button>
-          <button class="btn-print-range" onclick="printFilteredTokens()">
+          <button class="btn-print-range" onclick="showPrintOptions()">
             <i class="fas fa-print"></i> প্রিন্ট করুন
           </button>
         </div>
@@ -597,6 +597,7 @@
                   <th>পরিশোধ</th>
                   <th>বাকি</th>
                   <th>স্ট্যাটাস</th>
+                  <th>রেফারেন্স</th>
                   <th>অ্যাকশন</th>
                 </tr>
               </thead>
@@ -627,6 +628,68 @@
       </div>
     </div>
   </div>
+
+  <!-- প্রিন্ট অপশন মোডাল -->
+<div id="printOptionsModal" class="modal">
+  <div class="modal-content" style="max-width: 450px;">
+    <div class="modal-header">
+      <h2><i class="fas fa-print"></i> প্রিন্ট অপশন</h2>
+      <button class="close-modal" onclick="closePrintOptionsModal()">&times;</button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 15px; padding: 10px 0;">
+      <button onclick="openCardPrint()" style="background: #8b5cf6; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer;">
+        <i class="fas fa-id-card"></i> কার্ড প্রিন্ট
+      </button>
+      <button onclick="openTokenPrint()" style="background: #3b82f6; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer;">
+        <i class="fas fa-ticket-alt"></i> টোকেন প্রিন্ট
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- কার্ড প্রিন্ট মোডাল (ফি ক্যালকুলেশন) -->
+<div id="cardPrintModal" class="modal">
+  <div class="modal-content" style="max-width: 550px;">
+    <div class="modal-header">
+      <h2><i class="fas fa-id-card"></i> কার্ড প্রিন্ট</h2>
+      <button class="close-modal" onclick="closeCardPrintModal()">&times;</button>
+    </div>
+    <div id="cardPrintContent">
+      <!-- ডাইনামিক কন্টেন্ট এখানে আসবে -->
+    </div>
+    <div class="modal-actions">
+      <button class="btn-print" onclick="generateCardPrint()"><i class="fas fa-print"></i> প্রিন্ট করুন</button>
+      <button class="btn-cancel" onclick="closeCardPrintModal()">বাতিল</button>
+    </div>
+  </div>
+</div>
+
+<!-- টোকেন প্রিন্ট মোডাল (রেঞ্জ সিলেক্ট) -->
+<div id="tokenPrintModal" class="modal">
+  <div class="modal-content" style="max-width: 500px;">
+    <div class="modal-header">
+      <h2><i class="fas fa-ticket-alt"></i> টোকেন প্রিন্ট</h2>
+      <button class="close-modal" onclick="closeTokenPrintModal()">&times;</button>
+    </div>
+    <div class="token-detail">
+      <div class="token-detail-row">
+        <span class="token-detail-label">টোকেন আইডি (থেকে):</span>
+        <span class="token-detail-value"><input type="text" id="startTokenId" placeholder="যেমন: T-250101-01" style="width:100%;"></span>
+      </div>
+      <div class="token-detail-row">
+        <span class="token-detail-label">টোকেন আইডি (পর্যন্ত):</span>
+        <span class="token-detail-value"><input type="text" id="endTokenId" placeholder="যেমন: T-250101-50" style="width:100%;"></span>
+      </div>
+      <div class="token-detail-row" style="background: #dbeafe; margin-top: 10px; border-radius: 8px;">
+        <span class="token-detail-label">📌 টোকেন আইডি খালি থাকলে সব প্রিন্ট হবে</span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-print" onclick="generateTokenPrint()"><i class="fas fa-print"></i> প্রিন্ট করুন</button>
+      <button class="btn-cancel" onclick="closeTokenPrintModal()">বাতিল</button>
+    </div>
+  </div>
+</div>
   
   <script src="components-inline.js"></script>
 <script>
@@ -702,36 +765,6 @@
     return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
   }
 
-  // ==================== টোকেন নাম্বার জেনারেট (paymentHistories থেকে) ====================
-  async function generateNextTokenNumber() {
-  const today = new Date();
-  const yy = String(today.getFullYear()).slice(-2);
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
-  const datePrefix = `${yy}${mm}${dd}`;
-  
-  // 🔥 paymentHistories কালেকশন থেকে আজকের সর্বশেষ সিরিয়াল বের করুন
-  const paymentHistoriesRef = db.collection('paymentHistories');
-  const todayTokensQuery = await paymentHistoriesRef
-    .where('tokenDatePrefix', '==', datePrefix)
-    .orderBy('serial', 'desc')
-    .limit(1)
-    .get();
-  
-  let lastSerial = 0;
-  if (!todayTokensQuery.empty) {
-    lastSerial = todayTokensQuery.docs[0].data().serial || 0;
-  }
-  
-  const newSerial = lastSerial + 1;
-  
-  return {
-    tokenNumber: `T-${datePrefix}-${String(newSerial).padStart(2, '0')}`,
-    serial: newSerial,
-    datePrefix: datePrefix
-  };
-}
-
   // ==================== স্ট্যাটস আপডেট ====================
   function updateStats(tokens) {
     const feeMap = new Map();
@@ -765,34 +798,35 @@
     document.getElementById('totalDuePatients').textContent = toBengaliNumber(duePatientsCount);
   }
 
-  // ==================== টোকেন ডাটা লোড (paymentHistories থেকে) ====================
-  async function loadTokenData() {
-    if (!db) return;
+// ==================== টোকেন ডাটা লোড (শুধু মূল টোকেন দেখাবে) ====================
+async function loadTokenData() {
+  if (!db) return;
+  
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
+  const patientType = document.getElementById('patientTypeFilter').value;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  
+  try {
+    let query = db.collection('paymentHistories')
+      .orderBy('tokenTimestamp', 'desc');
     
-    const dateFrom = document.getElementById('dateFrom').value;
-    const dateTo = document.getElementById('dateTo').value;
-    const patientType = document.getElementById('patientTypeFilter').value;
-    const search = document.getElementById('searchInput').value.toLowerCase();
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      from.setHours(0,0,0,0);
+      query = query.where('tokenTimestamp', '>=', firebase.firestore.Timestamp.fromDate(from));
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23,59,59,999);
+      query = query.where('tokenTimestamp', '<=', firebase.firestore.Timestamp.fromDate(to));
+    }
     
-    try {
-      // 🔥 paymentHistories কালেকশন থেকে লোড করুন (paymentTokens না)
-      let query = db.collection('paymentHistories').orderBy('tokenTimestamp', 'desc');
-      
-      if (dateFrom) {
-        const from = new Date(dateFrom);
-        from.setHours(0,0,0,0);
-        query = query.where('tokenTimestamp', '>=', firebase.firestore.Timestamp.fromDate(from));
-      }
-      if (dateTo) {
-        const to = new Date(dateTo);
-        to.setHours(23,59,59,999);
-        query = query.where('tokenTimestamp', '<=', firebase.firestore.Timestamp.fromDate(to));
-      }
-      
-      const snapshot = await query.get();
-      let tokens = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
+    const snapshot = await query.get();
+    let tokens = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.isPaymentHistory !== true) {
         tokens.push({ 
           id: doc.id, 
           ...data,
@@ -800,29 +834,35 @@
           age: data.patientAge,
           phone: data.patientPhone
         });
-      });
-      
-      if (patientType !== 'all') {
-        tokens = tokens.filter(t => t.patientType === patientType);
       }
-      
-      if (search) {
-        tokens = tokens.filter(t => {
-          return (t.patientName && t.patientName.toLowerCase().includes(search)) ||
-                 (t.patientPhone && t.patientPhone.includes(search)) ||
-                 (t.tokenNumber && t.tokenNumber.toLowerCase().includes(search)) ||
-                 (t.serial && String(t.serial).includes(search));
-        });
-      }
-      
-      updateStats(tokens);
-      renderTokenTable(tokens);
-      
-    } catch (err) {
-      console.error('লোড করতে সমস্যা:', err);
-      showAlert('ডাটা লোড করতে সমস্যা হয়েছে', 'error');
+    });
+    
+    // ফিল্টার প্রয়োগ
+    if (patientType !== 'all') {
+      tokens = tokens.filter(t => t.patientType === patientType);
     }
+    
+    if (search) {
+      tokens = tokens.filter(t => {
+        return (t.patientName && t.patientName.toLowerCase().includes(search)) ||
+               (t.patientPhone && t.patientPhone.includes(search)) ||
+               (t.tokenNumber && t.tokenNumber.toLowerCase().includes(search)) ||
+               (t.serial && String(t.serial).includes(search));
+      });
+    }
+    
+    // 🔥 cachedTokens আপডেট করুন (print এর জন্য)
+    window.cachedTokens = tokens;
+    
+    // টেবিল রেন্ডার করুন
+    updateStats(tokens);
+    renderTokenTable(tokens);
+    
+  } catch (err) {
+    console.error('লোড করতে সমস্যা:', err);
+    showAlert('ডাটা লোড করতে সমস্যা হয়েছে', 'error');
   }
+}
 
   // ==================== টোকেন টেবিল রেন্ডার ====================
   function renderTokenTable(tokens) {
@@ -839,6 +879,7 @@
       const status = due === 0 ? 'paid' : 'due';
       const tokenNumber = token.tokenNumber || '—';
       const serialNumber = token.serial || '—';
+      const givenBy = token.givenBy || token.reference || token.source || '—';
       
       return `
         <tr>
@@ -853,6 +894,7 @@
           <td>${toBengaliNumber(paid)} টাকা</td>
           <td>${toBengaliNumber(due)} টাকা</td>
           <td><span class="status-badge ${status === 'paid' ? 'status-paid' : 'status-due'}">${status === 'paid' ? 'পরিশোধিত' : 'বাকি'}</span></td>
+          <td>${givenBy}</td>
           <td>
             <div class="action-buttons">
               <button class="btn-view" onclick="viewTokenDetails('${token.id}')">
@@ -911,6 +953,12 @@
                 <input type="number" id="newTokenPaid" value="0" style="width:100%;">
               </span>
             </div>
+       <div class="token-detail-row">
+            <span class="token-detail-label">রেফারেন্স:</span>
+            <span class="token-detail-value">
+              <input type="text" id="newTokenGivenBy" placeholder="রেফারেন্স নাম লিখুন" style="width:100%;" list="givenBySuggestions">
+            </span>
+          </div>
           </div>
           <div class="modal-actions">
             <button class="btn-save" onclick="saveNewToken()">টোকেন সংরক্ষণ করুন</button>
@@ -958,20 +1006,41 @@ async function saveNewToken() {
   }
   
   try {
-    const tokenInfo = await generateNextTokenNumber();
+    const today = new Date();
+    const yy = String(today.getFullYear()).slice(-2);
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const datePrefix = `${yy}${mm}${dd}`;
+    
+    // 🔥 শুধু where ব্যবহার করবো, orderBy ছাড়া
+    const allTokensQuery = await db.collection('paymentHistories')
+      .where('tokenDatePrefix', '==', datePrefix)
+      .get();
+    
+    // জাভাস্ক্রিপ্টে সর্বোচ্চ counter বের করা
+    let maxCounter = 0;
+    allTokensQuery.forEach(doc => {
+      const data = doc.data();
+      const counter = data.tokenCounter || 0;
+      if (counter > maxCounter) maxCounter = counter;
+    });
+    
+    const newTokenSerial = maxCounter + 1;
+    const padding = newTokenSerial >= 100 ? 3 : 2;
+    const tokenNumber = `T-${datePrefix}-${String(newTokenSerial).padStart(padding, '0')}`;
+    
     const patientType = document.getElementById('newTokenPatientType').value;
     const fee = parseInt(document.getElementById('newTokenFee').value) || (patientType === 'new' ? 800 : 600);
     const paid = parseInt(document.getElementById('newTokenPaid').value) || 0;
     const age = document.getElementById('newTokenAge').value;
     const phone = document.getElementById('newTokenPhone').value;
+    const givenBy = document.getElementById('newTokenGivenBy')?.value; 
     const due = fee - paid;
     
-    // 🔥 paymentHistories কালেকশনে টোকেন সেভ করুন
     await db.collection('paymentHistories').add({
-      tokenNumber: tokenInfo.tokenNumber,
-      serial: null,                    
-      hasSerial: false,                
-      tokenDatePrefix: tokenInfo.datePrefix,
+      tokenNumber: tokenNumber,
+      tokenCounter: newTokenSerial,
+      tokenDatePrefix: datePrefix,
       tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
       patientName: name,
       patientAge: age,
@@ -983,20 +1052,17 @@ async function saveNewToken() {
       amount: paid,
       method: 'নগদ',
       type: 'payment',
-      note: `টোকেন প্রদান - ${tokenInfo.tokenNumber}`,
+      note: `টোকেন প্রদান - ${tokenNumber}`,
       status: due === 0 ? 'paid' : 'due',
       source: 'tokenmanagement',
-      hasSerial: false,       
-      serial: null,  
+      givenBy: givenBy,  
+      reference: givenBy,
+      serial: null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: sessionStorage.getItem('adminEmail') || 'admin'
     });
     
-    showAlert(`✅ টোকেন ${tokenInfo.tokenNumber} সফলভাবে দেওয়া হয়েছে!`, 'success');
-    
-    // 🔥 সেভ হওয়ার পর প্রিন্ট করুন
-    printNewToken(tokenInfo.tokenNumber, name, age, phone, patientType, fee, paid);
-    
+    showAlert(`✅ টোকেন ${tokenNumber} সফলভাবে দেওয়া হয়েছে!`, 'success');
     closeTokenGiveBlankModal();
     loadTokenData();
     
@@ -1011,146 +1077,140 @@ async function saveNewToken() {
   }
 }
 
-// 🔥 নতুন টোকেন প্রিন্ট ফাংশন
-function printNewToken(tokenNumber, name, age, phone, patientType, fee, paid) {
-  const win = window.open('', '_blank');
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>টোকেন প্রিন্ট</title>
-      <meta charset="UTF-8">
-      <style>
-        @page { size: 80mm auto; margin: 0; }
-        body { font-family: 'Noto Sans Bengali', sans-serif; width: 80mm; padding: 10px; margin: 0 auto; }
-        .card { border: 1px dashed #2563eb; border-radius: 8px; padding: 12px; text-align: center; }
-        .header { border-bottom: 1px dashed #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; }
-        .header h2 { font-size: 16px; color: #2563eb; margin: 0 0 3px 0; }
-        .header p { font-size: 11px; color: #6b7280; margin: 0; }
-        .token-num { font-size: 22px; font-weight: bold; color: #2563eb; margin: 8px 0; letter-spacing: 1px; }
-        .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e5e7eb; font-size: 12px; }
-        .info-label { font-weight: 600; color: #4b5563; }
-        .info-value { color: #1f2937; }
-        .footer { margin-top: 10px; font-size: 9px; color: #9ca3af; text-align: center; }
-        @media print { body { margin: 0; padding: 5px; } .no-print { display: none; } }
-      </style>
-    </head>
-    <body>
-      <div class="card">
-        <div class="header">
-          <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
-          <p>টোকেন নাম্বার</p>
-        </div>
-        <div class="token-num">${tokenNumber}</div>
-        <div class="info-row"><span class="info-label">রোগীর নাম:</span><span class="info-value">${escapeHtml(name) || '—'}</span></div>
-        <div class="info-row"><span class="info-label">বয়স:</span><span class="info-value">${age || '—'}</span></div>
-        <div class="info-row"><span class="info-label">ফোন:</span><span class="info-value">${phone || '—'}</span></div>
-        <div class="info-row"><span class="info-label">ধরন:</span><span class="info-value">${patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী'}</span></div>
-        <div class="info-row"><span class="info-label">মোট ফি:</span><span class="info-value">${toBengaliNumber(fee)} টাকা</span></div>
-        <div class="info-row"><span class="info-label">পরিশোধ:</span><span class="info-value">${toBengaliNumber(paid)} টাকা</span></div>
-        <div class="info-row"><span class="info-label">বাকি:</span><span class="info-value">${toBengaliNumber(fee - paid)} টাকা</span></div>
-        <div class="footer">
-          <p>ধন্যবাদ 🙏 সুস্থ থাকুন</p>
-          <p>${new Date().toLocaleString('bn-BD')}</p>
-        </div>
-      </div>
-      <div class="no-print" style="text-align:center; margin-top:20px;">
-        <button onclick="window.print()" style="padding:10px 20px; background:#2563eb; color:white; border:none; border-radius:8px; cursor:pointer;">🖨️ প্রিন্ট করুন</button>
-      </div>
-      <script>window.onload = function() { setTimeout(() => window.print(), 500); }<\/script>
-    </body>
-    </html>
-  `);
-  win.document.close();
+async function deleteToken(tokenId, tokenName) {
+  const confirmDelete = confirm(`"${tokenName}" টোকেনটি ডিলিট করতে চান?`);
+  if (!confirmDelete) return;
+  
+  try {
+    const tokenDoc = await db.collection('paymentHistories').doc(tokenId).get();
+    const tokenData = tokenDoc.data();
+    const appointmentId = tokenData.appointmentId;
+    
+    const batch = db.batch();
+    
+    // 1. paymentHistories থেকে টোকেন ডিলিট
+    batch.delete(db.collection('paymentHistories').doc(tokenId));
+    
+    // 2. appointments আপডেট (এটাই যথেষ্ট, dashboard auto রিফ্রেশ হবে)
+    if (appointmentId) {
+      batch.update(db.collection('appointments').doc(appointmentId), {
+        tokenGiven: false,
+        tokenNumber: null,
+        tokenTimestamp: null,
+        tokenFee: null,
+        tokenPaid: null,
+        lastTokenUpdate: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    
+    // 3. সম্পর্কিত পেমেন্ট হিস্ট্রি ডিলিট
+    const relatedPayments = await db.collection('paymentHistories')
+      .where('parentTokenId', '==', tokenId)
+      .get();
+    
+    relatedPayments.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    
+    showAlert(`✅ টোকেন ডিলিট করা হয়েছে!`, 'success');
+    loadTokenData(); // শুধু tokenmanagement টেবিল রিফ্রেশের জন্য
+    
+    // 🔥 dashboard auto রিফ্রেশ হবে, আলাদা কিছু লাগবে না!
+    
+  } catch (err) {
+    console.error('Delete error:', err);
+    showAlert('❌ ডিলিট করতে সমস্যা হয়েছে: ' + err.message, 'error');
+  }
 }
-  // ==================== টোকেন ডিলিট (paymentHistories থেকে) ====================
-  async function deleteToken(tokenId, tokenName) {
-    const confirmDelete = confirm(`"${tokenName}" টোকেনটি ডিলিট করতে চান?`);
-    if (!confirmDelete) return;
-    
-    try {
-      await db.collection('paymentHistories').doc(tokenId).delete();
-      showAlert('✅ টোকেন ডিলিট করা হয়েছে!', 'success');
-      loadTokenData();
-    } catch (err) {
-      console.error('Delete error:', err);
-      showAlert('❌ ডিলিট করতে সমস্যা হয়েছে: ' + err.message, 'error');
-    }
-  }
 
-  // ==================== টোকেন বিস্তারিত (paymentHistories থেকে) ====================
-  async function viewTokenDetails(id) {
-    if (!db) return;
-    currentTokenId = id;
-    const doc = await db.collection('paymentHistories').doc(id).get();
-    if (!doc.exists) {
-      showAlert('টোকেন পাওয়া যায়নি', 'error');
-      return;
-    }
-    
-    currentTokenDoc = { id: doc.id, ...doc.data() };
-    const token = currentTokenDoc;
-    const fee = token.tokenFee || 0;
-    const paid = token.tokenPaid || 0;
-    const due = fee - paid;
-    const tokenNumber = token.tokenNumber || '—';
-    
-    // পেমেন্ট ইতিহাস দেখান (যেহেতু সব একই ডকুমেন্টে আছে)
-    let paymentHistoryHtml = '';
-    
-    // চেক করুন এই টোকেনের সাথে আরো পেমেন্ট আছে কিনা (একই tokenNumber সহ অন্য ডকুমেন্ট)
-    try {
-      const historySnapshot = await db.collection('paymentHistories')
-        .where('tokenNumber', '==', tokenNumber)
-        .orderBy('tokenTimestamp', 'desc')
-        .get();
-      
-      if (historySnapshot.size > 1) {
-        const paymentItems = historySnapshot.docs.map(p => {
-          const pData = p.data();
-          return `
-            <div class="payment-item" style="background: #dbeafe; padding: 10px; border-radius: 8px; margin-bottom: 8px;">
-              <div><strong>${formatDateTime(pData.tokenTimestamp)}</strong></div>
-              <div>পরিমাণ: ${toBengaliNumber(pData.amount || pData.tokenPaid || 0)} টাকা</div>
-              <div>পদ্ধতি: ${pData.method || 'নগদ'}</div>
-              ${pData.note ? `<div>📝 ${pData.note}</div>` : ''}
-            </div>
-          `;
-        }).join('');
-        
-        paymentHistoryHtml = `
-          <div class="payment-history">
-            <h4>💳 পেমেন্ট ইতিহাস:</h4>
-            <div style="max-height: 300px; overflow-y: auto;">
-              ${paymentItems}
-            </div>
-          </div>
-        `;
-      }
-    } catch (err) {
-      console.error('পেমেন্ট ইতিহাস লোড করতে সমস্যা:', err);
-    }
-    
-    if (!paymentHistoryHtml) {
-      paymentHistoryHtml = '<div class="payment-history"><p style="color:#9ca3af; padding: 20px; text-align: center;">📭 কোনো পেমেন্ট ইতিহাস নেই</p></div>';
-    }
-    
-    document.getElementById('modalContent').innerHTML = `
-      <div class="token-detail">
-        <div class="token-detail-row"><span class="token-detail-label">টোকেন নাম্বার:</span><span class="token-detail-value"><strong style="color:#2563eb;font-size:16px;">${tokenNumber}</strong></span></div>
-        <div class="token-detail-row"><span class="token-detail-label">সিরিয়াল:</span><span class="token-detail-value">${toBengaliNumber(token.serial)}</span></div>
-        <div class="token-detail-row"><span class="token-detail-label">তারিখ:</span><span class="token-detail-value">${formatDateTime(token.tokenTimestamp)}</span></div>
-        <div class="token-detail-row"><span class="token-detail-label">রোগীর নাম:</span><span class="token-detail-value"><input type="text" id="editName" value="${escapeHtml(token.patientName || '')}"></span></div>
-        <div class="token-detail-row"><span class="token-detail-label">বয়স:</span><span class="token-detail-value"><input type="text" id="editAge" value="${token.patientAge || ''}"></span></div>
-        <div class="token-detail-row"><span class="token-detail-label">ফোন:</span><span class="token-detail-value"><input type="text" id="editPhone" value="${token.patientPhone || ''}"></span></div>
-        <div class="token-detail-row"><span class="token-detail-label">ধরন:</span><span class="token-detail-value"><select id="editPatientType"><option value="new" ${token.patientType === 'new' ? 'selected' : ''}>নতুন</option><option value="old" ${token.patientType === 'old' ? 'selected' : ''}>পুরাতন</option></select></span></div>
-        <div class="token-detail-row"><span class="token-detail-label">ফি:</span><span class="token-detail-value"><input type="number" id="editFee" value="${fee}" onchange="calculateDue()"></span></div>
-        <div class="token-detail-row"><span class="token-detail-label">পরিশোধিত:</span><span class="token-detail-value"><input type="number" id="editPaid" value="${paid}" onchange="calculateDue()"><br><small id="dueAmount" style="color: ${due > 0 ? '#ef4444' : '#10b981'}">বাকি: ${due > 0 ? toBengaliNumber(due) : '০'} টাকা</small></span></div>
-      </div>
-      ${paymentHistoryHtml}
-    `;
-    document.getElementById('tokenModal').style.display = 'flex';
+// ==================== টোকেন বিস্তারিত (পেমেন্ট ইতিহাস সহ) ====================
+async function viewTokenDetails(id) {
+  if (!db) return;
+  currentTokenId = id;
+  const doc = await db.collection('paymentHistories').doc(id).get();
+  if (!doc.exists) {
+    showAlert('টোকেন পাওয়া যায়নি', 'error');
+    return;
   }
+  
+  currentTokenDoc = { id: doc.id, ...doc.data() };
+  const token = currentTokenDoc;
+  const fee = token.tokenFee || 0;
+  const paid = token.tokenPaid || 0;
+  const due = fee - paid;
+  const tokenNumber = token.tokenNumber || '—';
+  
+  // পেমেন্ট ইতিহাস দেখান
+  let paymentHistoryHtml = '';
+  const paymentHistory = token.paymentHistory || [];
+  
+  if (paymentHistory.length > 0) {
+    // সময় অনুযায়ী সাজান (নতুন থেকে পুরাতন)
+    const sortedHistory = [...paymentHistory].reverse();
+    
+    const paymentItems = sortedHistory.map(p => {
+      // টাইমস্ট্যাম্প ফরম্যাট করুন
+      let dateText = 'তারিখ নেই';
+      if (p.timestamp) {
+        try {
+          const date = new Date(p.timestamp);
+          dateText = date.toLocaleString('bn-BD', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        } catch(e) {
+          dateText = p.timestamp;
+        }
+      }
+      
+      return `
+        <div class="payment-item" style="background: ${p.type === 'payment' ? '#dbeafe' : '#fed7aa'}; padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+          <div><strong>📅 ${dateText}</strong></div>
+          <div>💰 পরিমাণ: ${toBengaliNumber(p.amount)} টাকা</div>
+          <div>💳 পদ্ধতি: ${p.method || 'নগদ'}</div>
+          <div>📝 ধরন: ${p.type === 'payment' ? 'পেমেন্ট' : 'ফেরত'}</div>
+          ${p.note ? `<div>📝 নোট: ${p.note}</div>` : ''}
+          <div style="font-size: 11px; color: #6b7280; margin-top: 5px;">
+            পূর্বের পরিশোধ: ${toBengaliNumber(p.previousPaid)} → নতুন: ${toBengaliNumber(p.newPaid)}
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    paymentHistoryHtml = `
+      <div class="payment-history">
+        <h4>💳 পেমেন্ট ইতিহাস (${paymentHistory.length}টি):</h4>
+        <div style="max-height: 300px; overflow-y: auto;">
+          ${paymentItems}
+        </div>
+      </div>
+    `;
+  } else {
+    paymentHistoryHtml = '<div class="payment-history"><p style="color:#9ca3af; padding: 20px; text-align: center;">📭 কোনো পেমেন্ট ইতিহাস নেই</p></div>';
+  }
+  
+  // মোডাল কন্টেন্ট
+  document.getElementById('modalContent').innerHTML = `
+    <div class="token-detail">
+      <div class="token-detail-row"><span class="token-detail-label">টোকেন নাম্বার:</span><span class="token-detail-value"><strong style="color:#2563eb;font-size:16px;">${tokenNumber}</strong></span></div>
+      <div class="token-detail-row"><span class="token-detail-label">সিরিয়াল:</span><span class="token-detail-value">${toBengaliNumber(token.serial)}</span></div>
+      <div class="token-detail-row"><span class="token-detail-label">তারিখ:</span><span class="token-detail-value">${formatDateTime(token.tokenTimestamp)}</span></div>
+      <div class="token-detail-row"><span class="token-detail-label">রোগীর নাম:</span><span class="token-detail-value"><input type="text" id="editName" value="${escapeHtml(token.patientName || '')}"></span></div>
+      <div class="token-detail-row"><span class="token-detail-label">বয়স:</span><span class="token-detail-value"><input type="text" id="editAge" value="${token.patientAge || ''}"></span></div>
+      <div class="token-detail-row"><span class="token-detail-label">ফোন:</span><span class="token-detail-value"><input type="text" id="editPhone" value="${token.patientPhone || ''}"></span></div>
+      <div class="token-detail-row"><span class="token-detail-label">ধরন:</span><span class="token-detail-value"><select id="editPatientType"><option value="new" ${token.patientType === 'new' ? 'selected' : ''}>নতুন</option><option value="old" ${token.patientType === 'old' ? 'selected' : ''}>পুরাতন</option></select></span></div>
+      <div class="token-detail-row"><span class="token-detail-label">ফি:</span><span class="token-detail-value"><input type="number" id="editFee" value="${fee}" onchange="calculateDue()"></span></div>
+      <div class="token-detail-row"><span class="token-detail-label">পরিশোধিত:</span><span class="token-detail-value"><input type="number" id="editPaid" value="${paid}" onchange="calculateDue()"><br><small id="dueAmount" style="color: ${due > 0 ? '#ef4444' : '#10b981'}">বাকি: ${due > 0 ? toBengaliNumber(due) : '০'} টাকা</small></span></div>
+    </div>
+    ${paymentHistoryHtml}
+  `;
+  document.getElementById('tokenModal').style.display = 'flex';
+}
 
   function calculateDue() {
     const fee = parseInt(document.getElementById('editFee')?.value) || 0;
@@ -1163,70 +1223,76 @@ function printNewToken(tokenNumber, name, age, phone, patientType, fee, paid) {
     }
   }
 
-  async function saveTokenDetails() {
-    if (!currentTokenId || !currentTokenDoc) {
-      showAlert('টোকেন তথ্য পাওয়া যায়নি', 'error');
-      return;
+async function saveTokenDetails() {
+  if (!currentTokenId || !currentTokenDoc) {
+    showAlert('টোকেন তথ্য পাওয়া যায়নি', 'error');
+    return;
+  }
+  
+  const newName = document.getElementById('editName')?.value || '';
+  const newAge = document.getElementById('editAge')?.value || '';
+  const newPhone = document.getElementById('editPhone')?.value || '';
+  const newPatientType = document.getElementById('editPatientType')?.value || 'new';
+  const newFee = parseInt(document.getElementById('editFee')?.value) || (newPatientType === 'new' ? 800 : 600);
+  const newPaid = parseInt(document.getElementById('editPaid')?.value) || 0;
+  
+  const oldPaid = currentTokenDoc.tokenPaid || 0;
+  const newDue = newFee - newPaid;
+  
+  try {
+    const tokenRef = db.collection('paymentHistories').doc(currentTokenId);
+    const tokenDoc = await tokenRef.get();
+    const existingData = tokenDoc.data();
+    
+    let paymentHistory = existingData.paymentHistory || [];
+    
+    // পেমেন্ট পরিবর্তন হলে ইতিহাসে যোগ করুন (serverTimestamp ছাড়া)
+    if (newPaid !== oldPaid) {
+      const difference = newPaid - oldPaid;
+      paymentHistory.push({
+        id: Date.now().toString(),
+        amount: Math.abs(difference),
+        type: difference > 0 ? 'payment' : 'refund',
+        method: 'নগদ',
+        previousPaid: oldPaid,
+        newPaid: newPaid,
+        note: difference > 0 ? `অতিরিক্ত পরিশোধ: ${difference} টাকা` : `ফেরত: ${Math.abs(difference)} টাকা`,
+        timestamp: new Date().toISOString(), // 🔥 serverTimestamp এর পরিবর্তে সাধারণ timestamp
+        createdBy: sessionStorage.getItem('adminEmail') || 'admin'
+      });
     }
     
-    const newName = document.getElementById('editName')?.value || '';
-    const newAge = document.getElementById('editAge')?.value || '';
-    const newPhone = document.getElementById('editPhone')?.value || '';
-    const newPatientType = document.getElementById('editPatientType')?.value || 'new';
-    const newFee = parseInt(document.getElementById('editFee')?.value) || (newPatientType === 'new' ? 800 : 600);
-    const newPaid = parseInt(document.getElementById('editPaid')?.value) || 0;
+    // ডকুমেন্ট আপডেট করুন
+    await tokenRef.update({
+      patientName: newName,
+      patientAge: newAge,
+      patientPhone: newPhone,
+      patientType: newPatientType,
+      tokenFee: newFee,
+      tokenPaid: newPaid,
+      tokenDue: newDue,
+      status: newDue === 0 ? 'paid' : 'due',
+      paymentHistory: paymentHistory,
+      lastUpdated: new Date().toISOString() // 🔥 serverTimestamp এর পরিবর্তে
+    });
     
-    const oldPaid = currentTokenDoc.tokenPaid || 0;
-    const newDue = newFee - newPaid;
-    
-    try {
-      // paymentHistories আপডেট করুন
-      await db.collection('paymentHistories').doc(currentTokenId).update({
-        patientName: newName,
-        patientAge: newAge,
-        patientPhone: newPhone,
-        patientType: newPatientType,
+    if (currentTokenDoc.appointmentId) {
+      await db.collection('appointments').doc(currentTokenDoc.appointmentId).update({
         tokenFee: newFee,
         tokenPaid: newPaid,
-        tokenDue: newDue,
-        status: newDue === 0 ? 'paid' : 'due',
-        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        lastTokenUpdate: new Date().toISOString()
       });
-      
-      // পেমেন্ট পরিবর্তন হলে নতুন এন্ট্রি তৈরি করুন
-      if (newPaid !== oldPaid) {
-        const difference = newPaid - oldPaid;
-        await db.collection('paymentHistories').add({
-          tokenNumber: currentTokenDoc.tokenNumber,
-          serial: currentTokenDoc.serial,
-          tokenDatePrefix: currentTokenDoc.tokenDatePrefix,
-          tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          patientName: newName,
-          patientAge: newAge,
-          patientPhone: newPhone,
-          patientType: newPatientType,
-          tokenFee: newFee,
-          tokenPaid: difference,
-          tokenDue: newDue,
-          amount: difference,
-          method: difference > 0 ? 'নগদ' : 'ফেরত',
-          type: difference > 0 ? 'payment' : 'refund',
-          note: difference > 0 ? `অতিরিক্ত পরিশোধ: ${difference} টাকা` : `ফেরত: ${Math.abs(difference)} টাকা`,
-          status: newDue === 0 ? 'paid' : 'due',
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          createdBy: sessionStorage.getItem('adminEmail') || 'admin'
-        });
-      }
-      
-      showAlert('টোকেন তথ্য আপডেট হয়েছে', 'success');
-      closeTokenModal();
-      loadTokenData();
-      
-    } catch (err) {
-      console.error('Save error:', err);
-      showAlert('সংরক্ষণ করতে সমস্যা হয়েছে: ' + err.message, 'error');
     }
+    
+    showAlert('✅ টোকেন তথ্য আপডেট হয়েছে', 'success');
+    closeTokenModal();
+    loadTokenData();
+    
+  } catch (err) {
+    console.error('Save error:', err);
+    showAlert('❌ সংরক্ষণ করতে সমস্যা হয়েছে: ' + err.message, 'error');
   }
+}
 
   function printToken() {
     if (!currentTokenDoc) return;
@@ -1284,83 +1350,445 @@ function printNewToken(tokenNumber, name, age, phone, patientType, fee, paid) {
     currentTokenId = null;
   }
 
-  // ==================== প্রিন্ট ফাংশন ====================
-  function printFilteredTokens() {
-    const tableRows = document.querySelectorAll('#tokenTableBody tr');
-    const tokens = [];
+// ==================== প্রিন্ট অপশন ফাংশন ====================
+function showPrintOptions() {
+  document.getElementById('printOptionsModal').style.display = 'flex';
+}
+
+function closePrintOptionsModal() {
+  document.getElementById('printOptionsModal').style.display = 'none';
+}
+
+function closeCardPrintModal() {
+  document.getElementById('cardPrintModal').style.display = 'none';
+}
+
+function closeTokenPrintModal() {
+  document.getElementById('tokenPrintModal').style.display = 'none';
+}
+
+// কার্ড প্রিন্ট ওপেন করুন (ফি অনুযায়ী কাউন্ট)
+async function openCardPrint() {
+  closePrintOptionsModal();
+  
+  // বর্তমান ফিল্টার থেকে টোকেন লোড করুন
+  const tokens = await getFilteredTokens();
+  
+  // ফি অনুযায়ী গণনা
+  const feeCount = {};
+  tokens.forEach(token => {
+    const fee = token.tokenFee || 0;
+    feeCount[fee] = (feeCount[fee] || 0) + 1;
+  });
+  
+  // সাজানো ফি
+  const sortedFees = Object.keys(feeCount).sort((a,b) => Number(b) - Number(a));
+  
+  let calculationHtml = '';
+  let totalAmount = 0;
+  
+  for (let fee of sortedFees) {
+    const count = feeCount[fee];
+    const subtotal = Number(fee) * count;
+    totalAmount += subtotal;
+    calculationHtml += `
+      <div class="token-detail-row">
+        <span class="token-detail-label">${toBengaliNumber(fee)} টাকা × ${toBengaliNumber(count)}টি</span>
+        <span class="token-detail-value">= ${toBengaliNumber(subtotal)} টাকা</span>
+      </div>
+    `;
+  }
+  
+  const html = `
+    <div class="token-detail">
+      <div class="token-detail-row" style="background:#f0fdf4; margin-bottom:10px;">
+        <span class="token-detail-label"><strong>📊 ফি সমারী</strong></span>
+        <span class="token-detail-value"><strong>মোট টোকেন: ${toBengaliNumber(tokens.length)}টি</strong></span>
+      </div>
+      ${calculationHtml}
+      <div class="token-detail-row" style="border-top:2px solid #333; margin-top:8px; padding-top:8px;">
+        <span class="token-detail-label"><strong>মোট প্রাপ্ত:</strong></span>
+        <span class="token-detail-value"><strong>${toBengaliNumber(totalAmount)} টাকা</strong></span>
+      </div>
+    </div>
     
-    tableRows.forEach(row => {
-      const cells = row.querySelectorAll('td');
-      if (cells.length >= 10 && cells[0]?.innerText !== 'কোনো টোকেন পাওয়া যায়নি') {
-        tokens.push({
-          tokenNumber: cells[1]?.innerText?.trim() || '—',
-          name: cells[3]?.innerText?.trim() || '—',
-          age: cells[4]?.innerText?.trim() || '—',
-          phone: cells[5]?.innerText?.trim() || '—',
-          type: cells[6]?.innerText?.trim() || '—',
-          fee: cells[7]?.innerText?.trim() || '—',
-          paid: cells[8]?.innerText?.trim() || '—',
-          due: cells[9]?.innerText?.trim() || '—'
-        });
-      }
+    <div class="token-detail" style="margin-top:15px;">
+      <div class="token-detail-row">
+        <span class="token-detail-label">➕ খরচ (Cost) যোগ করুন:</span>
+        <span class="token-detail-value">
+          <input type="number" id="costAmount" value="0" style="width:100%;" placeholder="খরচ টাকা">
+        </span>
+      </div>
+      <div class="token-detail-row">
+        <span class="token-detail-label">🔄 রিটার্ন (Return) যোগ করুন:</span>
+        <span class="token-detail-value">
+          <div id="returnItems">
+            <div class="return-item" style="display:flex; gap:8px; margin-bottom:8px;">
+              <input type="number" id="returnFee0" placeholder="ফি" style="width:45%; padding:6px;">
+              <input type="number" id="returnQty0" placeholder="পরিমাণ" style="width:35%; padding:6px;">
+              <button type="button" onclick="removeReturnItem(0)" style="background:#ef4444; color:white; border:none; border-radius:6px; width:30px;">✕</button>
+            </div>
+          </div>
+          <button type="button" onclick="addReturnItem()" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:5px 10px; margin-top:5px;">
+            <i class="fas fa-plus"></i> আরও যোগ করুন
+          </button>
+        </span>
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('cardPrintContent').innerHTML = html;
+  document.getElementById('cardPrintModal').style.display = 'flex';
+}
+
+let returnItemCount = 1;
+
+function addReturnItem() {
+  const container = document.getElementById('returnItems');
+  const newDiv = document.createElement('div');
+  newDiv.className = 'return-item';
+  newDiv.style.display = 'flex';
+  newDiv.style.gap = '8px';
+  newDiv.style.marginBottom = '8px';
+  newDiv.innerHTML = `
+    <input type="number" id="returnFee${returnItemCount}" placeholder="ফি" style="width:45%; padding:6px;">
+    <input type="number" id="returnQty${returnItemCount}" placeholder="পরিমাণ" style="width:35%; padding:6px;">
+    <button type="button" onclick="removeReturnItem(${returnItemCount})" style="background:#ef4444; color:white; border:none; border-radius:6px; width:30px;">✕</button>
+  `;
+  container.appendChild(newDiv);
+  returnItemCount++;
+}
+
+function removeReturnItem(id) {
+  const item = document.querySelector(`.return-item:has(#returnFee${id})`);
+  if (item) item.remove();
+}
+
+function generateCardPrint() {
+  // কারেন্ট টোকেন লিস্ট থেকে ফি কাউন্ট
+  const tokens = getFilteredTokensSync();
+  const feeCount = {};
+  tokens.forEach(token => {
+    const fee = token.tokenFee || 0;
+    feeCount[fee] = (feeCount[fee] || 0) + 1;
+  });
+  
+  const sortedFees = Object.keys(feeCount).sort((a,b) => Number(b) - Number(a));
+  let calculationRows = '';
+  let totalAmount = 0;
+  
+  for (let fee of sortedFees) {
+    const count = feeCount[fee];
+    const subtotal = Number(fee) * count;
+    totalAmount += subtotal;
+    calculationRows += `
+      <tr>
+        <td>${toBengaliNumber(fee)} টাকা</td>
+        <td style="text-align:center">× ${toBengaliNumber(count)}</td>
+        <td style="text-align:right">${toBengaliNumber(subtotal)} টাকা</td>
+      </tr>
+    `;
+  }
+  
+  // খরচ ও রিটার্ন ক্যালকুলেশন
+  const cost = parseInt(document.getElementById('costAmount')?.value) || 0;
+  
+  let returnTotal = 0;
+  let returnRows = '';
+  for (let i = 0; i < returnItemCount; i++) {
+    const feeInput = document.getElementById(`returnFee${i}`);
+    const qtyInput = document.getElementById(`returnQty${i}`);
+    if (feeInput && qtyInput && feeInput.value && qtyInput.value) {
+      const feeVal = parseInt(feeInput.value) || 0;
+      const qtyVal = parseInt(qtyInput.value) || 0;
+      const subtotal = feeVal * qtyVal;
+      returnTotal += subtotal;
+      returnRows += `
+        <tr>
+          <td>${toBengaliNumber(feeVal)} টাকা</td>
+          <td style="text-align:center">× ${toBengaliNumber(qtyVal)}</td>
+          <td style="text-align:right">${toBengaliNumber(subtotal)} টাকা</td>
+        </tr>
+      `;
+    }
+  }
+  
+  const netTotal = totalAmount - cost - returnTotal;
+  
+  const printHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>কার্ড প্রিন্ট</title>
+      <style>
+        @page { size: 80mm auto; margin: 5mm; }
+        body { font-family: 'Noto Sans Bengali', sans-serif; width: 80mm; margin: 0 auto; padding: 5px; font-size: 12px; }
+        .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 12px; }
+        .header h2 { font-size: 16px; margin: 0; color: #2563eb; }
+        .header p { font-size: 10px; margin: 3px 0 0; color: #666; }
+        table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+        td { padding: 5px 0; }
+        .total-row { border-top: 2px solid #333; margin-top: 5px; padding-top: 5px; font-weight: bold; }
+        .footer { text-align: center; font-size: 9px; margin-top: 15px; color: #999; border-top: 1px dashed #ccc; padding-top: 8px; }
+        hr { margin: 8px 0; border-color: #ddd; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
+        <p>ফি সমারী রিপোর্ট</p>
+        <p>${new Date().toLocaleDateString('bn-BD')}</p>
+      </div>
+      
+      <table>
+        <thead>
+          <tr><th style="text-align:left">ফি</th><th></th><th style="text-align:right">মোট</th></tr>
+        </thead>
+        <tbody>
+          ${calculationRows}
+        </tbody>
+      </table>
+      
+      <div style="margin: 8px 0;">
+        <div style="display:flex; justify-content:space-between;"><span>মোট প্রাপ্ত:</span><span>${toBengaliNumber(totalAmount)} টাকা</span></div>
+        ${cost > 0 ? `<div style="display:flex; justify-content:space-between; color:#ef4444;"><span>➖ খরচ:</span><span>${toBengaliNumber(cost)} টাকা</span></div>` : ''}
+        ${returnTotal > 0 ? `<div style="display:flex; justify-content:space-between; color:#f59e0b;"><span>➖ রিটার্ন:</span><span>${toBengaliNumber(returnTotal)} টাকা</span></div>` : ''}
+        <hr>
+        <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:14px;"><span>নিট পরিমাণ:</span><span>${toBengaliNumber(netTotal)} টাকা</span></div>
+      </div>
+      
+      ${returnRows ? `
+        <div style="margin-top:10px;">
+          <div style="background:#fef3c7; padding:5px; border-radius:5px;">
+            <strong>📋 রিটার্ন বিস্তারিত:</strong>
+            <table style="margin-top:5px">
+              ${returnRows}
+            </table>
+          </div>
+        </div>
+      ` : ''}
+      
+      <div class="footer">
+        প্রিন্টের তারিখ: ${new Date().toLocaleString('bn-BD')}
+      </div>
+      <div class="no-print" style="text-align:center; margin-top:15px;">
+        <button onclick="window.print()" style="padding:8px 16px; background:#2563eb; color:white; border:none; border-radius:6px;">🖨️ প্রিন্ট করুন</button>
+      </div>
+      <script>window.onload = function() { setTimeout(() => window.print(), 300); }<\/script>
+    </body>
+    </html>
+  `;
+  
+  const win = window.open('', '_blank');
+  win.document.write(printHtml);
+  win.document.close();
+  closeCardPrintModal();
+}
+
+// টোকেন প্রিন্ট (POS প্রিন্টার এর জন্য - 80mm রোল পেপার)
+function openTokenPrint() {
+  closePrintOptionsModal();
+  document.getElementById('tokenPrintModal').style.display = 'flex';
+}
+
+async function generateTokenPrint() {
+  console.log("generateTokenPrint started");
+  
+  // 🔥 নিশ্চিত করুন ভেরিয়েবল গুলোর মান ঠিক আছে
+  const startTokenIdInput = document.getElementById('startTokenId');
+  const endTokenIdInput = document.getElementById('endTokenId');
+  
+  let startTokenId = startTokenIdInput ? startTokenIdInput.value : '';
+  let endTokenId = endTokenIdInput ? endTokenIdInput.value : '';
+  
+  console.log("Start Token:", startTokenId, "End Token:", endTokenId);
+  
+  // 🔥 ফ্রেশ ডাটা লোড করুন
+  const allTokens = await getFilteredTokens();
+  console.log("Total tokens found:", allTokens.length);
+  
+  if (allTokens.length === 0) {
+    showAlert('❌ কোনো টোকেন পাওয়া যায়নি! দয়া করে ফিল্টার চেক করুন।', 'warning');
+    closeTokenPrintModal();
+    return;
+  }
+  
+  // 🔥 টোকেন ফিল্টার - খালি থাকলে সব টোকেন দেখাবে
+  let filteredTokens = [...allTokens]; // কপি তৈরি করুন
+  
+  if (startTokenId && startTokenId.trim() !== '' && endTokenId && endTokenId.trim() !== '') {
+    // দুইটা আইডি দেওয়া থাকলে রেঞ্জ ফিল্টার
+    filteredTokens = allTokens.filter(t => {
+      const tokenId = t.tokenNumber || '';
+      return tokenId >= startTokenId.trim() && tokenId <= endTokenId.trim();
     });
+    console.log("After range filter:", filteredTokens.length);
     
-    if (tokens.length === 0) {
-      showAlert('প্রিন্ট করার মতো কোনো টোকেন নেই!', 'warning');
+    if (filteredTokens.length === 0) {
+      showAlert(`⚠️ "${startTokenId}" থেকে "${endTokenId}" এর মধ্যে কোনো টোকেন নেই!`, 'warning');
       return;
     }
-    
-    const printHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>টোকেন প্রিন্ট</title>
-        <style>
-          @page { size: 80mm auto; margin: 0; }
-          body { font-family: 'Noto Sans Bengali', sans-serif; width: 80mm; margin: 0 auto; padding: 10px; }
-          .print-header { text-align: center; margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
-          .print-header h2 { font-size: 16px; margin: 0; }
-          .print-header p { font-size: 11px; margin: 5px 0 0; color: #666; }
-          .print-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-          .token-card { border: 1px solid #2563eb; border-radius: 6px; padding: 8px; text-align: center; font-size: 10px; page-break-inside: avoid; }
-          .token-card .token-num { font-size: 12px; font-weight: bold; color: #2563eb; background: #e0e7ff; padding: 2px 6px; border-radius: 12px; display: inline-block; margin-bottom: 6px; }
-          .token-card .name { font-weight: bold; margin: 5px 0; font-size: 11px; }
-          .token-card hr { margin: 6px 0; border-color: #ddd; }
-          .footer { text-align: center; font-size: 8px; margin-top: 15px; color: #999; }
-          @media print { body { margin: 0; padding: 5px; } .no-print { display: none; } }
-        </style>
-      </head>
-      <body>
-        <div class="print-header">
-          <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
-          <p>টোকেন তালিকা - ${new Date().toLocaleDateString('bn-BD')}</p>
-        </div>
-        <div class="print-grid">
-          ${tokens.map(t => `
-            <div class="token-card">
-              <div class="token-num">${escapeHtml(t.tokenNumber)}</div>
-              <div class="name">${escapeHtml(t.name.slice(0, 15))}</div>
-              <div>বয়স: ${t.age} | ${t.type}</div>
-              <div>ফি: ${t.fee} | পরিশোধ: ${t.paid}</div>
-              <hr>
-              <div style="font-size: 8px;">সিরিয়াল: ${t.tokenNumber.split('-').pop()}</div>
-            </div>
-          `).join('')}
-        </div>
-        <div class="footer">মোট টোকেন: ${tokens.length}টি | প্রিন্টের তারিখ: ${new Date().toLocaleString('bn-BD')}</div>
-        <div class="no-print" style="text-align:center; margin-top:20px;">
-          <button onclick="window.print()" style="padding:10px 20px; background:#2563eb; color:white; border:none; border-radius:8px;">🖨️ প্রিন্ট করুন</button>
-        </div>
-        <script>window.onload = function() { setTimeout(() => window.print(), 300); }<\/script>
-      </body>
-      </html>
-    `;
-    
-    const win = window.open('', '_blank');
-    win.document.write(printHtml);
-    win.document.close();
+  } else {
+    // 🔥 এটাই মূল অংশ: startTokenId বা endTokenId খালি থাকলে সব টোকেন প্রিন্ট হবে
+    console.log("No token range provided - printing all", filteredTokens.length, "tokens");
+    if (startTokenId || endTokenId) {
+      showAlert('⚠️ টোকেন রেঞ্জের জন্য দুটি আইডি প্রয়োজন। সব টোকেন প্রিন্ট হচ্ছে।', 'info');
+    }
   }
+  
+  // প্রিন্ট HTML তৈরি করুন (নিচের কোড আগের মতোই থাকবে)
+  const printHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>টোকেন প্রিন্ট</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        @page { size: 80mm auto; margin: 0; }
+        body { 
+          font-family: 'Noto Sans Bengali', monospace;
+          width: 80mm;
+          margin: 0 auto;
+          padding: 3mm 2mm;
+          font-size: 11px;
+        }
+        .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 5px; }
+        .header h2 { font-size: 14px; margin: 0; }
+        .divider { border-top: 1px dashed #000; margin: 5px 0; }
+        .filter-info { 
+          font-size: 9px; 
+          margin-bottom: 8px; 
+          padding: 4px; 
+          background: #f0f0f0; 
+          text-align: center;
+          border-radius: 4px;
+        }
+        table { width: 100%; border-collapse: collapse; margin: 5px 0; }
+        th { 
+          background: #ddd; 
+          padding: 5px 3px; 
+          font-size: 10px; 
+          border: 1px solid #999;
+          text-align: center;
+        }
+        td { 
+          border: 1px solid #ccc; 
+          padding: 4px 3px; 
+          font-size: 10px; 
+          text-align: center;
+        }
+        .total-row { background: #ddd; font-weight: bold; }
+        .total-row td { font-weight: bold; padding: 6px; }
+        .footer { 
+          text-align: center; 
+          font-size: 8px; 
+          margin-top: 8px; 
+          border-top: 1px dashed #000; 
+          padding-top: 5px;
+        }
+        @media print {
+          body { margin: 0; padding: 2mm; }
+          .no-print { display: none; }
+          th { background: #ddd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .total-row { background: #ddd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
+        <p>টোকেন তালিকা</p>
+      </div>
+      
+      <div class="filter-info">
+        📅 ${document.getElementById('dateFrom')?.value || 'সব'} থেকে ${document.getElementById('dateTo')?.value || 'সব'}<br>
+        🎫 মোট টোকেন: <strong>${toBengaliNumber(filteredTokens.length)}টি</strong>
+        ${startTokenId && endTokenId && startTokenId.trim() && endTokenId.trim() ? `<br>🔢 টোকেন রেঞ্জ: ${startTokenId} - ${endTokenId}` : '<br>📌 সব টোকেন দেখানো হচ্ছে'}
+      </div>
+      
+      <table>
+        <thead>
+          <tr>
+            <th style="width:35%">টোকেন নং</th>
+            <th style="width:45%">রোগীর নাম</th>
+            <th style="width:20%">বয়স</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredTokens.map(t => {
+            let ageText = t.patientAge || '—';
+            if (ageText !== '—' && ageText !== '' && !ageText.toString().includes('বছর')) {
+              ageText = ageText + 'বছর';
+            }
+            return `
+              <tr>
+                <td style="font-size:9px; font-weight:bold;">${t.tokenNumber || '—'}</td>
+                <td style="text-align:center;">${escapeHtml((t.patientName || '—').substring(0, 18))}</td>
+                <td style="font-size:9px;">${ageText}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+      
+      <div class="footer">
+        প্রিন্ট সময়: ${new Date().toLocaleString('bn-BD')}<br>
+        ধন্যবাদ 🙏 সুস্থ থাকুন
+      </div>
+      
+      <div class="no-print" style="text-align:center; margin-top:15px;">
+        <button onclick="window.print()" style="padding:10px 25px; background:#2563eb; color:white; border:none; border-radius:5px; cursor:pointer; font-size:12px;">
+          🖨️ প্রিন্ট করুন
+        </button>
+        <button onclick="window.close()" style="padding:10px 25px; background:#ef4444; color:white; border:none; border-radius:5px; cursor:pointer; margin-left:10px; font-size:12px;">
+          ✖ বন্ধ করুন
+        </button>
+      </div>
+      
+      <script>
+        window.onload = function() { 
+          setTimeout(function() { 
+            window.print(); 
+          }, 500);
+        };
+      <\/script>
+    </body>
+    </html>
+  `;
+  
+  // নতুন উইন্ডোতে প্রিন্ট করুন
+  const win = window.open('', '_blank');
+  if (!win) {
+    showAlert('❌ পপ-আপ ব্লকার চালু আছে! দয়া করে পপ-আপ অনুমতি দিন।', 'error');
+    return;
+  }
+  
+  win.document.write(printHtml);
+  win.document.close();
+  closeTokenPrintModal();
+  
+  // সাফল্যের মেসেজ
+  if (startTokenId && endTokenId && startTokenId.trim() && endTokenId.trim()) {
+    showAlert(`✅ ${filteredTokens.length}টি টোকেন প্রিন্ট হচ্ছে (${startTokenId} - ${endTokenId})`, 'success');
+  } else {
+    showAlert(`✅ সব ${filteredTokens.length}টি টোকেন প্রিন্ট হচ্ছে`, 'success');
+  }
+}
+
+// 🔥 print এর জন্য হেল্পার ফাংশন (খুব সিম্পল)
+async function getFilteredTokens() {
+  if (window.cachedTokens) {
+    return window.cachedTokens;
+  }
+  await loadTokenData();
+  return window.cachedTokens || [];
+}
+
+function getFilteredTokensSync() {
+  return window.cachedTokens || [];
+}
 
   function syncMobileFilters() {
     const mDateFrom = document.getElementById('dateFromMobile');

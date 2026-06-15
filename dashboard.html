@@ -1008,7 +1008,7 @@
       padding: 25px;
       border-radius: 12px;
       width: 90%;
-      max-width: 500px;
+      max-width: 600px;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
       position: relative;
       max-height: 85vh;
@@ -1143,6 +1143,8 @@
     .cancel-btn-modal:hover {
       background-color: #4b5563;
     }
+
+
 
     /* ======================================================== */
     /* মোবাইল রেসপনসিভ */
@@ -1628,6 +1630,9 @@ if (!checkAuthentication()) {
     
     // Grid System Instance
     let gridSystem = null;
+    let currentTokenId = null;      
+    let currentTokenDoc = null;     
+    let cleanupListeners = null; 
     
     try {
       const app = firebase.initializeApp(firebaseConfig);
@@ -2703,17 +2708,30 @@ if (tokenBtn) {
     // টোকেন বিস্তারিত মোডাল দেখানো (নতুন ফিচার)
     // =======================================================
     async function showTokenDetailsModal(button) {
-      const docId = button.getAttribute('data-id');
-      const doc = await db.collection('appointments').doc(docId).get();
-      const data = doc.data();
-      
-      currentTokenId = docId;
-      currentTokenData = { id: docId, ...data };
-      
-      const defaultFee = data.patientType === 'new' ? 800 : 600;
-      const currentFee = data.tokenFee || defaultFee;
-      const currentPaid = data.tokenPaid || 0;
-      const due = currentFee - currentPaid;
+  const docId = button.getAttribute('data-id');
+  const doc = await db.collection('appointments').doc(docId).get();
+  const data = doc.data();
+  
+  currentTokenId = docId;
+  
+  // 🔥 চেক করুন paymentHistories-এ এই appointmentId আছে কিনা
+  let existingToken = null;
+  const existingTokenQuery = await db.collection('paymentHistories')
+    .where('appointmentId', '==', docId)
+    .limit(1)
+    .get();
+  
+  if (!existingTokenQuery.empty) {
+    existingToken = { id: existingTokenQuery.docs[0].id, ...existingTokenQuery.docs[0].data() };
+    currentTokenDoc = existingToken;
+  } else {
+    currentTokenDoc = { id: docId, ...data };
+  }
+  
+  const defaultFee = data.patientType === 'new' ? 800 : 600;
+  const currentFee = existingToken?.tokenFee || data.tokenFee || defaultFee;
+  const currentPaid = existingToken?.tokenPaid || data.tokenPaid || 0;
+  const due = currentFee - currentPaid;
       
       const paymentHistory = data.paymentHistory || [];
       
@@ -2802,89 +2820,282 @@ if (tokenBtn) {
   }
 }
     
+
 async function saveAndPrintToken() {
-  if (!currentTokenId) return;
+  if (!currentTokenId) {
+    showAlert('টোকেন তথ্য পাওয়া যায়নি', 'error');
+    return;
+  }
   
   const name = document.getElementById('tokenName')?.value || '';
   const age = document.getElementById('tokenAge')?.value || '';
   const patientType = document.getElementById('tokenType')?.value;
   const fee = parseInt(document.getElementById('tokenFee')?.value) || (patientType === 'new' ? 800 : 600);
   const paid = parseInt(document.getElementById('tokenPaid')?.value) || 0;
+  const givenBy = document.getElementById('tokenGivenBy')?.value;
   
   try {
-    // 🔥 আজকের সর্বশেষ সিরিয়াল দেখে টোকেন নাম্বার জেনারেট করুন
-    const today = new Date();
-    const yy = String(today.getFullYear()).slice(-2);
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const datePrefix = `${yy}${mm}${dd}`;
+    const appointmentDoc = await db.collection('appointments').doc(currentTokenId).get();
+    const appointmentData = appointmentDoc.data();
+    const originalSerial = appointmentData.serial;
     
-    const paymentHistoriesRef = db.collection('paymentHistories');
-    const todayTokensQuery = await paymentHistoriesRef
-      .where('tokenDatePrefix', '==', datePrefix)
-      .orderBy('serial', 'desc')
+    const existingTokenQuery = await db.collection('paymentHistories')
+      .where('appointmentId', '==', currentTokenId)
       .limit(1)
       .get();
     
-    let lastSerial = 0;
-    if (!todayTokensQuery.empty) {
-      lastSerial = todayTokensQuery.docs[0].data().serial || 0;
+    let tokenNumber;
+    
+    if (!existingTokenQuery.empty) {
+      // Update existing token
+      const existingDoc = existingTokenQuery.docs[0];
+      tokenNumber = existingDoc.data().tokenNumber;
+      const existingData = existingDoc.data();
+      let paymentHistory = existingData.paymentHistory || [];
+      
+      const oldPaid = existingData.tokenPaid || 0;
+      if (paid !== oldPaid) {
+        const difference = paid - oldPaid;
+        paymentHistory.push({
+          id: Date.now().toString(),
+          amount: Math.abs(difference),
+          type: difference > 0 ? 'payment' : 'refund',
+          method: 'নগদ',
+          previousPaid: oldPaid,
+          newPaid: paid,
+          note: difference > 0 ? ` পেমেন্ট: ${difference} টাকা` : ` ফেরত: ${Math.abs(difference)} টাকা`,
+          timestamp: new Date().toISOString(),
+          createdBy: sessionStorage.getItem('adminEmail') || 'admin',
+          source: 'dashboard'
+        });
+      }
+      
+      await db.collection('paymentHistories').doc(existingDoc.id).update({
+        patientName: name,
+        patientAge: age,
+        patientType: patientType,
+        tokenFee: fee,
+        tokenPaid: paid,
+        tokenDue: fee - paid,
+        status: (fee - paid) === 0 ? 'paid' : 'due',
+        paymentHistory: paymentHistory,
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      
+      showAlert(`✅ টোকেন ${tokenNumber} আপডেট করা হয়েছে!`, 'success');
+      
+    } else {
+      const today = new Date();
+      const yy = String(today.getFullYear()).slice(-2);
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const datePrefix = `${yy}${mm}${dd}`;
+      
+      // 🔥 শুধু where ব্যবহার করবো, orderBy ছাড়া
+      const allTokensQuery = await db.collection('paymentHistories')
+        .where('tokenDatePrefix', '==', datePrefix)
+        .get();
+      
+      // জাভাস্ক্রিপ্টে সাজানো
+      let maxCounter = 0;
+      allTokensQuery.forEach(doc => {
+        const data = doc.data();
+        const counter = data.tokenCounter || 0;
+        if (counter > maxCounter) maxCounter = counter;
+      });
+      
+      const newTokenSerial = maxCounter + 1;
+      const padding = newTokenSerial >= 100 ? 3 : 2;
+      tokenNumber = `T-${datePrefix}-${String(newTokenSerial).padStart(padding, '0')}`;
+      
+      const initialPaymentHistory = [{
+        id: Date.now().toString(),
+        amount: paid,
+        type: 'payment',
+        method: 'নগদ',
+        note: `টোকেন প্রদান - ${tokenNumber}`,
+        timestamp: new Date().toISOString(),
+        createdBy: sessionStorage.getItem('adminEmail') || 'admin',
+        source: 'dashboard'
+      }];
+      
+      await db.collection('paymentHistories').add({
+        tokenNumber: tokenNumber,
+        tokenCounter: newTokenSerial,
+        tokenDatePrefix: datePrefix,
+        tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        patientName: name,
+        patientAge: age,
+        patientPhone: appointmentData.phone || '',
+        patientType: patientType,
+        tokenFee: fee,
+        tokenPaid: paid,
+        tokenDue: fee - paid,
+        amount: paid,
+        method: 'নগদ',
+        type: 'payment',
+        note: `টোকেন প্রদান - ${tokenNumber}`,
+        status: (fee - paid) === 0 ? 'paid' : 'due',
+        paymentHistory: initialPaymentHistory,
+        source: 'dashboard',
+        givenBy: givenBy, 
+        reference: givenBy,
+        appointmentId: currentTokenId,
+        serial: originalSerial,
+        appointmentSerial: originalSerial,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: sessionStorage.getItem('adminEmail') || 'admin'
+      });
+      
+      showAlert(`✅ টোকেন ${tokenNumber} তৈরি! (সিরিয়াল: ${originalSerial})`, 'success');
     }
     
-    const newSerial = lastSerial + 1;
-    const finalTokenNumber = `T-${datePrefix}-${String(newSerial).padStart(2, '0')}`;
-    
-    // 🔥 paymentHistories এ টোকেন সেভ করুন
-    await db.collection('paymentHistories').add({
-      tokenNumber: finalTokenNumber,
-      serial: newSerial,
-      tokenDatePrefix: datePrefix,
-      tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
-      
-      patientName: name,
-      patientAge: age,
-      patientPhone: document.getElementById('tokenPhone')?.value || '',
-      patientType: patientType,
-      
-      tokenFee: fee,
-      tokenPaid: paid,
-      tokenDue: fee - paid,
-      
-      amount: paid,
-      method: 'নগদ',
-      type: 'payment',
-      note: `টোকেন প্রদান - ${finalTokenNumber}`,
-      
-      status: (fee - paid) === 0 ? 'paid' : 'due',
-      
-      source: 'dashboard',  // 🔥 উৎস: ড্যাশবোর্ড
-      
-      appointmentId: currentTokenId,  // appointments ডকের সাথে সম্পর্ক
-      
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      createdBy: sessionStorage.getItem('adminEmail') || 'admin'
-    });
-    
-    // 🔥 appointments আপডেট করুন (টোকেন তথ্য)
     await db.collection('appointments').doc(currentTokenId).update({
       tokenGiven: true,
-      tokenNumber: finalTokenNumber,
+      tokenNumber: tokenNumber,
       tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
       tokenFee: fee,
       tokenPaid: paid,
       lastTokenUpdate: firebase.firestore.FieldValue.serverTimestamp()
     });
     
-    showAlert(`✅ টোকেন ${finalTokenNumber} সফলভাবে দেওয়া হয়েছে!`, 'success');
     closeTokenModal();
+    printTokenReceipt(tokenNumber, name, age, patientType, fee, paid);
     
-    // প্রিন্ট করুন
-    printTokenReceipt(finalTokenNumber, name, age, patientType, fee, paid);
+    if (allAppointmentsSnapshot) {
+      renderAppointments();
+      updateDashboardCards(allAppointmentsSnapshot);
+    }
     
   } catch (error) {
     console.error("❌ Error saving token:", error);
-    showAlert("সংরক্ষণ করতে সমস্যা হয়েছে", "error");
+    showAlert("সংরক্ষণ করতে সমস্যা হয়েছে: " + error.message, "error");
   }
+}
+
+async function showTokenDetailsModal(button) {
+  const docId = button.getAttribute('data-id');
+  const doc = await db.collection('appointments').doc(docId).get();
+  const data = doc.data();
+  
+  currentTokenId = docId;
+  
+  // paymentHistories থেকে টোকেন ডাটা নিন
+  let existingToken = null;
+  let paymentHistory = [];
+  
+  const existingTokenQuery = await db.collection('paymentHistories')
+    .where('appointmentId', '==', docId)
+    .limit(1)
+    .get();
+  
+  if (!existingTokenQuery.empty) {
+    existingToken = { id: existingTokenQuery.docs[0].id, ...existingTokenQuery.docs[0].data() };
+    currentTokenDoc = existingToken;
+    paymentHistory = existingToken.paymentHistory || [];
+  } else {
+    currentTokenDoc = { id: docId, ...data };
+  }
+  
+  const defaultFee = data.patientType === 'new' ? 800 : 600;
+  const currentFee = existingToken?.tokenFee || data.tokenFee || defaultFee;
+  const currentPaid = existingToken?.tokenPaid || data.tokenPaid || 0;
+  const due = currentFee - currentPaid;
+  
+  // পেমেন্ট ইতিহাস HTML তৈরি করুন
+  let paymentHistoryHtml = '';
+  if (paymentHistory.length > 0) {
+    const sortedHistory = [...paymentHistory].reverse();
+    const paymentItems = sortedHistory.map(p => {
+      let dateText = 'তারিখ নেই';
+      if (p.timestamp) {
+        try {
+          const date = new Date(p.timestamp);
+          dateText = date.toLocaleString('bn-BD', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        } catch(e) {
+          dateText = p.timestamp;
+        }
+      }
+      
+      return `
+        <div class="payment-item" style="background: ${p.type === 'payment' ? '#dbeafe' : '#fed7aa'}; padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+          <div><strong>📅 ${dateText}</strong></div>
+          <div>💰 পরিমাণ: ${toBengaliNumber(p.amount)} টাকা</div>
+          <div>💳 পদ্ধতি: ${p.method || 'নগদ'}</div>
+          <div>📝 ধরন: ${p.type === 'payment' ? 'পেমেন্ট' : 'ফেরত'}</div>
+          ${p.note ? `<div>📝 নোট: ${p.note}</div>` : ''}
+          <div style="font-size: 11px; color: #6b7280; margin-top: 5px;">
+            পূর্বের পরিশোধ: ${toBengaliNumber(p.previousPaid)} → নতুন: ${toBengaliNumber(p.newPaid)}
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    paymentHistoryHtml = `
+      <div class="payment-history">
+        <h4>💳 পেমেন্ট ইতিহাস (${paymentHistory.length}টি):</h4>
+        <div style="max-height: 300px; overflow-y: auto;">
+          ${paymentItems}
+        </div>
+      </div>
+    `;
+  } else {
+    paymentHistoryHtml = '<div class="payment-history"><p style="color:#9ca3af; padding: 20px; text-align: center;">📭 কোনো পেমেন্ট ইতিহাস নেই</p></div>';
+  }
+  
+  const modalHtml = `
+    <div class="token-modal-overlay" id="tokenModalOverlay">
+      <div class="token-modal-container">
+        <div class="token-modal-header">
+          <h3><i class="fas fa-ticket-alt"></i> টোকেন বিস্তারিত</h3>
+          <button class="token-modal-close" onclick="closeTokenModal()">&times;</button>
+        </div>
+        <div class="token-modal-body">
+          <div class="token-form-group">
+            <label>রোগীর নাম</label>
+            <input type="text" id="tokenName" value="${(data.name || '').replace(/"/g, '&quot;')}" placeholder="রোগীর নাম">
+          </div>
+          <div class="token-form-group">
+            <label>বয়স</label>
+            <input type="text" id="tokenAge" value="${getAgeDisplay(data)}" placeholder="বয়স">
+          </div>
+          <div class="token-form-group">
+            <label>রোগীর ধরন</label>
+            <select id="tokenType" onchange="updateFeeByPatientType(this.value)">
+              <option value="new" ${data.patientType === 'new' ? 'selected' : ''}>নতুন রোগী</option>
+              <option value="old" ${data.patientType === 'old' ? 'selected' : ''}>পুরাতন রোগী</option>
+            </select>
+          </div>
+          <div class="token-form-group">
+            <label>ফি (টাকা)</label>
+            <input type="number" id="tokenFee" value="${currentFee}" placeholder="ফি" oninput="updateDueAmount()">
+          </div>
+          <div class="token-form-group">
+            <label>পরিশোধিত টাকা</label>
+            <input type="number" id="tokenPaid" value="${currentPaid}" placeholder="পরিশোধিত টাকা" oninput="updateDueAmount()">
+            <div class="due-amount" id="dueAmount">বাকি: ${due} টাকা</div>
+          </div>
+         <div class="token-form-group">
+          <label>রেফারেন্স</label>
+          <input type="text" id="tokenGivenBy" placeholder="রেফারেন্স নাম লিখুন" style="width:100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+         </div>
+          ${paymentHistoryHtml} <!-- ✅ পেমেন্ট ইতিহাস দেখান -->
+        </div>
+        <div class="token-modal-actions">
+          <button class="btn-save-print" onclick="saveAndPrintToken()"><i class="fas fa-save"></i> সংরক্ষণ ও প্রিন্ট</button>
+          <button class="btn-cancel-modal" onclick="closeTokenModal()"><i class="fas fa-times"></i> বাতিল</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
 function printTokenReceipt(tokenNumber, name, age, patientType, fee, paid) {
@@ -2908,7 +3119,7 @@ function printTokenReceipt(tokenNumber, name, age, patientType, fee, paid) {
     </head>
     <body>
       <div class="card">
-        <div class="header"><h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2><p>টোকেন নাম্বার</p></div>
+        <div class="header"><h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2></div>
         <div class="token-num">${tokenNumber}</div>
         <div class="info-row"><span>রোগীর নাম:</span><span>${name || '—'}</span></div>
         <div class="info-row"><span>বয়স:</span><span>${age || '—'}</span></div>
@@ -3151,8 +3362,14 @@ async function loadSerialRanges() {
         if (gridSystem) {
           gridSystem.setCurrentPatientIndex(activeIndex);
           updateAllSerialDisplays();
-        }
-      },
+
+         setTimeout(() => {
+            if (gridSystem && gridSystem.updateGrid) {
+                gridSystem.updateGrid();
+            }
+        }, 50);
+    }
+},
       
       onGridUpdate: function(type, data) {
         console.log(`Grid updated: ${type}`, data);
