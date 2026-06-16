@@ -3666,29 +3666,28 @@ async function addQuickSerial() {
     const elapsed = Date.now() - startTime;
     console.log(`✅ বুকিং সম্পন্ন: ${elapsed}ms`);
 
-   // ==================== 📲 SMS Integration in Dashboard ====================
+   // ==================== SMS Integration (PHP) ====================
 if (!skipPhone && phone) {
-  // প্রতিটি রোগীর জন্য আলাদা এসএমএস
   for (let i = 0; i < allPatients.length; i++) {
     try {
       const smsPayload = {
         phone: phone,
-        name: allPatients[i].name || "রোগী",
+        name: allPatients[i].name || "Patient",
         serial: selectedSerials[i],
         date: appointmentDateInfo.displayDate || ""
       };
 
-      const response = await fetch('/.netlify/functions/send-sms', {
+      const response = await fetch('/api/send-sms.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(smsPayload),
       });
       
       const result = await response.json();
-      console.log(`📲 রোগী ${i + 1} এর এসএমএস:`, result);
+      console.log(`📲 রোগী ${i+1} এর এসএমএস:`, result);
       
-    } catch (smsError) {
-      console.error(`❌ রোগী ${i + 1} এর এসএমএস ত্রুটি:`, smsError);
+    } catch (error) {
+      console.error(`❌ রোগী ${i+1} এর এসএমএস ত্রুটি:`, error);
     }
   }
 }

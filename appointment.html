@@ -1532,17 +1532,17 @@
         await db.collection('appointments').add(appointmentData);
         currentAppointmentData = appointmentData;
 
-        // ==================== SMS Integration (Corrected) ====================
+        // ==================== SMS Integration (PHP) ====================
 try {
   const smsPayload = {
     phone: appointmentData.phone,
-    name: appointmentData.name || "রোগী",
+    name: appointmentData.name || "Patient",
     serial: appointmentData.serial,
     date: nextDateInfo.banglaDate || ""
   };
 
-  // ✅ Netlify ফাংশনে রিকোয়েস্ট
-  const response = await fetch('/.netlify/functions/send-sms', {
+  // ✅ PHP API তে রিকোয়েস্ট
+  const response = await fetch('/api/send-sms.php', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1553,14 +1553,13 @@ try {
   const result = await response.json();
   
   if (result.success) {
-    console.log("✅ এসএমএস সফলভাবে পাঠানো হয়েছে:", result.sent_to);
+    console.log("✅ এসএমএস সফল! স্ট্যাটাস:", result.status);
   } else {
-    console.warn("⚠️ এসএমএস পাঠাতে সমস্যা:", result);
+    console.warn("⚠️ এসএমএস সমস্যা:", result.error);
   }
   
-} catch (smsError) {
-  console.error("❌ এসএমএস ত্রুটি:", smsError);
-  // ইউজারকে দেখাবেন না, শুধু কনসোলে লগ রাখুন
+} catch (error) {
+  console.error("❌ এসএমএস ত্রুটি:", error);
 }
 // =====================================================================
 
