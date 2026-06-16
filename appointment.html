@@ -1532,31 +1532,37 @@
         await db.collection('appointments').add(appointmentData);
         currentAppointmentData = appointmentData;
 
-        // ==================== Netlify Serverless SMS Integration ====================
-        try {
-          const smsPayload = {
-            phone: appointmentData.phone,
-            name: appointmentData.name || "রোগী",
-            serial: appointmentData.serial,
-            date: nextDateInfo.banglaDate || ""
-          };
+        // ==================== SMS Integration (Corrected) ====================
+try {
+  const smsPayload = {
+    phone: appointmentData.phone,
+    name: appointmentData.name || "রোগী",
+    serial: appointmentData.serial,
+    date: nextDateInfo.banglaDate || ""
+  };
 
-          // আপনার নেটলিফাই ফাংশনের এন্ডপয়েন্টে রিকোয়েস্ট পাঠানো হচ্ছে
-          fetch('/.netlify/functions/send-sms', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(smsPayload),
-          })
-          .then(res => res.json())
-          .then(data => console.log("📲 SMS Sent via Netlify:", data))
-          .catch(err => console.error("❌ Netlify SMS Fetch Error:", err));
-
-        } catch (smsError) {
-          console.error("❌ SMS Section Error:", smsError);
-        }
-        // =====================================================================
+  // ✅ Netlify ফাংশনে রিকোয়েস্ট
+  const response = await fetch('/.netlify/functions/send-sms', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(smsPayload),
+  });
+  
+  const result = await response.json();
+  
+  if (result.success) {
+    console.log("✅ এসএমএস সফলভাবে পাঠানো হয়েছে:", result.sent_to);
+  } else {
+    console.warn("⚠️ এসএমএস পাঠাতে সমস্যা:", result);
+  }
+  
+} catch (smsError) {
+  console.error("❌ এসএমএস ত্রুটি:", smsError);
+  // ইউজারকে দেখাবেন না, শুধু কনসোলে লগ রাখুন
+}
+// =====================================================================
 
         showPopup('success', 'অ্যাপয়েন্টমেন্ট সফল হয়েছে!', 
           `আপনি চাইলে নিচের থেকে কনফার্মেশন স্লিপ ডাউনলোড করতে পারেন!<br><br>

@@ -3666,36 +3666,33 @@ async function addQuickSerial() {
     const elapsed = Date.now() - startTime;
     console.log(`✅ বুকিং সম্পন্ন: ${elapsed}ms`);
 
-    // ==================== 📲 Netlify Serverless SMS Integration ====================
-    // ফায়ারবেসে সফলভাবে সেভ হবার পর এবং "ফোন ছাড়া বুকিং" না করা থাকলে মেসেজ যাবে
-    if (!skipPhone && phone) {
-      allPatients.forEach((patient, index) => {
-        try {
-          const smsPayload = {
-            phone: phone,
-            name: patient.name || "রোগী",
-            serial: selectedSerials[index],
-            date: appointmentDateInfo.displayDate || "" // আপনার ফাংশনের রিয়েল ডিসপ্লে ডেট ফরম্যাট
-          };
+   // ==================== 📲 SMS Integration in Dashboard ====================
+if (!skipPhone && phone) {
+  // প্রতিটি রোগীর জন্য আলাদা এসএমএস
+  for (let i = 0; i < allPatients.length; i++) {
+    try {
+      const smsPayload = {
+        phone: phone,
+        name: allPatients[i].name || "রোগী",
+        serial: selectedSerials[i],
+        date: appointmentDateInfo.displayDate || ""
+      };
 
-          // নেটলিফাই ব্যাকএন্ড ফাংশন হিট
-          fetch('/.netlify/functions/send-sms', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(smsPayload),
-          })
-          .then(res => res.json())
-          .then(data => console.log(`📲 Patient ${index + 1} SMS Status:`, data))
-          .catch(err => console.error(`❌ Patient ${index + 1} SMS Fetch Error:`, err));
-
-        } catch (smsError) {
-          console.error("❌ Indivual Patient SMS Logic Error:", smsError);
-        }
+      const response = await fetch('/.netlify/functions/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(smsPayload),
       });
+      
+      const result = await response.json();
+      console.log(`📲 রোগী ${i + 1} এর এসএমএস:`, result);
+      
+    } catch (smsError) {
+      console.error(`❌ রোগী ${i + 1} এর এসএমএস ত্রুটি:`, smsError);
     }
-    // =============================================================================
+  }
+}
+// =============================================================================
     
     showAlert(`✅ ${allPatients.length} জন রোগী সফলভাবে বুক হয়েছে!\n📞 ফোন: ${phone || 'ছাড়া'}\n🎫 সিরিয়াল: ${selectedSerials.join(', ')}`, 'success');
     
