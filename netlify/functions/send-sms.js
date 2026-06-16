@@ -50,15 +50,37 @@ exports.handler = async function(event, context) {
     console.log('📱 Formatted:', formattedPhone);
 
     // =============================================
+    // 🔤 নাম ক্লিন করা (শুধু ইংরেজি)
+    // =============================================
+    function cleanName(name) {
+      if (!name) return 'Patient';
+      
+      // শুধু ইংরেজি অক্ষর, সংখ্যা ও স্পেস রাখুন
+      const englishOnly = name.replace(/[^\x00-\x7F]/g, '').trim();
+      
+      // যদি কোনো ইংরেজি অক্ষর না থাকে, তাহলে 'Patient' ব্যবহার করুন
+      return englishOnly || 'Patient';
+    }
+
+    const cleanPatientName = cleanName(name);
+    console.log('📝 Original Name:', name);
+    console.log('📝 Clean Name:', cleanPatientName);
+
+    // =============================================
     // 📨 এসএমএস কনফিগারেশন
     // =============================================
     const apiKey = "5eb80a33837009444c330abc5c7335e4";
     const senderId = "8809617635159";
 
-    const message = `Dear ${name || "Patient"}, Serial: ${serial || ""}, Date: ${date || ""}. Thank you!`;
+    // ✅ মেসেজ (শুধু ইংরেজি - নাম ক্লিন করা)
+    const message = `Dear ${cleanPatientName}, your serial is successful. Serial No: ${serial || ""}, Date: ${date || ""}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
+
+    // smsformat=1 = Text (ইংরেজি)
     const url = `https://api.automas.com.bd/smsapiv3?apikey=${apiKey}&sender=${senderId}&msisdn=${formattedPhone}&smstext=${encodeURIComponent(message)}&smsformat=1`;
 
-    console.log('📤 URL:', url);
+    console.log('📤 Sending to:', formattedPhone);
+    console.log('📝 Message:', message);
+    console.log('📏 Length:', message.length);
 
     // =============================================
     // 🚀 এসএমএস পাঠানো
@@ -66,57 +88,32 @@ exports.handler = async function(event, context) {
     const response = await fetch(url);
     const responseData = await response.text();
     
-    console.log('📥 Raw API Response:', responseData);
+    console.log('📥 API Response:', responseData);
 
     // =============================================
-    // ✅ সঠিক রেসপন্স পার্সিং
+    // ✅ রেসপন্স পার্সিং
     // =============================================
     let isSuccess = false;
     let statusCode = null;
     let messageId = null;
-    let errorMsg = null;
 
     try {
-      // JSON রেসপন্স পার্স করার চেষ্টা
       const jsonResponse = JSON.parse(responseData);
-      
-      console.log('📊 Parsed JSON:', jsonResponse);
-      
-      if (jsonResponse.response && Array.isArray(jsonResponse.response)) {
+      if (jsonResponse.response && jsonResponse.response.length > 0) {
         const firstResponse = jsonResponse.response[0];
         statusCode = firstResponse.status;
         messageId = firstResponse.id;
         
-        // ✅ সঠিক স্ট্যাটাস চেক
         if (statusCode === 100 || statusCode === 109) {
           isSuccess = true;
-          console.log('✅ SMS সফল! Status:', statusCode);
-        } else {
-          errorMsg = `API Status: ${statusCode}`;
-          console.log('❌ API Status:', statusCode);
-          
-          // Status কোড অনুযায়ী এরর মেসেজ
-          if (statusCode === 101) errorMsg = 'ব্যালেন্স কম';
-          else if (statusCode === 102) errorMsg = 'ভুল API Key';
-          else if (statusCode === 103) errorMsg = 'ভুল সেন্ডার আইডি';
-          else if (statusCode === 104) errorMsg = 'ভুল নম্বর';
         }
-      } else {
-        errorMsg = 'Invalid API response format';
       }
     } catch (e) {
-      // JSON না হলে টেক্সট চেক
-      console.log('📝 Text Response:', responseData);
       if (responseData.includes('Success') || responseData.includes('success')) {
         isSuccess = true;
-      } else {
-        errorMsg = responseData || 'Unknown error';
       }
     }
 
-    // =============================================
-    // 📊 ফাইনাল রেসপন্স
-    // =============================================
     return {
       statusCode: 200,
       headers: {
@@ -127,10 +124,11 @@ exports.handler = async function(event, context) {
         success: isSuccess,
         status: statusCode,
         message_id: messageId,
-        error: errorMsg,
         api_response: responseData,
         sent_to: formattedPhone,
-        original: phone
+        original_name: name,
+        clean_name: cleanPatientName,
+        message_length: message.length
       })
     };
 
