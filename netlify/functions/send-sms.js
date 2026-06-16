@@ -1,74 +1,66 @@
-// netlify/functions/send-sms.js
+const axios = require('axios');
 
-exports.handler = async (event, context) => {
-  // ১. নিরাপত্তা চেক: শুধুমাত্র POST রিকোয়েস্ট গ্রহণ করা হবে
-  if (event.httpMethod !== "POST") {
+exports.handler = async function(event, context) {
+  // CORS প্রি-ফ্লাইট (Preflight) রিকোয়েস্ট হ্যান্ডেল করা
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: ''
+    };
+  }
+
+  // শুধুমাত্র POST রিকোয়েস্ট অনুমতি দেওয়া
+  if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      body: JSON.stringify({ error: "Method Not Allowed. Use POST request." }),
+      body: JSON.stringify({ error: 'Method Not Allowed' })
     };
   }
 
   try {
-    // ২. ফ্রন্টএন্ড (appointment.html / dashboard.html) থেকে পাঠানো ডাটা রিসিভ করা
+    // ফ্রন্টএন্ড থেকে আসা ডাটা রিসিভ করা
     const { phone, name, serial, date } = JSON.parse(event.body);
 
-    // ৩. ফোন নম্বর ভ্যালিডেশন
     if (!phone) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: "Phone number is required" }),
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ error: 'Phone number is required' })
       };
     }
 
-    // ৪. 🔒 Netlify Environment Variables থেকে গোপন API Credentials রিড করা (GitHub এ নিরাপদ)
-    const apiKey = process.env.AUTOMAS_API_KEY;
-    const senderId = process.env.AUTOMAS_SENDER_ID;
-    
-    // ড্যাশবোর্ড বা ব্যাকএন্ডে কনফিগারেশন মিসিং থাকলে এরর হ্যান্ডলিং
-    if (!apiKey || !senderId) {
-      return { 
-        statusCode: 500, 
-        body: JSON.stringify({ error: "API Credentials are not configured in Netlify Settings." }) 
-      };
-    }
+    // ১. আপনার এপিআই ক্রেডেনশিয়াল সরাসরি সেট করা হলো
+    const apiKey = "5eb80a33837009444c330abc5c7335e4";
+    const senderId = "8809617635159";
 
-    // ৫. প্রফেশনাল বাংলা মেসেজ টেমপ্লেট তৈরি
-    // উদাহরণ: প্রিয় আবির হোসেন, আপনার সিরিয়ালটি সফলভাবে বুক হয়েছে। সিরিয়াল নং: ২৫, তারিখ: ১৬-০৬-২০২৬। ধন্যবাদ!
-    const smsText = `Dear ${name || "Patient"}, your serial is successful. Serial No: ${serial || ""}, Date: ${date || ""}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
+    // ২. আপনার কাস্টম মেসেজ ফরম্যাট (লিংক সহ)
+    const message = `Dear ${name || "Patient"}, your serial is successful. Serial No: ${serial || ""}, Date: ${date || ""}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
 
-    // ৬. Automas API V3 গেটওয়ে ইউআরএল তৈরি
-    const automasUrl = `https://api.automas.com.bd/smsapiv3?apikey=${apiKey}&sender=${senderId}&msisdn=${phone}&smstext=${encodeURIComponent(smsText)}&smsformat=1`;
+    // ৩. Automas API V3 এর URL তৈরি করা (মেসেজটি এখানে encodeURIComponent দিয়ে সেফ করা হয়েছে)
+    const url = `https://api.automas.com.bd/smsapiv3?apikey=${apiKey}&sender=${senderId}&msisdn=${phone}&smstext=${encodeURIComponent(message)}&smsformat=1`;
 
-    // ৭. নেটলিফাই ব্যাকএন্ড থেকে সরাসরি Automas API হিট করা (ব্রাউজারে কোনো CORS এরর আসবে না)
-    const response = await fetch(automasUrl);
-    
-    if (!response.ok) {
-      throw new Error("Automas Gateway responded with an error");
-    }
+    // ৪. Axios দিয়ে Automas সার্ভারে রিকোয়েস্ট পাঠানো
+    const response = await axios.get(url);
 
-    const responseData = await response.json();
-    console.log("📲 Automas API Response Log:", responseData);
-
-    // ৮. ফ্রন্টএন্ডে সফল রেসপন্স পাঠানো
     return {
       statusCode: 200,
       headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*", // যেকোনো পেজ থেকে সিকিউর কানেকশনের জন্য
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ 
-        success: true, 
-        message: "SMS sent successfully via Netlify!",
-        api_response: responseData 
-      }),
+      body: JSON.stringify({ success: true, api_response: response.data })
     };
 
   } catch (error) {
-    console.error("❌ SMS Function Internal Error:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ success: false, error: error.message })
     };
   }
 };
