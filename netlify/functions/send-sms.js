@@ -1,19 +1,16 @@
 // netlify/functions/send-sms.js
 
 exports.handler = async function(event, context) {
-    // CORS হেডার
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'POST, OPTIONS'
     };
 
-    // OPTIONS (Preflight)
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
     }
 
-    // শুধু POST
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
@@ -33,11 +30,9 @@ exports.handler = async function(event, context) {
             };
         }
 
-        console.log('📥 রিকোয়েস্ট:', { phone, name, serial, date });
+        console.log('📥 Request:', { phone, name, serial, date });
 
-        // =============================================
-        // 📱 ফোন ফরম্যাট
-        // =============================================
+        // 📱 Phone formatting
         let formattedPhone = phone.toString().replace(/\D/g, '');
         
         if (formattedPhone.startsWith('01') && formattedPhone.length === 11) {
@@ -50,9 +45,7 @@ exports.handler = async function(event, context) {
 
         console.log('📱 Formatted:', formattedPhone);
 
-        // =============================================
-        // 🔤 নাম ক্লিন
-        // =============================================
+        // 🔤 Clean name
         function cleanName(name) {
             if (!name) return 'Patient';
             const englishOnly = name.replace(/[^\x00-\x7F]/g, '').trim();
@@ -61,9 +54,7 @@ exports.handler = async function(event, context) {
 
         const cleanPatientName = cleanName(name);
 
-        // =============================================
-        // 📨 SMS কনফিগারেশন
-        // =============================================
+        // 📨 SMS Configuration
         const apiKey = "74a82f2a949057f0e67fa4b672f75275";
         const senderId = "8809617635159";
 
@@ -72,48 +63,58 @@ exports.handler = async function(event, context) {
         const url = `https://api.automas.com.bd/smsapiv3?apikey=${apiKey}&sender=${senderId}&msisdn=${formattedPhone}&smstext=${encodeURIComponent(message)}&smsformat=1`;
 
         console.log('📤 Sending to:', formattedPhone);
+        console.log('📤 Message:', message);
 
-        // =============================================
-        // 🚀 SMS পাঠানো
-        // =============================================
+        // 🚀 Send SMS
         const response = await fetch(url);
         const responseData = await response.text();
         
-        console.log('📥 API Response:', responseData);
+        console.log('📥 API Raw Response:', responseData);
 
-        // =============================================
-        // ✅ রেসপন্স পার্সিং
-        // =============================================
+        // ✅ Parse Response - FIXED
         let isSuccess = false;
         let statusCode = null;
         let messageId = null;
         let errorMsg = null;
 
+        // Try to parse as JSON first
         try {
             const jsonResponse = JSON.parse(responseData);
+            console.log('📥 JSON Response:', jsonResponse);
+            
             if (jsonResponse.response && jsonResponse.response.length > 0) {
                 const firstResponse = jsonResponse.response[0];
                 statusCode = firstResponse.status;
                 messageId = firstResponse.id;
                 
-                if (statusCode === 100 || statusCode === 109) {
+                // ✅ Success codes
+                if (statusCode === 100 || statusCode === 109 || statusCode === 110) {
                     isSuccess = true;
                 } else {
                     if (statusCode === 101) errorMsg = 'ব্যালেন্স কম';
                     else if (statusCode === 102) errorMsg = 'ভুল API Key';
                     else if (statusCode === 103) errorMsg = 'ভুল সেন্ডার আইডি';
                     else if (statusCode === 104) errorMsg = 'ভুল নম্বর';
+                    else if (statusCode === 105) errorMsg = 'মেসেজ খুব বড়';
+                    else if (statusCode === 106) errorMsg = 'স্প্যাম ডিটেক্ট';
                     else errorMsg = `স্ট্যাটাস: ${statusCode}`;
                 }
+            } else {
+                errorMsg = 'API তে কোনো রেসপন্স নেই';
             }
         } catch (e) {
-            if (responseData.includes('Success') || responseData.includes('success')) {
+            // Not JSON - check text response
+            console.log('📥 Not JSON, checking text:', responseData);
+            
+            if (responseData.includes('Success') || responseData.includes('success') || 
+                responseData.includes('Accepted') || responseData.includes('accepted')) {
                 isSuccess = true;
             } else {
                 errorMsg = responseData || 'Unknown error';
             }
         }
 
+        // ✅ Return response
         return {
             statusCode: 200,
             headers,
@@ -123,7 +124,12 @@ exports.handler = async function(event, context) {
                 message_id: messageId,
                 error: errorMsg,
                 api_response: responseData,
-                sent_to: formattedPhone
+                sent_to: formattedPhone,
+                debug: {
+                    original_phone: phone,
+                    formatted: formattedPhone,
+                    url: url
+                }
             })
         };
 
@@ -134,7 +140,8 @@ exports.handler = async function(event, context) {
             headers,
             body: JSON.stringify({
                 success: false,
-                error: error.message
+                error: error.message,
+                stack: error.stack
             })
         };
     }
