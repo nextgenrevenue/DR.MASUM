@@ -3666,7 +3666,7 @@ async function addQuickSerial() {
     const elapsed = Date.now() - startTime;
     console.log(`✅ বুকিং সম্পন্ন: ${elapsed}ms`);
 
-   // ==================== SMS Integration (PHP) ====================
+   // ==================== SMS Integration ====================
 if (!skipPhone && phone) {
   for (let i = 0; i < allPatients.length; i++) {
     try {
@@ -3677,7 +3677,7 @@ if (!skipPhone && phone) {
         date: appointmentDateInfo.displayDate || ""
       };
 
-      const response = await fetch('/api/send-sms.php', {
+      const response = await fetch('/.netlify/functions/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(smsPayload),

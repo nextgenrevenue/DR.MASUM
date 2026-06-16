@@ -1532,7 +1532,7 @@
         await db.collection('appointments').add(appointmentData);
         currentAppointmentData = appointmentData;
 
-        // ==================== SMS Integration (PHP) ====================
+        // ==================== SMS Integration ====================
 try {
   const smsPayload = {
     phone: appointmentData.phone,
@@ -1542,7 +1542,7 @@ try {
   };
 
   // ✅ PHP API তে রিকোয়েস্ট
-  const response = await fetch('/api/send-sms.php', {
+  const response = await fetch('/.netlify/functions/send-sms', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
