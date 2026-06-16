@@ -1021,7 +1021,8 @@
   <script src="grid.js"></script>
 
 <script>
-    // ==================== FIREBASE CONFIGURATION ====================
+// ==================== FIREBASE CONFIGURATION ====================
+    // ১ম ডেটাবেজ (বর্তমান রানিং সপ্তাহের জন্য - আপনার মূল জিমেইলের প্রজেক্ট)
     const firebaseConfig = {
       apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
       authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
@@ -1031,26 +1032,182 @@
       appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
     };
 
+    // ২য় ডেটাবেজ (আর্কাইভ পুরনো ডেটার জন্য - অন্য জিমেইলের প্রজেক্ট যা আপনি দিয়েছেন)
+    const archiveFirebaseConfig = {
+      apiKey: "AIzaSyCigxjHdYfYNDizaSKDGUPCaBs39Ff-awM",
+      authDomain: "asraful-704b9.firebaseapp.com",
+      projectId: "asraful-704b9",
+      storageBucket: "asraful-704b9.firebasestorage.app",
+      messagingSenderId: "418467079550",
+      appId: "1:418467079550:web:9454a5851d477e3ad4bf2f"
+      // measurementId অপশনাল, এখানে প্রয়োজন নেই
+    };
+
     // Global variables
-    let db;
+    let db;         // ১ম ডেটাবেজ রেফারেন্স
+    let archiveDb;  // ২য় ডেটাবেজ রেফারেন্স
     let realtimeListeners = [];
     let appointmentsManager = null;
     let selectedAppointments = new Set();
     let searchTimer;
     let serialRanges = {
-      Thursday: {
-        new: {},
-        old: {}
-      },
-      Friday: {
-        new: {},
-        old: {}
-      }
+      Thursday: { new: {}, old: {} },
+      Friday: { new: {}, old: {} }
     };
     let pendingSelections = {};
     let adminSessionId = 'admin_' + Date.now();
-    let editGridSystem = null; // Edit Modal গ্রিড সিস্টেমের জন্য
+    let editGridSystem = null;
+    
+     // ==================== ২য় ডেটাবেজে স্বয়ংক্রিয় স্থানান্তর লজিক (সংশোধিত) ====================
+async function runAutoArchiving() {
+  try {
+    const currentWeek = getCurrentWeekDateRange();
+    const currentWeekStart = currentWeek.startDate;
+    currentWeekStart.setHours(0, 0, 0, 0);
+    
+    console.log("⌛ পুরনো ডেটা চেকিং এবং ডিলিট করার প্রক্রিয়া শুরু হয়েছে...");
+    console.log("📅 বর্তমান সপ্তাহের শুরু (শনিবার):", currentWeekStart);
+    
+    // ১. ১ম ডেটাবেজ থেকে সব অ্যাপয়েন্টমেন্ট আনা
+    const snapshot = await db.collection('appointments').get();
+    let archiveCount = 0;
+    let deleteCount = 0;
+    
+    // ২. পুরনো ডেটা সংগ্রহ করা
+    const oldDocuments = [];
+    
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      let appointmentDate = null;
 
+      // তারিখ পার্স করা
+      if (data.appointmentDate) {
+        const [year, month, day] = data.appointmentDate.split('-');
+        appointmentDate = new Date(year, month - 1, day);
+      } else if (data.visitingDate || data.date) {
+        appointmentDate = parseDateString(data.visitingDate || data.date);
+      } else if (data.timestamp) {
+        appointmentDate = data.timestamp.seconds ? new Date(data.timestamp.seconds * 1000) : new Date(data.timestamp);
+      }
+
+      if (appointmentDate) {
+        appointmentDate.setHours(0, 0, 0, 0);
+      }
+
+      // ৩. পুরনো ডেটা চিহ্নিত করা
+      if (appointmentDate && appointmentDate < currentWeekStart) {
+        oldDocuments.push({
+          id: doc.id,
+          data: data,
+          ref: doc.ref
+        });
+      }
+    }
+    
+    console.log(`📊 মোট ${oldDocuments.length}টি পুরনো ডকুমেন্ট পাওয়া গেছে`);
+    
+    if (oldDocuments.length === 0) {
+      console.log("✅ কোনো পুরনো ডেটা নেই।");
+      return;
+    }
+    
+    // ৪. প্রতি ৫০০টি করে ব্যাচে ভাগ করা
+    const BATCH_SIZE = 500;
+    const batches = [];
+    
+    for (let i = 0; i < oldDocuments.length; i += BATCH_SIZE) {
+      batches.push(oldDocuments.slice(i, i + BATCH_SIZE));
+    }
+    
+    console.log(`📦 ${batches.length}টি ব্যাচ তৈরি করা হয়েছে (প্রতি ব্যাচে ${BATCH_SIZE}টি)`);
+    
+    // ৫. প্রতিটি ব্যাচ প্রসেস করা
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      const dbBatch = db.batch();
+      
+      console.log(`🔄 ব্যাচ ${batchIndex + 1}/${batches.length} প্রসেস করা হচ্ছে...`);
+      
+      // ক) আর্কাইভে কপি করা এবং ডিলিটের জন্য ব্যাচে যোগ করা
+      for (const doc of batch) {
+        try {
+          // আর্কাইভে কপি
+          const archiveRef = archiveDb.collection('archived_appointments').doc(doc.id);
+          await archiveRef.set({
+            ...doc.data,
+            archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            archivedBatch: batchIndex + 1,
+            archivedDate: new Date().toISOString()
+          });
+          
+          // ডিলিটের জন্য ব্যাচে যোগ
+          dbBatch.delete(doc.ref);
+          archiveCount++;
+          
+        } catch (error) {
+          console.error(`❌ ডকুমেন্ট ${doc.id} আর্কাইভ করতে সমস্যা:`, error);
+        }
+      }
+      
+      // খ) ব্যাচ কমিট করা (ডিলিট)
+      try {
+        await dbBatch.commit();
+        deleteCount += batch.length;
+        console.log(`✅ ব্যাচ ${batchIndex + 1} সম্পূর্ণ: ${batch.length}টি ডকুমেন্ট ডিলিট করা হয়েছে`);
+        
+        // ছোট বিরতি (Firestore rate limit এড়ানোর জন্য)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      } catch (error) {
+        console.error(`❌ ব্যাচ ${batchIndex + 1} কমিট করতে সমস্যা:`, error);
+      }
+    }
+    
+    console.log(`🎉 সম্পূর্ণ! ${archiveCount}টি ডকুমেন্ট আর্কাইভ করা হয়েছে এবং ${deleteCount}টি ডকুমেন্ট ডিলিট করা হয়েছে।`);
+    
+  } catch (error) {
+    console.error("❌ অটো-আর্কাইভ এবং ডিলিট করার সময় সমস্যা হয়েছে:", error);
+  }
+}
+
+// এই ফাংশনটি ১ম ও ২য় ডেটাবেজ থেকে ডেটা এনে একসাথে জোড়া লাগাবে
+async function loadMergedAppointments(onDataCallback) {
+  try {
+    // ১. ১ম ডেটাবেজ থেকে রানিং ডেটা আনা
+    const primarySnapshot = await db.collection('appointments').get();
+    const primaryData = primarySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      isArchived: false
+    }));
+
+    // ২. ২য় ডেটাবেজ থেকে আর্কাইভ ডেটা আনা
+    const archiveSnapshot = await archiveDb.collection('archived_appointments').get();
+    const archivedData = archiveSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      isArchived: true
+    }));
+
+    // ৩. দুটি ডেটাবেজের ডেটা একসাথে জোড়া (Merge) দেওয়া
+    const allAppointments = [...primaryData, ...archivedData];
+
+    // ৪. তারিখ অনুযায়ী ডেটা সর্ট বা সাজানো (নতুনগুলো উপরে থাকবে)
+    allAppointments.sort((a, b) => {
+      return new Date(b.visitingDate || b.date) - new Date(a.visitingDate || a.date);
+    });
+
+    console.log(`📊 Total Loaded: Primary (${primaryData.length}) + Archive (${archivedData.length})`);
+    
+    // ৫. ডেটা তৈরি হয়ে গেলে কলব্যাক ফাংশনে পাঠিয়ে দেওয়া
+    if (typeof onDataCallback === 'function') {
+      onDataCallback(allAppointments);
+    }
+
+  } catch (error) {
+    console.error("❌ দুটি ডেটাবেজ থেকে তথ্য লোড করতে সমস্যা হয়েছে:", error);
+  }
+}
     // ==================== UTILITY FUNCTIONS ====================
     function showAlert(message, type = 'success') {
       const alert = document.createElement('div');
@@ -1608,27 +1765,52 @@
         try {
           if (!this.db) return;
           
+          // ১ম ডেটাবেজে (appointments) কোনো পরিবর্তন (নতুন সিরিয়াল, এডিট বা ডিলিট) হলে এই লিসেনারটি চালু হবে
           const listener = this.db.collection('appointments')
             .orderBy('timestamp', 'desc')
-            .onSnapshot(snapshot => {
+            .onSnapshot(async (primarySnapshot) => {
+              console.log("⚡ ১ম ডেটাবেজে পরিবর্তন সনাক্ত হয়েছে! ২য় ডেটাবেজের সাথে মার্জ করা হচ্ছে...");
+              
               this.appointments = [];
               this.timeOptions.clear();
               
-              snapshot.forEach(doc => {
-                const data = {
+              // ক) ১ম ডেটাবেজ থেকে রানিং ডেটাগুলো নেওয়া
+              const primaryData = primarySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                isArchived: false
+              }));
+
+              // খ) ২য় ডেটাবেজ (অন্য জিমেইলের প্রজেক্ট) থেকে আর্কাইভ করা ডেটাগুলো নিয়ে আসা
+              let archivedData = [];
+              try {
+                const archiveSnapshot = await archiveDb.collection('archived_appointments').get();
+                archivedData = archiveSnapshot.docs.map(doc => ({
                   id: doc.id,
-                  ...doc.data()
-                };
+                  ...doc.data(),
+                  isArchived: true
+                }));
+              } catch (archError) {
+                console.error('❌ ২য় ডেটাবেজ থেকে ডাটা টানতে সমস্যা হয়েছে:', archError);
+              }
+
+              // গ) দুটি ডেটাবেজের ডেটা একসাথে এক তালিকায় যোগ করা (Merge)
+              const mergedAppointments = [...primaryData, ...archivedData];
+
+              // ঘ) পুরো ডাটাকে আপনার অ্যাপের রুলস অনুযায়ী প্রসেস এবং টাইম ফিল্টার সেট করা
+              mergedAppointments.forEach(data => {
                 this.appointments.push(data);
-                
                 if (data.time) {
                   this.timeOptions.add(data.time);
                 }
               });
               
+              // ঙ) টেবিল রেন্ডার এবং পরিসংখ্যান আপডেট করা (আপনার আগের মেথডগুলো)
               this.populateTimeFilter();
               this.loadAppointmentsTable();
               this.updateStats();
+              
+              console.log(`📊 টোটাল লোড হয়েছে: রানিং (${primaryData.length}) + আর্কাইভ (${archivedData.length})`);
             }, error => {
               console.error('❌ Error loading appointments:', error);
               showAlert('অ্যাপয়েন্টমেন্ট লোড করতে সমস্যা হয়েছে', 'error');
@@ -3324,13 +3506,22 @@ html += `
     // ==================== INITIALIZATION ====================
     function initializeFirebase() {
       try {
-        if (!firebase.apps.length) {
-          firebase.initializeApp(firebaseConfig);
-        }
-        db = firebase.firestore();
-        console.log("✅ Firebase initialized successfully");
+        // ১. ১ম ডেটাবেজ কানেক্ট (ডিফল্ট অ্যাপ)
+        const primaryApp = firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore(primaryApp);
+        window.db = db; // গ্রিড সিস্টেমের জন্য গ্লোবাল অ্যাসাইনমেন্ট
+
+        // ২. ২য় ডেটাবেজ কানেক্ট (আলাদা নাম "archiveApp" দিয়ে)
+        const archiveApp = firebase.initializeApp(archiveFirebaseConfig, "archiveApp");
+        archiveDb = firebase.firestore(archiveApp);
+
+        console.log("✅ Both Databases Initialized Successfully (Different Gmails)");
         
-        window.db = db;
+        // ==========================================
+        // ⚠️ এই লাইনটি এখানে অবশ্যই যোগ করে দিন ⚠️
+        runAutoArchiving(); 
+        // ==========================================
+        
         return true;
       } catch (error) {
         console.error("❌ Firebase initialization error:", error);
