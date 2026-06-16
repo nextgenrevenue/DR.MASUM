@@ -32,49 +32,22 @@ exports.handler = async function(event, context) {
     }
 
     // =============================================
-    // 📱 ফোন নম্বর ফরম্যাট - উন্নত ভার্সন
+    // 📱 ফোন নম্বর ফরম্যাট
     // =============================================
     let formattedPhone = phone.toString().trim();
-    
-    // সব ধরনের স্পেস, ড্যাশ, ব্র্যাকেট, প্লাস সাইন বাদ
     formattedPhone = formattedPhone.replace(/[\s\-\(\)\+]/g, '');
-    
-    // শুধুমাত্র সংখ্যা রাখা
     formattedPhone = formattedPhone.replace(/\D/g, '');
     
-    // ফরম্যাট চেক
-    if (formattedPhone.length === 11 && formattedPhone.startsWith('01')) {
-      // 017XXXXXXXX → 88017XXXXXXXX (সঠিক)
+    if (formattedPhone.startsWith('01') && formattedPhone.length === 11) {
       formattedPhone = '880' + formattedPhone.substring(1);
-      console.log('✅ 11 ডিজিট থেকে কনভার্ট:', formattedPhone);
-    } 
-    else if (formattedPhone.length === 13 && formattedPhone.startsWith('880')) {
-      // ইতিমধ্যে সঠিক ফরম্যাটে আছে
-      console.log('✅ ইতিমধ্যে সঠিক ফরম্যাট:', formattedPhone);
-    }
-    else if (formattedPhone.length === 10 && formattedPhone.startsWith('1')) {
-      // 17XXXXXXXX → 88017XXXXXXXX
+    } else if (formattedPhone.length === 10 && formattedPhone.startsWith('1')) {
       formattedPhone = '880' + formattedPhone;
-      console.log('✅ 10 ডিজিট থেকে কনভার্ট:', formattedPhone);
-    }
-    else if (formattedPhone.length === 12 && formattedPhone.startsWith('88')) {
-      // 88017XXXXXXXX এর বদলে 881783315140 (ভুল)
-      // 88 এর পর 01 থাকতে হবে
-      if (!formattedPhone.startsWith('8801')) {
-        // 881783315140 → 8801783315140
-        formattedPhone = '880' + formattedPhone.substring(2);
-        console.log('✅ 12 ডিজিট ফিক্স:', formattedPhone);
-      }
-    }
-    
-    // ✅ শেষ চেক: নম্বরটি 8801 দিয়ে শুরু হচ্ছে কিনা
-    if (!formattedPhone.startsWith('8801')) {
-      console.warn('⚠️ নম্বর ফরম্যাট সঠিক নয়:', formattedPhone);
-      // তবুও পাঠানোর চেষ্টা
+    } else if (formattedPhone.startsWith('88') && formattedPhone.length === 12) {
+      formattedPhone = '880' + formattedPhone.substring(2);
     }
     
     console.log('📱 Original:', phone);
-    console.log('📱 Final:', formattedPhone);
+    console.log('📱 Formatted:', formattedPhone);
 
     // =============================================
     // 📨 এসএমএস কনফিগারেশন
@@ -82,15 +55,10 @@ exports.handler = async function(event, context) {
     const apiKey = "5eb80a33837009444c330abc5c7335e4";
     const senderId = "8809617635159";
 
-    // মেসেজ তৈরি (সংক্ষিপ্ত ও ক্লিয়ার)
     const message = `Dear ${name || "Patient"}, Serial: ${serial || ""}, Date: ${date || ""}. Thank you!`;
-
-    // URL তৈরি
     const url = `https://api.automas.com.bd/smsapiv3?apikey=${apiKey}&sender=${senderId}&msisdn=${formattedPhone}&smstext=${encodeURIComponent(message)}&smsformat=1`;
 
-    console.log('📤 Sending to:', formattedPhone);
-    console.log('📝 Message:', message);
-    console.log('🔗 URL:', url);
+    console.log('📤 URL:', url);
 
     // =============================================
     // 🚀 এসএমএস পাঠানো
@@ -98,39 +66,57 @@ exports.handler = async function(event, context) {
     const response = await fetch(url);
     const responseData = await response.text();
     
-    console.log('📥 API Response:', responseData);
+    console.log('📥 Raw API Response:', responseData);
 
-    // ✅ রেসপন্স ডিটেইল চেক
-    const isSuccess = responseData.includes('Success') || 
-                      responseData.includes('success') || 
-                      responseData.includes('OK') || 
-                      responseData.includes('SENT') ||
-                      responseData.includes('ACCEPTED');
+    // =============================================
+    // ✅ সঠিক রেসপন্স পার্সিং
+    // =============================================
+    let isSuccess = false;
+    let statusCode = null;
+    let messageId = null;
+    let errorMsg = null;
 
-    // ❌ এরর মেসেজ চেক
-    const isError = responseData.includes('Error') || 
-                    responseData.includes('error') || 
-                    responseData.includes('Failed') ||
-                    responseData.includes('Insufficient');
-
-    if (isError) {
-      console.error('❌ API Error:', responseData);
-      return {
-        statusCode: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          success: false,
-          error: 'SMS API Error',
-          api_response: responseData,
-          sent_to: formattedPhone,
-          original: phone
-        })
-      };
+    try {
+      // JSON রেসপন্স পার্স করার চেষ্টা
+      const jsonResponse = JSON.parse(responseData);
+      
+      console.log('📊 Parsed JSON:', jsonResponse);
+      
+      if (jsonResponse.response && Array.isArray(jsonResponse.response)) {
+        const firstResponse = jsonResponse.response[0];
+        statusCode = firstResponse.status;
+        messageId = firstResponse.id;
+        
+        // ✅ সঠিক স্ট্যাটাস চেক
+        if (statusCode === 100 || statusCode === 109) {
+          isSuccess = true;
+          console.log('✅ SMS সফল! Status:', statusCode);
+        } else {
+          errorMsg = `API Status: ${statusCode}`;
+          console.log('❌ API Status:', statusCode);
+          
+          // Status কোড অনুযায়ী এরর মেসেজ
+          if (statusCode === 101) errorMsg = 'ব্যালেন্স কম';
+          else if (statusCode === 102) errorMsg = 'ভুল API Key';
+          else if (statusCode === 103) errorMsg = 'ভুল সেন্ডার আইডি';
+          else if (statusCode === 104) errorMsg = 'ভুল নম্বর';
+        }
+      } else {
+        errorMsg = 'Invalid API response format';
+      }
+    } catch (e) {
+      // JSON না হলে টেক্সট চেক
+      console.log('📝 Text Response:', responseData);
+      if (responseData.includes('Success') || responseData.includes('success')) {
+        isSuccess = true;
+      } else {
+        errorMsg = responseData || 'Unknown error';
+      }
     }
 
+    // =============================================
+    // 📊 ফাইনাল রেসপন্স
+    // =============================================
     return {
       statusCode: 200,
       headers: {
@@ -139,7 +125,9 @@ exports.handler = async function(event, context) {
       },
       body: JSON.stringify({
         success: isSuccess,
-        message: isSuccess ? 'SMS sent' : 'SMS failed',
+        status: statusCode,
+        message_id: messageId,
+        error: errorMsg,
         api_response: responseData,
         sent_to: formattedPhone,
         original: phone
