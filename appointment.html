@@ -1532,36 +1532,48 @@
         await db.collection('appointments').add(appointmentData);
         currentAppointmentData = appointmentData;
 
-        // ==================== SMS Integration ====================
+// ==================== SMS Integration ====================
 try {
-  const smsPayload = {
-    phone: appointmentData.phone,
-    name: appointmentData.name || "Patient",
-    serial: appointmentData.serial,
-    date: nextDateInfo.banglaDate || ""
-  };
+  const patientName = appointmentData.name || "Patient";
+  const selectedPhone = appointmentData.phone;
+  const selectedSerial = appointmentData.serial;
+  const englishDateStr = nextDateInfo.dateString || ""; 
+const appointmentTime = selectedTime || ""; 
 
-  // ✅ PHP API তে রিকোয়েস্ট
-  const response = await fetch('/.netlify/functions/send-sms', {
-    method: 'POST',
+  // সম্পূর্ণ ইংরেজি মেসেজ টেমপ্লেট
+  const smsMessage = `Dear ${patientName},your Serial No: ${selectedSerial}, Date: ${englishDateStr}, Please Present At: ${appointmentTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
+
+
+  const apiKey = '74a82f2a949057f0e67fa4b672f75275';
+  const sender = '8809617635159';
+  
+  // সরাসরি Automas এপিআই লিঙ্ক জেনারেট করা (কোনো প্রক্সি ছাড়াই)
+  const automasUrl = `https://api.automas.com.bd/smsapiv3?apikey=${apiKey}&sender=${sender}&msisdn=${selectedPhone}&smstext=${encodeURIComponent(smsMessage)}`;
+
+  console.log("🚀 Sending real-time English SMS directly to Automas (No-CORS Mode)...");
+
+  // mode: 'no-cors' ব্যবহারের ফলে ব্রাউজার এটিকে ব্লক না করে ব্যাকগ্রাউন্ডে রিকোয়েস্ট পাঠিয়ে দেবে
+  fetch(automasUrl, {
+    method: 'POST', // আপনার পিএইচপি কোডের মতো পোস্ট মেথড রাখা হলো
+    mode: 'no-cors',
     headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(smsPayload),
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  })
+  .then(() => {
+    console.log("📥 SMS Request sent successfully to Automas server!");
+  })
+  .catch(err => {
+    console.warn("⚠️ Background SMS Network Error:", err);
   });
-  
-  const result = await response.json();
-  
-  if (result.success) {
-    console.log("✅ এসএমএস সফল! স্ট্যাটাস:", result.status);
-  } else {
-    console.warn("⚠️ এসএমএস সমস্যা:", result.error);
-  }
-  
+
 } catch (error) {
-  console.error("❌ এসএমএস ত্রুটি:", error);
+  console.error("❌ SMS Gateway Connection Error:", error);
 }
 // =====================================================================
+
+
+
 
         showPopup('success', 'অ্যাপয়েন্টমেন্ট সফল হয়েছে!', 
           `আপনি চাইলে নিচের থেকে কনফার্মেশন স্লিপ ডাউনলোড করতে পারেন!<br><br>
