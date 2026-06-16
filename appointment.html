@@ -740,13 +740,13 @@
 
 <script>
     // ==================== FIREBASE CONFIGURATION ====================
-    const firebaseConfig = {
-      apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
-      authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
-      projectId: "doctor-appointment-syste-23828",
-      storageBucket: "doctor-appointment-syste-23828.appspot.com",
-      messagingSenderId: "79600391014",
-      appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+  const firebaseConfig = {
+      apiKey: CONFIG.apiKey,
+      authDomain: CONFIG.authDomain,
+      projectId: CONFIG.projectId,
+      storageBucket: CONFIG.storageBucket,
+      messagingSenderId: CONFIG.messagingSenderId,
+      appId: CONFIG.appId
     };
 
     let db;
@@ -1531,6 +1531,32 @@
 
         await db.collection('appointments').add(appointmentData);
         currentAppointmentData = appointmentData;
+
+        // ==================== Netlify Serverless SMS Integration ====================
+        try {
+          const smsPayload = {
+            phone: appointmentData.phone,
+            name: appointmentData.name || "রোগী",
+            serial: appointmentData.serial,
+            date: nextDateInfo.banglaDate || ""
+          };
+
+          // আপনার নেটলিফাই ফাংশনের এন্ডপয়েন্টে রিকোয়েস্ট পাঠানো হচ্ছে
+          fetch('/.netlify/functions/send-sms', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(smsPayload),
+          })
+          .then(res => res.json())
+          .then(data => console.log("📲 SMS Sent via Netlify:", data))
+          .catch(err => console.error("❌ Netlify SMS Fetch Error:", err));
+
+        } catch (smsError) {
+          console.error("❌ SMS Section Error:", smsError);
+        }
+        // =====================================================================
 
         showPopup('success', 'অ্যাপয়েন্টমেন্ট সফল হয়েছে!', 
           `আপনি চাইলে নিচের থেকে কনফার্মেশন স্লিপ ডাউনলোড করতে পারেন!<br><br>

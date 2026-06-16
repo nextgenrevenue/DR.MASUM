@@ -1604,13 +1604,13 @@ if (!checkAuthentication()) {
     // =======================================================
     // ১. ফায়ারবেস কনফিগারেশন
     // =======================================================
-    const firebaseConfig = {
-      apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
-      authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
-      projectId: "doctor-appointment-syste-23828",
-      storageBucket: "doctor-appointment-syste-23828.appspot.com",
-      messagingSenderId: "79600391014",
-      appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+const firebaseConfig = {
+      apiKey: CONFIG.apiKey,
+      authDomain: CONFIG.authDomain,
+      projectId: CONFIG.projectId,
+      storageBucket: CONFIG.storageBucket,
+      messagingSenderId: CONFIG.messagingSenderId,
+      appId: CONFIG.appId
     };
 
     let db;
@@ -3665,6 +3665,37 @@ async function addQuickSerial() {
     
     const elapsed = Date.now() - startTime;
     console.log(`✅ বুকিং সম্পন্ন: ${elapsed}ms`);
+
+    // ==================== 📲 Netlify Serverless SMS Integration ====================
+    // ফায়ারবেসে সফলভাবে সেভ হবার পর এবং "ফোন ছাড়া বুকিং" না করা থাকলে মেসেজ যাবে
+    if (!skipPhone && phone) {
+      allPatients.forEach((patient, index) => {
+        try {
+          const smsPayload = {
+            phone: phone,
+            name: patient.name || "রোগী",
+            serial: selectedSerials[index],
+            date: appointmentDateInfo.displayDate || "" // আপনার ফাংশনের রিয়েল ডিসপ্লে ডেট ফরম্যাট
+          };
+
+          // নেটলিফাই ব্যাকএন্ড ফাংশন হিট
+          fetch('/.netlify/functions/send-sms', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(smsPayload),
+          })
+          .then(res => res.json())
+          .then(data => console.log(`📲 Patient ${index + 1} SMS Status:`, data))
+          .catch(err => console.error(`❌ Patient ${index + 1} SMS Fetch Error:`, err));
+
+        } catch (smsError) {
+          console.error("❌ Indivual Patient SMS Logic Error:", smsError);
+        }
+      });
+    }
+    // =============================================================================
     
     showAlert(`✅ ${allPatients.length} জন রোগী সফলভাবে বুক হয়েছে!\n📞 ফোন: ${phone || 'ছাড়া'}\n🎫 সিরিয়াল: ${selectedSerials.join(', ')}`, 'success');
     
