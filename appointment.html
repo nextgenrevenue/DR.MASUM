@@ -2,7 +2,7 @@
 <html lang="bn">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>অ্যাপয়েন্টমেন্ট ফর্ম</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -493,6 +493,11 @@
         margin: 10px auto;
         border-radius: 0;
       }
+
+      .date-header {
+    font-size: 13px !important;
+    padding: 6px 10px !important;
+  }
       
       form {
         padding: 20px;
@@ -1526,7 +1531,7 @@
           serial: selectedSerial,
           timestamp: firebase.firestore.FieldValue.serverTimestamp(),
           status: 'confirmed',
-          age: ageValidationData.ageInMonths
+          age: ageValidationData.ageDisplay
         };
 
         await db.collection('appointments').add(appointmentData);
@@ -1541,7 +1546,7 @@ try {
 const appointmentTime = selectedTime || ""; 
 
   // সম্পূর্ণ ইংরেজি মেসেজ টেমপ্লেট
-  const smsMessage = `Dear ${patientName},your Serial No: ${selectedSerial}, Date: ${englishDateStr}, Please Present At: ${appointmentTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
+  const smsMessage = `Dear ${patientName},your Serial No: ${selectedSerial}, Date: ${englishDateStr}, Estimated Time: ${appointmentTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
 
 
   const apiKey = '74a82f2a949057f0e67fa4b672f75275';

@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>সিরিয়াল তালিকা</title>
+  <!-- ফন্ট, টেইলউইন্ড, ফন্ট অ্যাওসাম, ফায়ারবেস, সুইট অ্যালার্ট -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <!-- ===== grid.js লোড করুন (RealTimeGridSystem) ===== -->
+  <script src="grid.js"></script>
+  
+  <!-- components-inline.js (সাইডবার, হেডার, ফুটার লোডার) -->
+  <script src="components-inline.js"></script>
+  
+  <style>
+    /* বেসিক রিসেট ও ফন্ট */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: 'Inter', 'Noto Sans Bengali', sans-serif; 
+      background: #f0f4f8; 
+      margin: 0;
+      padding-top: 64px; /* হেডারের জন্য জায়গা */
+    }
+    /* কাস্টম স্ট্যাটাস ব্যাজ */
+    .status-badge {
+      display: inline-block; padding: 4px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; min-width: 90px; text-align: center;
+    }
+    .status-badge.pending { background: #fef3c7; color: #d97706; }
+    .status-badge.token-given { background: #dcfce7; color: #16a34a; }
+    .status-badge.visited { background: #dbeafe; color: #3b82f6; }
+    .status-badge.absent { background: #fee2e2; color: #dc2626; }
+
+    /* টেবিল স্টাইল */
+    .table-container { 
+      background: white; border-radius: 16px; padding: 20px 24px; 
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; 
+      margin: 20px 24px;
+    }
+    .table-container .table-header { 
+      display: flex; justify-content: space-between; align-items: center; 
+      flex-wrap: wrap; gap: 12px; margin-bottom: 16px; 
+    }
+    .table-container .table-header h3 { font-size: 18px; font-weight: 700; color: #1e293b; }
+    .table-container .table-header input {
+      padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 13px; width: 220px; outline: none;
+    }
+    .table-container .table-header input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table thead { background: #f8fafc; }
+    table th { padding: 10px 12px; text-align: left; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+    table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    table tbody tr:hover { background: #f8fafc; }
+
+    /* এডিট ও ভিউ বাটন */
+    .edit-btn {
+      background: #eff6ff; color: #3b82f6; border: none;
+      padding: 4px 12px; border-radius: 6px; font-size: 12px;
+      cursor: pointer; font-weight: 500; transition: 0.15s;
+      margin-right: 4px;
+    }
+    .edit-btn:hover { background: #dbeafe; }
+    .view-btn {
+      background: #dbeafe; color: #3b82f6; border: none;
+      padding: 4px 12px; border-radius: 6px; font-size: 12px;
+      cursor: pointer; font-weight: 500; transition: 0.15s;
+    }
+    .view-btn:hover { background: #bfdbfe; transform: scale(1.05); }
+    .expired-badge {
+      background: #fee2e2; color: #b91c1c; 
+      padding: 4px 10px; border-radius: 9999px; 
+      font-size: 11px; font-weight: 600; 
+      display: inline-flex; align-items: center; gap: 4px; 
+      cursor: default;
+    }
+    /* মডাল (এডিট + ভিউ) */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      max-width: 700px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      animation: modalSlideIn 0.3s ease;
+    }
+    @keyframes modalSlideIn {
+      from { transform: translateY(-30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px; padding-bottom: 15px;
+      border-bottom: 2px solid #f1f5f9;
+    }
+    .modal-header h2 { font-size: 20px; font-weight: 700; color: #1e293b; }
+    .modal-header .close-btn {
+      background: none; border: none; font-size: 28px; color: #94a3b8;
+      cursor: pointer; padding: 0 8px; transition: 0.15s;
+    }
+    .modal-header .close-btn:hover { color: #dc2626; transform: scale(1.1); }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 14px; color: #334155; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 10px 14px;
+      border: 2px solid #e2e8f0; border-radius: 10px;
+      font-size: 14px; outline: none; font-family: inherit;
+      transition: 0.15s;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    }
+    .form-actions {
+      display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end;
+    }
+    .form-actions .cancel-btn-modal {
+      padding: 10px 24px; border: 2px solid #e2e8f0; border-radius: 10px;
+      background: white; font-weight: 600; cursor: pointer; transition: 0.15s;
+    }
+    .form-actions .cancel-btn-modal:hover { background: #f1f5f9; }
+    .form-actions .submit-btn {
+      padding: 10px 24px; border: none; border-radius: 10px;
+      background: #3b82f6; color: white; font-weight: 700;
+      cursor: pointer; transition: 0.15s;
+    }
+    .form-actions .submit-btn:hover { background: #2563eb; }
+    /* সিরিয়াল গ্রিড (এডিট মোডালের জন্য) - grid.js স্টাইল ওভাররাইড */
+    .serial-grid {
+      display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px;
+      padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px;
+      max-height: 200px; overflow-y: auto; margin: 8px 0;
+      background: white;
+    }
+    .serial-item {
+      padding: 8px; text-align: center; border-radius: 6px;
+      font-weight: 600; font-size: 13px; cursor: pointer;
+      border: 2px solid transparent; transition: all 0.15s;
+    }
+    .serial-item.available { background: #dcfce7; color: #16a34a; border-color: #16a34a; }
+    .serial-item.available:hover { background: #bbf7d0; transform: scale(1.05); }
+    .serial-item.booked { background: #fecaca; color: #dc2626; border-color: #dc2626; cursor: not-allowed; opacity: 0.7; }
+    .serial-item.pending { background: #dbeafe; color: #3b82f6; border-color: #3b82f6; cursor: not-allowed; opacity: 0.7; }
+    .serial-item.selected { background: #fef3c7; color: #d97706; border-color: #d97706; box-shadow: 0 0 0 3px rgba(245,158,11,0.3); }
+    /* ভিউ টোকেন মডালের জন্য অতিরিক্ত */
+    #viewTokenPatientInfo { background: #f8fafc; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+    #viewTokenPatientInfo > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    #viewTokenHistoryList { max-height: 300px; overflow-y: auto; }
+    #viewTokenSummary { 
+      margin-top: 15px; background: #f1f5f9; padding: 15px; border-radius: 10px; 
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;
+    }
+    /* মোবাইল অ্যাডজাস্ট */
+    @media (max-width: 768px) {
+      .table-container { margin: 12px 8px; padding: 16px; }
+      .table-container .table-header input { width: 100%; }
+      .serial-grid { grid-template-columns: repeat(7, 1fr); }
+      #viewTokenPatientInfo > div { grid-template-columns: 1fr; }
+      #viewTokenSummary { grid-template-columns: 1fr; }
+    }
+    /* কন্টেইনার লেআউট */
+    .main-wrap {
+      display: flex;
+      min-height: calc(100vh - 64px);
+    }
+    #sidebar-container {
+      flex-shrink: 0;
+      width: 280px;
+    }
+    .content-area {
+      flex: 1;
+      padding: 16px 20px 40px;
+      background: #f0f4f8;
+    }
+    @media (max-width: 768px) {
+      .main-wrap { flex-direction: column; }
+      #sidebar-container { width: 100%; }
+      .content-area { padding: 12px 8px 40px; }
+    }
+    #header-container, #footer-container {
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== হেডার ===== -->
+<div id="header-container"></div>
+
+<!-- ===== মেইন র‍্যাপ ===== -->
+<div class="main-wrap">
+  <!-- সাইডবার -->
+  <div id="sidebar-container"></div>
+
+  <!-- কন্টেন্ট এরিয়া -->
+  <div class="content-area" id="contentArea">
+    <!-- পেজ হেডার -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+      <div>
+        <h2 style="font-size:20px; font-weight:700; color:#1e293b;">সিরিয়াল তালিকা</h2>
+        <p style="font-size:13px; color:#94a3b8;">আপনার সকল সিরিয়ালের তালিকা</p>
+      </div>
+      <span style="font-size:13px; font-weight:500; color:#475569;">
+        <i class="far fa-calendar-alt"></i> <span id="headerDate"></span>
+      </span>
+    </div>
+
+    <!-- ===== সিরিয়াল টেবিল ===== -->
+    <div class="table-container">
+      <div class="table-header">
+        <h3><i class="fas fa-list-alt text-indigo-500"></i> আমার সিরিয়াল তালিকা</h3>
+        <input type="text" id="searchInput" placeholder="নাম বা সিরিয়াল দিয়ে খুঁজুন...">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>তারিখ</th>
+              <th>সিরিয়াল</th>
+              <th>রোগীর নাম</th>
+              <th>বয়স</th>
+              <th>সময়</th>
+              <th>ধরন</th>
+              <th>বুকিং তারিখ</th>
+              <th>স্ট্যাটাস</th>
+              <th>অ্যাকশন</th>
+            </tr>
+          </thead>
+          <tbody id="allSerialTable">
+            <tr><td colspan="9" class="text-center text-muted" style="padding:20px;">লোড হচ্ছে...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ফুটার ===== -->
+<div id="footer-container"></div>
+
+<!-- ===== এডিট অ্যাপয়েন্টমেন্ট মোডাল ===== -->
+<div class="modal" id="editAppointmentModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>অ্যাপয়েন্টমেন্ট এডিট করুন</h2>
+      <button class="close-btn" id="closeEditModal">&times;</button>
+    </div>
+    <form id="editAppointmentForm">
+      <input type="hidden" id="editAppointmentId">
+      
+      <div class="form-group">
+        <label>রোগীর নাম</label>
+        <input type="text" id="editName" required>
+      </div>
+      
+      <div class="form-group">
+        <label>বয়স</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <div style="flex:1;"><input type="number" id="editAgeYears" min="0" max="120" placeholder="বছর" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;"></div>
+          <div style="flex:1;"><input type="number" id="editAgeMonths" min="0" max="11" placeholder="মাস" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;"></div>
+          <div style="flex:1;"><input type="number" id="editAgeDays" min="0" max="30" placeholder="দিন" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;"></div>
+        </div>
+        <input type="hidden" id="editAge">
+      </div>
+      
+      <div class="form-group">
+        <label>ফোন নম্বর</label>
+        <input type="text" id="editPhone" required>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+        <div class="form-group">
+          <label>দিন</label>
+          <select id="editDay" required>
+            <option value="">-- নির্বাচন করুন --</option>
+            <option value="Thursday">বৃহস্পতিবার</option>
+            <option value="Friday">শুক্রবার</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>ধরন</label>
+          <select id="editType" required>
+            <option value="">-- নির্বাচন করুন --</option>
+            <option value="new">নতুন রোগী</option>
+            <option value="old">পুরাতন রোগী</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>সময়</label>
+        <select id="editTime" required>
+          <option value="">-- সময় নির্বাচন করুন --</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>সিরিয়াল নির্বাচন করুন</label>
+        <div class="serial-grid" id="editSerialGrid">
+          <div style="grid-column:1/-1; text-align:center; padding:20px; color:#94a3b8;">
+            দিন, ধরন এবং সময় নির্বাচন করুন
+          </div>
+        </div>
+        <input type="hidden" id="editSerial">
+      </div>
+      
+      <div class="form-actions">
+        <button type="button" class="cancel-btn-modal" id="cancelEditModal">বাতিল</button>
+        <button type="submit" class="submit-btn" id="submitEditBtn">আপডেট করুন</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== ভিউ টোকেন মোডাল ===== -->
+<div class="modal" id="viewTokenModal">
+  <div class="modal-content" style="max-width: 700px;">
+    <div class="modal-header">
+      <h2><i class="fas fa-history"></i> টোকেন ইতিহাস</h2>
+      <button class="close-btn" id="closeViewTokenModal">&times;</button>
+    </div>
+    <div id="viewTokenContent" style="padding: 10px 0;">
+      <div id="viewTokenPatientInfo" style="background:#f8fafc; padding:15px; border-radius:10px; margin-bottom:15px;">
+        <div>
+          <div><strong>👤 নাম:</strong> <span id="viewPatientName">—</span></div>
+          <div><strong>🔢 সিরিয়াল:</strong> <span id="viewPatientSerial">—</span></div>
+          <div><strong>📞 ফোন:</strong> <span id="viewPatientPhone">—</span></div>
+          <div><strong>📅 তারিখ:</strong> <span id="viewPatientDate">—</span></div>
+          <div><strong>⏰ সময়:</strong> <span id="viewPatientTime">—</span></div>
+          <div><strong>🧾 ধরন:</strong> <span id="viewPatientType">—</span></div>
+        </div>
+      </div>
+      <div id="viewTokenHistoryContainer">
+        <h4 style="margin-bottom:12px; color:#1e293b;"><i class="fas fa-receipt"></i> পেমেন্ট ইতিহাস</h4>
+        <div id="viewTokenHistoryList" style="max-height:300px; overflow-y:auto;">
+          <div style="text-align:center; padding:30px; color:#94a3b8;">
+            <i class="fas fa-spinner fa-spin"></i> লোড হচ্ছে...
+          </div>
+        </div>
+      </div>
+      <div id="viewTokenSummary">
+        <div><div style="font-size:12px; color:#94a3b8;">মোট ফি</div><div style="font-size:20px; font-weight:700; color:#1e293b;" id="viewTotalFee">০</div></div>
+        <div><div style="font-size:12px; color:#94a3b8;">পরিশোধিত</div><div style="font-size:20px; font-weight:700; color:#16a34a;" id="viewTotalPaid">০</div></div>
+        <div><div style="font-size:12px; color:#94a3b8;">বাকি</div><div style="font-size:20px; font-weight:700; color:#dc2626;" id="viewTotalDue">০</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// FIREBASE কনফিগ
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+  authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+  projectId: "doctor-appointment-syste-23828",
+  storageBucket: "doctor-appointment-syste-23828.appspot.com",
+  messagingSenderId: "79600391014",
+  appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+};
+
+const archiveFirebaseConfig = {
+  apiKey: "AIzaSyCigxjHdYfYNDizaSKDGUPCaBs39Ff-awM",
+  authDomain: "asraful-704b9.firebaseapp.com",
+  projectId: "asraful-704b9",
+  storageBucket: "asraful-704b9.firebasestorage.app",
+  messagingSenderId: "418467079550",
+  appId: "1:418467079550:web:9454a5851d477e3ad4bf2f"
+};
+
+let db, archiveDb;
+try {
+  if (!firebase.apps.length) {
+    const defaultApp = firebase.initializeApp(firebaseConfig);
+    db = defaultApp.firestore();
+  } else {
+    db = firebase.firestore();
+  }
+  let archiveApp = firebase.apps.find(app => app.name === "archiveApp");
+  if (!archiveApp) {
+    archiveApp = firebase.initializeApp(archiveFirebaseConfig, "archiveApp");
+  }
+  archiveDb = archiveApp.firestore();
+  window.db = db;
+  console.log('✅ Firebase connected');
+} catch (err) {
+  console.error('❌ Firebase init error:', err);
+}
+
+// ============================================================
+// গ্লোবাল ভেরিয়েবল
+// ============================================================
+let allAppointments = [];
+let currentUser = sessionStorage.getItem('userPhone') || sessionStorage.getItem('loggedInUser') || null;
+let gridRanges = {};
+let editGridSystem = null;
+let editModeId = null;
+
+// ============================================================
+// ⭐ সময় কনভার্ট করার ফাংশন (সাজানোর জন্য)
+// ============================================================
+function convertTimeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  let cleaned = timeStr.trim().toUpperCase();
+  let hours = 0, minutes = 0;
+  let isPM = cleaned.includes('PM');
+  
+  const parts = cleaned.match(/(\d+):?(\d+)?/);
+  if (parts) {
+    hours = parseInt(parts[1]);
+    minutes = parseInt(parts[2] || 0);
+  }
+  
+  if (isPM && hours < 12) hours += 12;
+  if (!isPM && hours === 12) hours = 0;
+  
+  return hours * 60 + minutes;
+}
+
+// ============================================================
+// ⭐ সময়কে AM/PM ফরম্যাটে দেখানোর ফাংশন
+// ============================================================
+function formatTimeAMPM(timeStr) {
+  if (!timeStr) return '-';
+  
+  let cleaned = timeStr.trim().toUpperCase();
+  // ইতিমধ্যে AM/PM থাকলে সেটাই রিটার্ন
+  if (cleaned.includes('AM') || cleaned.includes('PM')) {
+    return timeStr;
+  }
+  
+  const parts = cleaned.match(/(\d+):?(\d+)?/);
+  if (!parts) return timeStr;
+  
+  let hours = parseInt(parts[1]);
+  let minutes = parseInt(parts[2] || 0);
+  let ampm = hours >= 12 ? 'PM' : 'AM';
+  
+  let displayHour = hours % 12;
+  if (displayHour === 0) displayHour = 12;
+  
+  const minStr = minutes.toString().padStart(2, '0');
+  return `${displayHour}:${minStr} ${ampm}`;
+}
+
+// ============================================================
+// হেল্পার ফাংশন
+// ============================================================
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function formatDate(date) {
+  return date.toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function formatBookingDate(app) {
+  if (app.bookingDate) return app.bookingDate;
+  if (app.timestamp) {
+    let d;
+    if (app.timestamp.seconds) d = new Date(app.timestamp.seconds * 1000);
+    else if (app.timestamp.toDate) d = app.timestamp.toDate();
+    else if (app.timestamp instanceof Date) d = app.timestamp;
+    if (d && !isNaN(d)) {
+      return d.toLocaleDateString('bn-BD', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    }
+  }
+  return '-';
+}
+
+function getStatusBadge(app) {
+  if (app.tokenGiven === true || app.tokenStatus === 'given') {
+    return '<span class="status-badge token-given">Token Given</span>';
+  }
+  if (app.status === 'visited') {
+    return '<span class="status-badge visited">Visited</span>';
+  }
+  const appointmentDate = app.appointmentDate || app.date;
+  if (appointmentDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const appDate = new Date(appointmentDate);
+    appDate.setHours(0, 0, 0, 0);
+    if (appDate < today && app.tokenGiven !== true) {
+      return '<span class="status-badge absent">Absent</span>';
+    }
+  }
+  return '<span class="status-badge pending">Pending</span>';
+}
+
+function parseAgeString(ageStr) {
+  let years = 0, months = 0, days = 0;
+  if (!ageStr) return { years, months, days };
+  if (ageStr.includes('বছর')) { 
+    const m = ageStr.match(/(\d+)\s*বছর/); 
+    if (m) years = parseInt(m[1]); 
+  }
+  if (ageStr.includes('মাস')) { 
+    const m = ageStr.match(/(\d+)\s*মাস/); 
+    if (m) months = parseInt(m[1]); 
+  }
+  if (ageStr.includes('দিন')) { 
+    const m = ageStr.match(/(\d+)\s*দিন/); 
+    if (m) days = parseInt(m[1]); 
+  }
+  return { years, months, days };
+}
+
+function getNextDateByDay(targetDay) {
+  const daysMap = {
+    "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3,
+    "Thursday": 4, "Friday": 5, "Saturday": 6
+  };
+  const targetDayIndex = daysMap[targetDay];
+  const today = new Date();
+  const todayIndex = today.getDay();
+  let daysToAdd = targetDayIndex - todayIndex;
+  if (daysToAdd < 0) daysToAdd += 7;
+  const nextDate = new Date(today);
+  nextDate.setDate(today.getDate() + daysToAdd);
+  const year = nextDate.getFullYear();
+  const month = String(nextDate.getMonth() + 1).padStart(2, '0');
+  const day = String(nextDate.getDate()).padStart(2, '0');
+  const banglaMonths = ['জানুয়ারী', 'ফেব্রুয়ারী', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+  const banglaDays = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+  const banglaDate = `${banglaDays[nextDate.getDay()]}, ${nextDate.getDate()} ${banglaMonths[nextDate.getMonth()]} ${year}`;
+  return {
+    date: nextDate,
+    dateString: `${year}-${month}-${day}`,
+    displayDate: nextDate.toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+    banglaDate: banglaDate,
+    isToday: daysToAdd === 0
+  };
+}
+
+// ============================================================
+// লোড সিরিয়াল রেঞ্জ
+// ============================================================
+async function loadRanges() {
+  try {
+    const doc = await db.collection('settings').doc('serialRanges').get();
+    if (doc.exists) {
+      gridRanges = doc.data();
+      if (!gridRanges.Thursday) gridRanges.Thursday = { new: {}, old: {} };
+      if (!gridRanges.Friday) gridRanges.Friday = { new: {}, old: {} };
+    } else {
+      gridRanges = { Thursday: { new: {}, old: {} }, Friday: { new: {}, old: {} } };
+    }
+    console.log('✅ সিরিয়াল রেঞ্জ লোড হয়েছে');
+  } catch (e) { console.error('Ranges error:', e); }
+}
+
+// ============================================================
+// ফেচ অ্যাপয়েন্টমেন্ট
+// ============================================================
+async function fetchAppointments() {
+  if (!currentUser) {
+    console.warn('No user');
+    return;
+  }
+  try {
+    let primaryData = [];
+    const primarySnap = await db.collection('appointments')
+      .where('phone', '==', currentUser)
+      .get();
+    primaryData = primarySnap.docs.map(d => ({ 
+      id: d.id, 
+      ...d.data(), 
+      isArchived: false,
+      source: 'appointments'
+    }));
+
+    let archiveData = [];
+    if (archiveDb) {
+      const archiveSnap = await archiveDb.collection('archived_appointments')
+        .where('phone', '==', currentUser)
+        .get();
+      archiveData = archiveSnap.docs.map(d => ({ 
+        id: d.id, 
+        ...d.data(), 
+        isArchived: true,
+        source: 'archived_appointments'
+      }));
+    }
+    allAppointments = [...primaryData, ...archiveData];
+    allAppointments.sort((a, b) => {
+      const dateA = a.appointmentDate || a.date || '';
+      const dateB = b.appointmentDate || b.date || '';
+      return dateB.localeCompare(dateA);
+    });
+    renderTable();
+    updateSidebarStats();
+  } catch (e) {
+    console.error('Fetch error:', e);
+    allAppointments = [];
+    renderTable();
+  }
+}
+
+// ============================================================
+// রেন্ডার টেবিল - সময় AM/PM ফরম্যাটে
+// ============================================================
+function renderTable() {
+  const tbody = document.getElementById('allSerialTable');
+  const search = document.getElementById('searchInput')?.value?.toLowerCase() || '';
+  const todayStr = getTodayStr();
+
+  const filtered = allAppointments.filter(a => {
+    const name = (a.name || '').toLowerCase();
+    const serial = String(a.serial || '');
+    return name.includes(search) || serial.includes(search);
+  });
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted" style="padding:20px;">কোনো সিরিয়াল পাওয়া যায়নি</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(a => {
+    const appDateStr = a.appointmentDate || a.date;
+    let actionHtml = '';
+    
+    // ✅ সময় AM/PM ফরম্যাটে
+    const displayTime = a.time ? formatTimeAMPM(a.time) : '-';
+    
+    if (appDateStr && appDateStr < todayStr) {
+      const patientName = a.name || 'রোগী';
+      const serialNo = a.serial || '০';
+      actionHtml = `
+        <span onclick="Swal.fire({ title: 'অপারেশন ব্যর্থ!', text: 'প্রিয় ${patientName}, আপনার অ্যাপয়েন্টমেন্ট এর দিন টি অতিক্রম হয়ে যাওয়ায় #${serialNo} নং সিরিয়াল এডিট বা আপডেট করা সম্ভব নয়।', icon: 'error' })" 
+              style="background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+          <i class="fas fa-calendar-times" style="font-size: 10px;"></i> Expired
+        </span>
+        <button class="view-btn" onclick="viewTokenHistory('${a.id}')"><i class="fas fa-eye"></i> ভিউ</button>
+      `;
+    } else {
+      actionHtml = `
+        <button class="edit-btn" onclick="editAppointment('${a.id}')"><i class="fas fa-edit"></i> এডিট</button>
+        <button class="view-btn" onclick="viewTokenHistory('${a.id}')"><i class="fas fa-eye"></i> ভিউ</button>
+      `;
+    }
+
+    return `
+      <tr>
+        <td>${appDateStr || '-'}</td>
+        <td><strong style="color:#4f46e5;">#${a.serial || '0'}</strong></td>
+        <td>${a.name || '-'}</td>
+        <td>${a.age || '-'}</td>
+        <td>${displayTime}</td>
+        <td><span style="background:#f1f5f9;padding:2px 10px;border-radius:4px;font-size:12px;">${a.patientType || a.type || 'General'}</span></td>
+        <td>${formatBookingDate(a)}</td>
+        <td>${getStatusBadge(a)}</td>
+        <td>${actionHtml}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// সাইডবার স্ট্যাট আপডেট - উভয় DB থেকে
+function updateSidebarStats() {
+  const total = allAppointments.length;
+  const pending = allAppointments.filter(a => {
+    if (a.tokenGiven === true || a.tokenStatus === 'given') return false;
+    if (a.status === 'visited') return false;
+    const appointmentDate = a.appointmentDate || a.date;
+    if (appointmentDate) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const appDate = new Date(appointmentDate);
+      appDate.setHours(0,0,0,0);
+      if (appDate < today) return false;
+    }
+    // পেন্ডিং চেক
+    const statusText = a.status ? a.status.toString().trim().toLowerCase() : '';
+    return statusText === 'pending' || statusText === 'পেন্ডিং';
+  });
+  
+  // ✅ components-inline.js এর ফাংশন কল
+  if (typeof window.updateSidebarStats === 'function') {
+    window.updateSidebarStats(total, pending.length);
+  } else {
+    const sideTotal = document.getElementById('sideTotal');
+    const sidePending = document.getElementById('sidePending');
+    if (sideTotal) sideTotal.textContent = total;
+    if (sidePending) sidePending.textContent = pending.length;
+  }
+}
+
+// ============================================================
+// এডিট মোডালের টাইম অপশন - AM/PM ফরম্যাট সহ
+// ============================================================
+function updateEditTimeOptions() {
+  const day = document.getElementById('editDay').value;
+  const type = document.getElementById('editType').value;
+  const timeSelect = document.getElementById('editTime');
+  
+  timeSelect.innerHTML = '<option value="">-- সময় নির্বাচন করুন --</option>';
+  if (!day || !type) return;
+  
+  if (gridRanges[day] && gridRanges[day][type]) {
+    const times = Object.keys(gridRanges[day][type]);
+    
+    // ✅ সঠিকভাবে সাজান
+    times.sort((a, b) => {
+      return convertTimeToMinutes(a) - convertTimeToMinutes(b);
+    });
+    
+    times.forEach(time => {
+      const option = document.createElement('option');
+      option.value = time;
+      option.textContent = formatTimeAMPM(time);
+      timeSelect.appendChild(option);
+    });
+  }
+}
+
+async function editAppointment(id) {
+  const appointment = allAppointments.find(app => app.id === id);
+  if (!appointment) {
+    Swal.fire({ title: 'ত্রুটি!', text: 'অ্যাপয়েন্টমেন্ট খুঁজে পাওয়া যায়নি', icon: 'error' });
+    return;
+  }
+
+  editModeId = id;
+  document.getElementById('editAppointmentId').value = id;
+  document.getElementById('editName').value = appointment.name || '';
+  document.getElementById('editPhone').value = appointment.phone || '';
+
+  let ageYears = 0, ageMonths = 0, ageDays = 0;
+  if (appointment.ageYears !== undefined) {
+    ageYears = Number(appointment.ageYears) || 0;
+    ageMonths = Number(appointment.ageMonths) || 0;
+    ageDays = Number(appointment.ageDays) || 0;
+  } else if (appointment.age && typeof appointment.age === 'string') {
+    const parsed = parseAgeString(appointment.age);
+    ageYears = parsed.years; ageMonths = parsed.months; ageDays = parsed.days;
+  }
+  document.getElementById('editAgeYears').value = ageYears;
+  document.getElementById('editAgeMonths').value = ageMonths;
+  document.getElementById('editAgeDays').value = ageDays;
+
+  document.getElementById('editDay').value = appointment.day || '';
+  document.getElementById('editType').value = appointment.patientType || appointment.type || '';
+  updateEditTimeOptions();
+
+  if (editGridSystem) {
+    editGridSystem.cleanup();
+    editGridSystem = null;
+  }
+
+  setTimeout(() => {
+    document.getElementById('editTime').value = appointment.time || '';
+    document.getElementById('editSerial').value = appointment.serial || '';
+    
+    editGridSystem = new RealTimeGridSystem({
+      db: db,
+      gridContainerId: 'editSerialGrid',
+      selectedSerialInputId: 'editSerial',
+      dayElementId: 'editDay',
+      timeElementId: 'editTime',
+      typeElementId: 'editType',
+      mode: 'user',
+      multiSelect: false,
+      userPendingExpiry: 1 * 60 * 1000,
+      adminPendingExpiry: 5 * 60 * 1000,
+      
+      onSerialClick: function(data) {
+        console.log('🎯 সিরিয়াল সিলেক্টেড:', data);
+        if (data.status === 'selected' || data.status === 'pending') {
+          document.getElementById('editSerial').value = data.serial;
+          Swal.fire({
+            title: 'সিলেক্টেড',
+            text: `সিরিয়াল ${data.serial} নির্বাচিত`,
+            icon: 'success',
+            timer: 1200,
+            showConfirmButton: false
+          });
+        }
+      },
+      
+      onGridUpdate: function(type, data) {
+        console.log('📊 এডিট গ্রিড আপডেট:', type, data);
+      }
+    });
+    
+    editGridSystem.init().then(success => {
+      if (success) {
+        console.log('✅ এডিট গ্রিড সিস্টেম রেডি');
+        setTimeout(() => {
+          const currentSerial = appointment.serial;
+          if (currentSerial) {
+            const items = document.querySelectorAll('#editSerialGrid .serial-item');
+            items.forEach(el => {
+              if (parseInt(el.dataset.serial) === currentSerial) {
+                el.classList.add('selected');
+              }
+            });
+          }
+        }, 300);
+      } else {
+        console.error('❌ এডিট গ্রিড ইনিশিয়ালাইজ ব্যর্থ');
+      }
+    });
+  }, 300);
+
+  document.getElementById('editAppointmentModal').style.display = 'flex';
+}
+
+async function updateAppointment(e) {
+  e.preventDefault();
+  const id = document.getElementById('editAppointmentId').value;
+  const newSerial = parseInt(document.getElementById('editSerial').value);
+  const day = document.getElementById('editDay').value;
+  const time = document.getElementById('editTime').value;
+  const type = document.getElementById('editType').value;
+
+  if (!newSerial) {
+    Swal.fire({ title: 'সতর্কতা!', text: 'অনুগ্রহ করে একটি সিরিয়াল নির্বাচন করুন', icon: 'warning' });
+    return;
+  }
+
+  try {
+    const currentDoc = await db.collection('appointments').doc(id).get();
+    if (currentDoc.exists) {
+      const currentData = currentDoc.data();
+      const todayStr = getTodayStr();
+      if (currentData.appointmentDate && currentData.appointmentDate < todayStr) {
+        Swal.fire({ title: 'অপারেশন ব্যর্থ!', text: 'অতিক্রান্ত সিরিয়াল এডিট বা আপডেট করা সম্ভব নয়।', icon: 'error' });
+        document.getElementById('editAppointmentModal').style.display = 'none';
+        return;
+      }
+    }
+  } catch(err) { console.error('Date check error:', err); }
+
+  const years = parseInt(document.getElementById('editAgeYears').value) || 0;
+  const months = parseInt(document.getElementById('editAgeMonths').value) || 0;
+  const days = parseInt(document.getElementById('editAgeDays').value) || 0;
+  let ageString = '';
+  if (years > 0) ageString += `${years} বছর`;
+  if (months > 0) ageString += `${ageString ? ', ' : ''}${months} মাস`;
+  if (days > 0) ageString += `${ageString ? ', ' : ''}${days} দিন`;
+
+  const nextDateInfo = getNextDateByDay(day);
+  const appointmentDate = nextDateInfo.dateString;
+  const appointmentDateDisplay = nextDateInfo.banglaDate;
+
+  try {
+    await db.collection('appointments').doc(id).update({
+      name: document.getElementById('editName').value,
+      phone: document.getElementById('editPhone').value,
+      age: ageString,
+      ageYears: years, ageMonths: months, ageDays: days,
+      day: day, time: time, patientType: type,
+      serial: newSerial,
+      appointmentDate: appointmentDate,
+      appointmentDateDisplay: appointmentDateDisplay,
+      updatedAt: new Date()
+    });
+    document.getElementById('editAppointmentModal').style.display = 'none';
+    editModeId = null;
+    if (editGridSystem) { editGridSystem.cleanup(); editGridSystem = null; }
+    Swal.fire({ title: 'সফল!', text: 'অ্যাপয়েন্টমেন্ট আপডেট করা হয়েছে', icon: 'success', timer: 2000, showConfirmButton: false });
+    fetchAppointments();
+  } catch (error) {
+    console.error('Update error:', error);
+    Swal.fire({ title: 'সমস্যা!', text: 'আপডেট করতে সমস্যা হয়েছে', icon: 'error' });
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('editAppointmentModal').style.display = 'none';
+  editModeId = null;
+  if (editGridSystem) { editGridSystem.cleanup(); editGridSystem = null; }
+}
+
+// ============================================================
+// VIEW TOKEN HISTORY
+// ============================================================
+
+document.getElementById('closeViewTokenModal').addEventListener('click', function() {
+  document.getElementById('viewTokenModal').style.display = 'none';
+});
+
+window.addEventListener('click', function(e) {
+  const modal = document.getElementById('viewTokenModal');
+  if (e.target === modal) {
+    modal.style.display = 'none';
+  }
+});
+
+async function viewTokenHistory(appointmentId) {
+  const modal = document.getElementById('viewTokenModal');
+  const historyList = document.getElementById('viewTokenHistoryList');
+  
+  historyList.innerHTML = `<div style="text-align:center; padding:30px; color:#94a3b8;">
+    <i class="fas fa-spinner fa-spin"></i> লোড হচ্ছে...
+  </div>`;
+  modal.style.display = 'flex';
+
+  try {
+    let appDoc = await db.collection('appointments').doc(appointmentId).get();
+    let appData = null;
+    let isArchived = false;
+
+    if (!appDoc.exists && archiveDb) {
+      console.log('🔄 archived_appointments-এ খুঁজছি...');
+      appDoc = await archiveDb.collection('archived_appointments').doc(appointmentId).get();
+      if (appDoc.exists) {
+        isArchived = true;
+        console.log('✅ archived_appointments-এ পাওয়া গেছে');
+      }
+    }
+
+    if (!appDoc || !appDoc.exists) {
+      const localApp = allAppointments.find(a => a.id === appointmentId);
+      if (localApp) {
+        appData = localApp;
+      } else {
+        historyList.innerHTML = `<div style="text-align:center; padding:20px; color:#dc2626;">অ্যাপয়েন্টমেন্ট খুঁজে পাওয়া যায়নি</div>`;
+        return;
+      }
+    } else {
+      appData = appDoc.data();
+      appData.id = appointmentId;
+      appData.isArchived = isArchived;
+    }
+
+    document.getElementById('viewPatientName').textContent = appData.name || '—';
+    document.getElementById('viewPatientSerial').textContent = `#${appData.serial || '—'}`;
+    document.getElementById('viewPatientPhone').textContent = appData.phone || '—';
+    document.getElementById('viewPatientDate').textContent = appData.appointmentDateDisplay || appData.appointmentDate || '—';
+    document.getElementById('viewPatientTime').textContent = appData.time ? formatTimeAMPM(appData.time) : '—';
+    document.getElementById('viewPatientType').textContent = appData.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+
+    const tokenQuery = await db.collection('paymentHistories')
+      .where('appointmentId', '==', appointmentId)
+      .limit(1)
+      .get();
+    let paymentHistory = [];
+    let fee = appData.tokenFee || 0;
+    let paid = appData.tokenPaid || 0;
+
+    if (!tokenQuery.empty) {
+      const tokenData = tokenQuery.docs[0].data();
+      paymentHistory = tokenData.paymentHistory || [];
+      fee = tokenData.tokenFee || fee;
+      paid = tokenData.tokenPaid || paid;
+    } else {
+      paymentHistory = appData.paymentHistory || [];
+      if (appData.isArchived && appData.paymentHistory) {
+        paymentHistory = appData.paymentHistory;
+        fee = appData.tokenFee || fee;
+        paid = appData.tokenPaid || paid;
+      }
+    }
+
+    if (!paymentHistory || paymentHistory.length === 0) {
+      historyList.innerHTML = `
+        <div style="text-align:center; padding:30px; color:#94a3b8;">
+          <i class="fas fa-info-circle"></i> কোনো পেমেন্ট ইতিহাস নেই
+          <div style="font-size:12px; margin-top:8px; color:#cbd5e1;">
+            ফি: ${fee} টাকা | পরিশোধিত: ${paid} টাকা
+          </div>
+        </div>
+      `;
+    } else {
+      const sorted = [...paymentHistory].reverse();
+      let html = '';
+      
+      sorted.forEach((p, idx) => {
+        let dateText = 'তারিখ নেই';
+        if (p.timestamp) {
+          try {
+            const d = p.timestamp.seconds ? new Date(p.timestamp.seconds * 1000) : new Date(p.timestamp);
+            dateText = d.toLocaleString('bn-BD', { 
+              year: 'numeric', month: 'long', day: 'numeric', 
+              hour: '2-digit', minute: '2-digit' 
+            });
+          } catch(e) {
+            dateText = p.timestamp || 'তারিখ নেই';
+          }
+        }
+        
+        const typeLabel = p.type === 'payment' ? 'পেমেন্ট' : 'ফেরত';
+        const typeColor = p.type === 'payment' ? '#dbeafe' : '#fed7aa';
+        const amountColor = p.type === 'payment' ? '#16a34a' : '#dc2626';
+        const icon = p.type === 'payment' ? '💰' : '↩️';
+        
+        html += `
+          <div style="background:${typeColor}; padding:12px 15px; border-radius:8px; margin-bottom:8px; border-left:4px solid ${p.type === 'payment' ? '#3b82f6' : '#f59e0b'};">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:5px;">
+              <div><strong>📅 ${dateText}</strong></div>
+              <div>
+                <span style="font-weight:700; color:${amountColor};">
+                  ${p.type === 'payment' ? '+' : '-'} ${p.amount} টাকা
+                </span>
+                <span style="background:#e2e8f0; padding:2px 10px; border-radius:12px; font-size:11px; margin-left:8px;">
+                  ${icon} ${typeLabel}
+                </span>
+              </div>
+            </div>
+            <div style="font-size:13px; color:#475569; margin-top:4px;">
+              💳 ${p.method || 'নগদ'} 
+              ${p.note ? `| 📝 ${p.note}` : ''}
+              ${p.previousPaid !== undefined ? `| পূর্বে: ${p.previousPaid} → বর্তমান: ${p.newPaid}` : ''}
+            </div>
+          </div>
+        `;
+      });
+      
+      historyList.innerHTML = html;
+    }
+
+    const due = Math.max(0, fee - paid);
+    document.getElementById('viewTotalFee').textContent = fee;
+    document.getElementById('viewTotalPaid').textContent = paid;
+    document.getElementById('viewTotalDue').textContent = due;
+
+  } catch (error) {
+    console.error('❌ ভিউ টোকেন এরর:', error);
+    historyList.innerHTML = `<div style="text-align:center; padding:20px; color:#dc2626;">
+      <i class="fas fa-exclamation-circle"></i> লোড করতে সমস্যা হয়েছে: ${error.message}
+    </div>`;
+  }
+}
+
+// ============================================================
+// রিয়েল-টাইম লিসেনার
+// ============================================================
+let primaryListener = null;
+function setupListeners() {
+  if (primaryListener) primaryListener();
+  if (!currentUser) return;
+  primaryListener = db.collection('appointments')
+    .where('phone', '==', currentUser)
+    .onSnapshot(() => { fetchAppointments(); }, (error) => console.error('Listener error:', error));
+}
+
+// ============================================================
+// কম্পোনেন্ট লোডার রেডি হওয়ার জন্য অপেক্ষা
+// ============================================================
+function waitForComponentLoader(callback, retries = 15) {
+  if (typeof ComponentLoader !== 'undefined' && ComponentLoader.loadAllComponents) {
+    callback();
+    return;
+  }
+  if (retries <= 0) {
+    console.warn('⚠️ ComponentLoader পাওয়া যায়নি');
+    return;
+  }
+  setTimeout(() => waitForComponentLoader(callback, retries - 1), 300);
+}
+
+// ============================================================
+// DOM লোড হলে
+// ============================================================
+document.addEventListener('DOMContentLoaded', async function() {
+  if (!currentUser) {
+    currentUser = sessionStorage.getItem('userPhone') || sessionStorage.getItem('loggedInUser');
+    if (!currentUser) {
+      window.location.href = 'login.html';
+      return;
+    }
+  }
+
+  const now = new Date();
+  document.getElementById('headerDate').textContent = formatDate(now);
+
+  // কম্পোনেন্ট লোড
+  waitForComponentLoader(() => {
+    ComponentLoader.loadAllComponents('সিরিয়াল তালিকা');
+    console.log('✅ কম্পোনেন্ট লোড সম্পন্ন');
+    setTimeout(() => { updateSidebarStats(); }, 500);
+  });
+
+  // ইভেন্ট লিসেনার
+  document.getElementById('searchInput').addEventListener('input', renderTable);
+
+  document.getElementById('closeEditModal').addEventListener('click', closeEditModal);
+  document.getElementById('cancelEditModal').addEventListener('click', closeEditModal);
+  document.getElementById('editAppointmentForm').addEventListener('submit', updateAppointment);
+
+  document.getElementById('editDay').addEventListener('change', function() {
+    updateEditTimeOptions();
+    document.getElementById('editTime').value = '';
+    document.getElementById('editSerial').value = '';
+    if (editGridSystem) editGridSystem.updateGrid();
+  });
+  document.getElementById('editType').addEventListener('change', function() {
+    updateEditTimeOptions();
+    document.getElementById('editTime').value = '';
+    document.getElementById('editSerial').value = '';
+    if (editGridSystem) editGridSystem.updateGrid();
+  });
+  document.getElementById('editTime').addEventListener('change', function() {
+    document.getElementById('editSerial').value = '';
+    if (editGridSystem) editGridSystem.updateGrid();
+  });
+
+  document.getElementById('closeViewTokenModal').addEventListener('click', function() {
+    document.getElementById('viewTokenModal').style.display = 'none';
+  });
+  window.addEventListener('click', function(e) {
+    const modal = document.getElementById('viewTokenModal');
+    if (e.target === modal) modal.style.display = 'none';
+  });
+
+// ডাটা লোড
+  await loadRanges();
+  await fetchAppointments();
+  setupListeners();
+
+  setTimeout(() => {
+    if (window.ComponentLoader && window.ComponentLoader.initGlobalSidebarStats) {
+      window.ComponentLoader.initGlobalSidebarStats();
+    }
+  }, 1000);
+});
+
+// ============================================================
+// ক্লিনআপ
+// ============================================================
+window.addEventListener('beforeunload', function() {
+  if (primaryListener) primaryListener();
+  if (editGridSystem) { editGridSystem.cleanup(); editGridSystem = null; }
+});
+</script>
+
+</body>
+</html>

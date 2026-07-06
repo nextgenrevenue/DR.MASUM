@@ -2704,18 +2704,16 @@ if (tokenBtn) {
       }
     }
 
-    // =======================================================
-    // টোকেন বিস্তারিত মোডাল দেখানো (নতুন ফিচার)
-    // =======================================================
-    async function showTokenDetailsModal(button) {
+async function showTokenDetailsModal(button) {
   const docId = button.getAttribute('data-id');
   const doc = await db.collection('appointments').doc(docId).get();
   const data = doc.data();
   
   currentTokenId = docId;
   
-  // 🔥 চেক করুন paymentHistories-এ এই appointmentId আছে কিনা
   let existingToken = null;
+  let paymentHistory = [];
+  
   const existingTokenQuery = await db.collection('paymentHistories')
     .where('appointmentId', '==', docId)
     .limit(1)
@@ -2724,6 +2722,7 @@ if (tokenBtn) {
   if (!existingTokenQuery.empty) {
     existingToken = { id: existingTokenQuery.docs[0].id, ...existingTokenQuery.docs[0].data() };
     currentTokenDoc = existingToken;
+    paymentHistory = existingToken.paymentHistory || [];
   } else {
     currentTokenDoc = { id: docId, ...data };
   }
@@ -2732,64 +2731,114 @@ if (tokenBtn) {
   const currentFee = existingToken?.tokenFee || data.tokenFee || defaultFee;
   const currentPaid = existingToken?.tokenPaid || data.tokenPaid || 0;
   const due = currentFee - currentPaid;
+  
+  let paymentHistoryHtml = '';
+  if (paymentHistory.length > 0) {
+    const sortedHistory = [...paymentHistory].reverse();
+    const paymentItems = sortedHistory.map(p => {
+      let dateText = 'তারিখ নেই';
+      if (p.timestamp) {
+        try {
+          const date = new Date(p.timestamp);
+          dateText = date.toLocaleString('bn-BD', {
+            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+        } catch(e) {
+          dateText = p.timestamp;
+        }
+      }
       
-      const paymentHistory = data.paymentHistory || [];
-      
-      const modalHtml = `
-        <div class="token-modal-overlay" id="tokenModalOverlay">
-          <div class="token-modal-container">
-            <div class="token-modal-header">
-              <h3><i class="fas fa-ticket-alt"></i> টোকেন বিস্তারিত</h3>
-              <button class="token-modal-close" onclick="closeTokenModal()">&times;</button>
-            </div>
-            <div class="token-modal-body">
-              <div class="token-form-group">
-                <label>রোগীর নাম</label>
-                <input type="text" id="tokenName" value="${(data.name || '').replace(/"/g, '&quot;')}" placeholder="রোগীর নাম">
-              </div>
-              <div class="token-form-group">
-  <div class="token-form-group">
-  <label>বয়স</label>
-  <input type="text" id="tokenAge" value="${getAgeDisplay(data)}" placeholder="বয়স">
-</div>
-              <div class="token-form-group">
-  <label>রোগীর ধরন</label>
-  <select id="tokenType" onchange="updateFeeByPatientType(this.value)">
-    <option value="new" ${data.patientType === 'new' ? 'selected' : ''}>নতুন রোগী</option>
-    <option value="old" ${data.patientType === 'old' ? 'selected' : ''}>পুরাতন রোগী</option>
-  </select>
-</div>
-<div class="token-form-group">
-  <label>ফি (টাকা)</label>
-  <input type="number" id="tokenFee" value="${currentFee}" placeholder="ফি" oninput="updateDueAmount()">
-</div>
-              <div class="token-form-group">
-                <label>পরিশোধিত টাকা</label>
-                <input type="number" id="tokenPaid" value="${currentPaid}" placeholder="পরিশোধিত টাকা" oninput="updateDueAmount()">
-                <div class="due-amount" id="dueAmount">বাকি: ${due} টাকা</div>
-              </div>
-              ${paymentHistory.length > 0 ? `
-                <div class="payment-history">
-                  <h4>পেমেন্ট ইতিহাস:</h4>
-                  ${paymentHistory.map(p => `
-                    <div class="payment-item">
-                      <strong>${new Date(p.date?.toDate?.() || p.timestamp || Date.now()).toLocaleDateString('bn-BD')}</strong> - 
-                      ${p.amount} টাকা (${p.method || 'নগদ'}) - ${p.note || ''}
-                    </div>
-                  `).join('')}
-                </div>
-              ` : ''}
-            </div>
-            <div class="token-modal-actions">
-              <button class="btn-save-print" onclick="saveAndPrintToken()"><i class="fas fa-save"></i> সংরক্ষণ ও প্রিন্ট</button>
-              <button class="btn-cancel-modal" onclick="closeTokenModal()"><i class="fas fa-times"></i> বাতিল</button>
-            </div>
+      return `
+        <div class="payment-item" style="background: ${p.type === 'payment' ? '#dbeafe' : '#fed7aa'}; padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+          <div><strong>📅 ${dateText}</strong></div>
+          <div>💰 পরিমাণ: ${toBengaliNumber(p.amount)} টাকা</div>
+          <div>💳 পদ্ধতি: ${p.method || 'নগদ'}</div>
+          <div>📝 ধরন: ${p.type === 'payment' ? 'পেমেন্ট' : 'ফেরত'}</div>
+          ${p.note ? `<div>📝 নোট: ${p.note}</div>` : ''}
+          <div style="font-size: 11px; color: #6b7280; margin-top: 5px;">
+            পূর্বের পরিশোধ: ${toBengaliNumber(p.previousPaid)} → নতুন: ${toBengaliNumber(p.newPaid)}
           </div>
         </div>
       `;
-      
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
-    }
+    }).join('');
+    
+    paymentHistoryHtml = `
+      <div class="payment-history">
+        <h4>💳 পেমেন্ট ইতিহাস (${paymentHistory.length}টি):</h4>
+        <div style="max-height: 300px; overflow-y: auto;">
+          ${paymentItems}
+        </div>
+      </div>
+    `;
+  } else {
+    paymentHistoryHtml = '<div class="payment-history"><p style="color:#9ca3af; padding: 20px; text-align: center;">📭 কোনো পেমেন্ট ইতিহাস নেই</p></div>';
+  }
+  
+  // ✅ বাটন এবং টাইটেল নির্ধারণ (এখানে বাটনে id যোগ করা হয়েছে)
+  let modalTitle = 'নতুন টোকেন প্রদান';
+  let actionButtonHtml = `
+    <button class="btn-save-print" id="savePrintTokenBtn" onclick="saveAndPrintToken(true)">
+      <i class="fas fa-print"></i> সংরক্ষণ ও প্রিন্ট
+    </button>
+  `;
+  
+  if (existingToken) {
+    modalTitle = 'টোকেন বিস্তারিত ও আপডেট';
+    actionButtonHtml = `
+      <button class="btn-save-print" id="savePrintTokenBtn" style="background-color: #16a34a;" onclick="saveAndPrintToken(false)">
+        <i class="fas fa-edit"></i> তথ্য আপডেট করুন
+      </button>
+    `;
+  }
+
+  const modalHtml = `
+    <div class="token-modal-overlay" id="tokenModalOverlay">
+      <div class="token-modal-container">
+        <div class="token-modal-header">
+          <h3><i class="fas fa-ticket-alt"></i> ${modalTitle}</h3>
+          <button class="token-modal-close" onclick="closeTokenModal()">&times;</button>
+        </div>
+        <div class="token-modal-body">
+          <div class="token-form-group">
+            <label>রোগীর নাম</label>
+            <input type="text" id="tokenName" value="${(data.name || '').replace(/"/g, '&quot;')}" placeholder="রোগীর নাম">
+          </div>
+          <div class="token-form-group">
+            <label>বয়স</label>
+            <input type="text" id="tokenAge" value="${getAgeDisplay(data)}" placeholder="বয়স">
+          </div>
+          <div class="token-form-group">
+            <label>রোগীর ধরন</label>
+            <select id="tokenType" onchange="updateFeeByPatientType(this.value)">
+              <option value="new" ${data.patientType === 'new' ? 'selected' : ''}>নতুন রোগী</option>
+              <option value="old" ${data.patientType === 'old' ? 'selected' : ''}>পুরাতন রোগী</option>
+            </select>
+          </div>
+          <div class="token-form-group">
+            <label>ফি (টাকা)</label>
+            <input type="number" id="tokenFee" value="${currentFee}" placeholder="ফি" oninput="updateDueAmount()">
+          </div>
+          <div class="token-form-group">
+            <label>পরিশোধিত টাকা</label>
+            <input type="number" id="tokenPaid" value="${currentPaid}" placeholder="পরিশোধিত টাকা" oninput="updateDueAmount()">
+            <div class="due-amount" id="dueAmount">বাকি: ${due} টাকা</div>
+          </div>
+          <div class="token-form-group">
+            <label>রেফারেন্স</label>
+            <input type="text" id="tokenGivenBy" value="${existingToken?.givenBy || data.givenBy || ''}" placeholder="রেফারেন্স নাম লিখুন" style="width:100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+          </div>
+          ${paymentHistoryHtml}
+        </div>
+        <div class="token-modal-actions">
+          ${actionButtonHtml}
+          <button class="btn-cancel-modal" onclick="closeTokenModal()"><i class="fas fa-times"></i> বাতিল</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
     
     function updateDueAmount() {
       const fee = parseInt(document.getElementById('tokenFee')?.value) || 0;
@@ -2821,20 +2870,38 @@ if (tokenBtn) {
 }
     
 
-async function saveAndPrintToken() {
+// গ্লোবাল ফ্ল্যাগ – একই সময়ে একাধিক সেভ প্রতিরোধ
+let isTokenSaving = false;
+
+async function saveAndPrintToken(shouldPrint) {
+  // ✅ যদি ইতিমধ্যেই সেভ চলছে, তাহলে আরেকটি কল ব্লক করুন
+  if (isTokenSaving) {
+    showAlert('দয়া করে অপেক্ষা করুন, টোকেন সংরক্ষণ করা হচ্ছে...', 'warning');
+    return;
+  }
+
   if (!currentTokenId) {
     showAlert('টোকেন তথ্য পাওয়া যায়নি', 'error');
     return;
   }
-  
-  const name = document.getElementById('tokenName')?.value || '';
-  const age = document.getElementById('tokenAge')?.value || '';
-  const patientType = document.getElementById('tokenType')?.value;
-  const fee = parseInt(document.getElementById('tokenFee')?.value) || (patientType === 'new' ? 800 : 600);
-  const paid = parseInt(document.getElementById('tokenPaid')?.value) || 0;
-  const givenBy = document.getElementById('tokenGivenBy')?.value;
-  
+
+  // ✅ বাটন ডিজেবল করা
+  const saveBtn = document.getElementById('savePrintTokenBtn');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> সংরক্ষণ হচ্ছে...';
+  }
+
+  isTokenSaving = true; // লক
+
   try {
+    const name = document.getElementById('tokenName')?.value || '';
+    const age = document.getElementById('tokenAge')?.value || '';
+    const patientType = document.getElementById('tokenType')?.value;
+    const fee = parseInt(document.getElementById('tokenFee')?.value) || (patientType === 'new' ? 800 : 600);
+    const paid = parseInt(document.getElementById('tokenPaid')?.value) || 0;
+    const givenBy = document.getElementById('tokenGivenBy')?.value || '';
+    
     const appointmentDoc = await db.collection('appointments').doc(currentTokenId).get();
     const appointmentData = appointmentDoc.data();
     const originalSerial = appointmentData.serial;
@@ -2847,7 +2914,6 @@ async function saveAndPrintToken() {
     let tokenNumber;
     
     if (!existingTokenQuery.empty) {
-      // Update existing token
       const existingDoc = existingTokenQuery.docs[0];
       tokenNumber = existingDoc.data().tokenNumber;
       const existingData = existingDoc.data();
@@ -2879,10 +2945,12 @@ async function saveAndPrintToken() {
         tokenDue: fee - paid,
         status: (fee - paid) === 0 ? 'paid' : 'due',
         paymentHistory: paymentHistory,
+        givenBy: givenBy,
+        reference: givenBy,
         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
       });
       
-      showAlert(`✅ টোকেন ${tokenNumber} আপডেট করা হয়েছে!`, 'success');
+      showAlert(`✅ টোকেন ${tokenNumber} সফলভাবে আপডেট করা হয়েছে!`, 'success');
       
     } else {
       const today = new Date();
@@ -2891,12 +2959,10 @@ async function saveAndPrintToken() {
       const dd = String(today.getDate()).padStart(2, '0');
       const datePrefix = `${yy}${mm}${dd}`;
       
-      // 🔥 শুধু where ব্যবহার করবো, orderBy ছাড়া
       const allTokensQuery = await db.collection('paymentHistories')
         .where('tokenDatePrefix', '==', datePrefix)
         .get();
       
-      // জাভাস্ক্রিপ্টে সাজানো
       let maxCounter = 0;
       allTokensQuery.forEach(doc => {
         const data = doc.data();
@@ -2938,7 +3004,7 @@ async function saveAndPrintToken() {
         status: (fee - paid) === 0 ? 'paid' : 'due',
         paymentHistory: initialPaymentHistory,
         source: 'dashboard',
-        givenBy: givenBy, 
+        givenBy: givenBy,
         reference: givenBy,
         appointmentId: currentTokenId,
         serial: originalSerial,
@@ -2947,7 +3013,7 @@ async function saveAndPrintToken() {
         createdBy: sessionStorage.getItem('adminEmail') || 'admin'
       });
       
-      showAlert(`✅ টোকেন ${tokenNumber} তৈরি! (সিরিয়াল: ${originalSerial})`, 'success');
+      showAlert(`✅ টোকেন ${tokenNumber} তৈরি করা হয়েছে! (সিরিয়াল: ${originalSerial})`, 'success');
     }
     
     await db.collection('appointments').doc(currentTokenId).update({
@@ -2956,11 +3022,16 @@ async function saveAndPrintToken() {
       tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
       tokenFee: fee,
       tokenPaid: paid,
+      givenBy: givenBy,
       lastTokenUpdate: firebase.firestore.FieldValue.serverTimestamp()
     });
     
     closeTokenModal();
-    printTokenReceipt(tokenNumber, name, age, patientType, fee, paid);
+    
+    // শুধু shouldPrint এর মান true হলেই প্রিন্ট উইন্ডো ওপেন হবে
+    if (shouldPrint === true) {
+      printTokenReceipt(tokenNumber, name, age, patientType, fee, paid);
+    }
     
     if (allAppointmentsSnapshot) {
       renderAppointments();
@@ -2969,7 +3040,21 @@ async function saveAndPrintToken() {
     
   } catch (error) {
     console.error("❌ Error saving token:", error);
-    showAlert("সংরক্ষণ করতে সমস্যা হয়েছে: " + error.message, "error");
+    showAlert("সংরক্ষণ করতে সমস্যা হয়েছে: " + error.message, "error");
+  } finally {
+    // ✅ সব শেষে বাটন আবার সক্রিয় করুন এবং ফ্ল্যাগ রিসেট করুন
+    isTokenSaving = false;
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      // আগের টেক্সট ফিরিয়ে দিন (আমরা জানি না আসল টেক্সট কি, তাই সাধারণ রাখা)
+      if (saveBtn.innerHTML.includes('সংরক্ষণ হচ্ছে')) {
+        if (saveBtn.textContent.includes('আপডেট')) {
+          saveBtn.innerHTML = '<i class="fas fa-edit"></i> তথ্য আপডেট করুন';
+        } else {
+          saveBtn.innerHTML = '<i class="fas fa-print"></i> সংরক্ষণ ও প্রিন্ট';
+        }
+      }
+    }
   }
 }
 
@@ -2980,7 +3065,6 @@ async function showTokenDetailsModal(button) {
   
   currentTokenId = docId;
   
-  // paymentHistories থেকে টোকেন ডাটা নিন
   let existingToken = null;
   let paymentHistory = [];
   
@@ -3002,7 +3086,6 @@ async function showTokenDetailsModal(button) {
   const currentPaid = existingToken?.tokenPaid || data.tokenPaid || 0;
   const due = currentFee - currentPaid;
   
-  // পেমেন্ট ইতিহাস HTML তৈরি করুন
   let paymentHistoryHtml = '';
   if (paymentHistory.length > 0) {
     const sortedHistory = [...paymentHistory].reverse();
@@ -3012,11 +3095,7 @@ async function showTokenDetailsModal(button) {
         try {
           const date = new Date(p.timestamp);
           dateText = date.toLocaleString('bn-BD', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
           });
         } catch(e) {
           dateText = p.timestamp;
@@ -3049,11 +3128,20 @@ async function showTokenDetailsModal(button) {
     paymentHistoryHtml = '<div class="payment-history"><p style="color:#9ca3af; padding: 20px; text-align: center;">📭 কোনো পেমেন্ট ইতিহাস নেই</p></div>';
   }
   
+  // বাটন এবং টাইটেল নির্ধারণ
+  let modalTitle = 'নতুন টোকেন প্রদান';
+  let actionButtonHtml = `<button class="btn-save-print" onclick="saveAndPrintToken(true)"><i class="fas fa-print"></i> সংরক্ষণ ও প্রিন্ট</button>`;
+  
+  if (existingToken) {
+    modalTitle = 'টোকেন বিস্তারিত ও আপডেট';
+    actionButtonHtml = `<button class="btn-save-print" style="background-color: #16a34a;" onclick="saveAndPrintToken(false)"><i class="fas fa-edit"></i> তথ্য আপডেট করুন</button>`;
+  }
+
   const modalHtml = `
     <div class="token-modal-overlay" id="tokenModalOverlay">
       <div class="token-modal-container">
         <div class="token-modal-header">
-          <h3><i class="fas fa-ticket-alt"></i> টোকেন বিস্তারিত</h3>
+          <h3><i class="fas fa-ticket-alt"></i> ${modalTitle}</h3>
           <button class="token-modal-close" onclick="closeTokenModal()">&times;</button>
         </div>
         <div class="token-modal-body">
@@ -3081,14 +3169,14 @@ async function showTokenDetailsModal(button) {
             <input type="number" id="tokenPaid" value="${currentPaid}" placeholder="পরিশোধিত টাকা" oninput="updateDueAmount()">
             <div class="due-amount" id="dueAmount">বাকি: ${due} টাকা</div>
           </div>
-         <div class="token-form-group">
-          <label>রেফারেন্স</label>
-          <input type="text" id="tokenGivenBy" placeholder="রেফারেন্স নাম লিখুন" style="width:100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
-         </div>
-          ${paymentHistoryHtml} <!-- ✅ পেমেন্ট ইতিহাস দেখান -->
+          <div class="token-form-group">
+            <label>রেফারেন্স</label>
+            <input type="text" id="tokenGivenBy" value="${existingToken?.givenBy || data.givenBy || ''}" placeholder="রেফারেন্স নাম লিখুন" style="width:100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+          </div>
+          ${paymentHistoryHtml}
         </div>
         <div class="token-modal-actions">
-          <button class="btn-save-print" onclick="saveAndPrintToken()"><i class="fas fa-save"></i> সংরক্ষণ ও প্রিন্ট</button>
+          ${actionButtonHtml}
           <button class="btn-cancel-modal" onclick="closeTokenModal()"><i class="fas fa-times"></i> বাতিল</button>
         </div>
       </div>
@@ -3099,6 +3187,7 @@ async function showTokenDetailsModal(button) {
 }
 
 function printTokenReceipt(tokenNumber, name, age, patientType, fee, paid) {
+  const adminName = sessionStorage.getItem('adminName') || 'অ্যাডমিন';
   const win = window.open('', '_blank');
   win.document.write(`
     <!DOCTYPE html>
@@ -3107,12 +3196,12 @@ function printTokenReceipt(tokenNumber, name, age, patientType, fee, paid) {
       <title>টোকেন প্রিন্ট</title>
       <meta charset="UTF-8">
       <style>
-        @page { size: 80mm auto; margin: 0; }
-        body { font-family: 'Noto Sans Bengali', sans-serif; width: 80mm; padding: 10px; margin: 0 auto; }
+        @page { size: 60mm auto; margin: 0; }
+        body { font-family: 'Noto Sans Bengali', sans-serif; width: 56mm; padding: 10px; margin: 0 auto; }
         .card { border: 1px dashed #2563eb; border-radius: 8px; padding: 12px; text-align: center; }
         .header { border-bottom: 1px dashed #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; }
-        .header h2 { font-size: 16px; color: #2563eb; margin: 0 0 3px 0; }
-        .token-num { font-size: 22px; font-weight: bold; color: #2563eb; margin: 8px 0; }
+        .header h2 { font-size: 12px; font-weight: bold; color: #2563eb; margin: 0 0 3px 0; }
+        .token-num { font-size: 20px; font-weight: bold; color: #2563eb; margin: 8px 0; }
         .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e5e7eb; font-size: 12px; }
         .footer { margin-top: 10px; font-size: 9px; color: #9ca3af; text-align: center; }
       </style>
@@ -3125,7 +3214,7 @@ function printTokenReceipt(tokenNumber, name, age, patientType, fee, paid) {
         <div class="info-row"><span>বয়স:</span><span>${age || '—'}</span></div>
         <div class="info-row"><span>ধরন:</span><span>${patientType === 'new' ? 'নতুন' : 'পুরাতন'}</span></div>
         <div class="info-row"><span>ফি:</span><span>${fee} টাকা</span></div>
-        <div class="footer"><p>ধন্যবাদ 🙏 সুস্থ থাকুন</p><p>${new Date().toLocaleString('bn-BD')}</p></div>
+        <div class="footer"><p>Printed by: ${adminName}</p><p>${new Date().toLocaleString('bn-BD')}</p></div>
       </div>
       <div class="no-print" style="text-align:center;margin-top:20px;">
         <button onclick="window.print()" style="padding:10px 20px;background:#2563eb;color:white;border:none;border-radius:8px;">🖨️ প্রিন্ট করুন</button>
@@ -3489,7 +3578,7 @@ function getActivePatientIndex() {
 }
 
     // =======================================================
-// তারিখ গণনা ফাংশন যোগ করুন (search.html থেকে)
+// তারিখ গণনা ফাংশন যোগ করুন
 // =======================================================
 function getNextDateByDay(targetDay) {
   const daysMap = {
@@ -3666,32 +3755,58 @@ async function addQuickSerial() {
     const elapsed = Date.now() - startTime;
     console.log(`✅ বুকিং সম্পন্ন: ${elapsed}ms`);
 
-   // ==================== SMS Integration ====================
-if (!skipPhone && phone) {
-  for (let i = 0; i < allPatients.length; i++) {
-    try {
-      const smsPayload = {
-        phone: phone,
-        name: allPatients[i].name || "Patient",
-        serial: selectedSerials[i],
-        date: appointmentDateInfo.displayDate || ""
-      };
+// ==================== SMS Integration (Multi-Serial Supported) ====================
+try {
+  // ১. ডাইনামিক লোকাল ভ্যারিয়েবল থেকে ডেটা সংগ্রহ (লুপের বাইরে সাধারণ ডেটা)
+  const selectedPhone = phone; // উপরের ফাংশনে থাকা আসল ফোন নম্বর
+  const appointmentTime = time || "07:00 PM"; // উপরে থাকা সিলেক্টেড টাইম
+  const englishDateStr = appointmentDateInfo ? appointmentDateInfo.dateString : ""; // জেনারেট হওয়া ইংরেজি তারিখ
 
-      const response = await fetch('/.netlify/functions/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(smsPayload),
-      });
-      
-      const result = await response.json();
-      console.log(`📲 রোগী ${i+1} এর এসএমএস:`, result);
-      
-    } catch (error) {
-      console.error(`❌ রোগী ${i+1} এর এসএমএস ত্রুটি:`, error);
-    }
+  const apiKey = '74a82f2a949057f0e67fa4b672f75275';
+  const sender = '8809617635159';
+
+  // ২. ফোন নম্বর থাকলে এবং "ফোন ছাড়া বুকিং" চেক না করা থাকলেই কেবল এসএমএস যাবে
+  if (selectedPhone && !skipPhone) {
+    console.log(`🚀 Total serials to notify: ${allPatients.length}. Sending individual SMS...`);
+
+    // অলরেডি ফর্ম ভ্যালিডেশন করা 'allPatients' এবং 'selectedSerials' অ্যারে থেকে লুপ চালানো
+    allPatients.forEach((patient, i) => {
+      const patientName = patient.name || "Patient";
+      const singleSerial = selectedSerials[i]; // ঠিক এই রোগীর জন্য বরাদ্দকৃত সিরিয়াল
+
+      if (singleSerial) {
+        // প্রতিটি রোগীর জন্য আলাদা ডাইনামিক ইংরেজি মেসেজ টেমপ্লেট
+        const smsMessage = `Dear ${patientName}, your Serial No: ${singleSerial}, Date: ${englishDateStr}, Estimated Time: ${appointmentTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
+
+        const automasUrl = `https://api.automas.com.bd/smsapiv3?apikey=${apiKey}&sender=${sender}&msisdn=${selectedPhone}&smstext=${encodeURIComponent(smsMessage)}`;
+
+        // no-cors মোডে সাইলেন্ট ব্যাকগ্রাউন্ড রিকোয়েস্ট
+        fetch(automasUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        })
+        .then(() => {
+          console.log(`📥 SMS sent successfully for ${patientName} (Serial: ${singleSerial})`);
+        })
+        .catch(err => {
+          console.warn(`⚠️ SMS Network Error for Serial ${singleSerial}:`, err);
+        });
+      }
+    });
+  } else {
+    console.log("ℹ️ SMS skipped: No phone number provided or skip phone checked.");
   }
+
+} catch (error) {
+  console.error("❌ SMS Gateway Connection Error in Dashboard:", error);
 }
-// =============================================================================
+// ===================================================================================
+
+
+
     
     showAlert(`✅ ${allPatients.length} জন রোগী সফলভাবে বুক হয়েছে!\n📞 ফোন: ${phone || 'ছাড়া'}\n🎫 সিরিয়াল: ${selectedSerials.join(', ')}`, 'success');
     

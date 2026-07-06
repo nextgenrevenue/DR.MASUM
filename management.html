@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>সিরিয়াল ম্যানেজমেন্ট</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   
 <style>
     :root {
@@ -1075,6 +1076,8 @@
       
       console.log('🔍 Raw data from Firebase:', JSON.stringify(rawData));
       
+      let needDatabaseUpdate = false; // ডাটাবেজে ব্যাক-আপডেট করার ফ্ল্যাগ
+      
       // 🔧 কমা/হাইফেন কে অ্যারেতে রূপান্তর
       for (const day in rawData) {
         if (!rawData[day]) continue;
@@ -1085,6 +1088,8 @@
             console.log(`📌 Before conversion: ${day} ${type} ${time} =`, val, typeof val);
             
             if (typeof val === 'string') {
+              needDatabaseUpdate = true; // যেহেতু স্ট্রিং পাওয়া গেছে, ডাটাবেজ আপডেট করতে হবে
+              
               if (val.includes('-')) {
                 const parts = val.split('-');
                 rawData[day][type][time] = [parseInt(parts[0]), parseInt(parts[1])];
@@ -1097,12 +1102,14 @@
               } 
               else {
                 const single = parseInt(val);
-                rawData[day][type][time] = [1, single];
+                rawData[day][type][time] = [1, isNaN(single) ? 10 : single]; // নিরাপদ ব্যাকআপ
                 console.log(`✅ Converted single: ${val} → [1, ${single}]`);
               }
             }
             else if (Array.isArray(val)) {
-              console.log(`✅ Already array: [${val[0]}, ${val[1]}]`);
+              // নিশ্চিত করা যে অ্যারের ভেতরের ভ্যালুগুলো স্ট্রিং না হয়ে নাম্বার (Integer) আছে
+              rawData[day][type][time] = [parseInt(val[0]) || 1, parseInt(val[1]) || 10];
+              console.log(`✅ Validated array: [${rawData[day][type][time][0]}, ${rawData[day][type][time][1]}]`);
             }
             
             console.log(`📌 After conversion: ${day} ${type} ${time} =`, rawData[day][type][time]);
@@ -1111,7 +1118,14 @@
       }
       
       this.serialRanges = rawData;
-      console.log('✅ Final serialRanges:', this.serialRanges);
+      console.log('✅ Final serialRanges Object:', this.serialRanges);
+      
+      // 🔥 যদি ফায়ারবেসে পুরোনো কোন স্ট্রিং ডাটা থেকে থাকে, তবে তাকে অটো অ্যারেতে রূপান্তর করে ফায়ারবেসে পার্মানেন্টলি সেভ করে দেবে
+      if (needDatabaseUpdate) {
+        await this.db.collection('settings').doc('serialRanges').set(this.serialRanges);
+        console.log('💾 Database automatically fixed and updated with true Arrays!');
+      }
+
       this.updateTimeFilterOptions();
     } else {
       this.serialRanges = { Thursday: {}, Friday: {} };

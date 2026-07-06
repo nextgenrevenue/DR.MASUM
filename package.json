@@ -1,0 +1,6 @@
+{
+  "name": "DrMasum",
+  "dependencies": {
+    "firebase-admin": "^11.8.0"
+  }
+}

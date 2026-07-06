@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>সিরিয়াল বুকিং - সহজ সিরিয়াল</title>
+  <!-- ফন্ট, টেইলউইন্ড, ফন্ট অ্যাওসাম, ফায়ারবেস, সুইট অ্যালার্ট -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <!-- ===== grid.js (RealTimeGridSystem) ===== -->
+  <script src="grid.js"></script>
+  
+  <!-- ===== components-inline.js (সাইডবার, হেডার, ফুটার) ===== -->
+  <script src="components-inline.js"></script>
+  
+  <style>
+    /* বেসিক রিসেট */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: 'Inter', 'Noto Sans Bengali', sans-serif; 
+      background: #f0f4f8; 
+      margin: 0;
+      padding-top: 64px; /* হেডারের জন্য জায়গা */
+    }
+
+    /* সিরিয়াল গ্রিড */
+    .serial-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 6px;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      max-height: 260px;
+      overflow-y: auto;
+      margin: 8px 0;
+      background: white;
+    }
+    @media (max-width: 768px) { 
+      .serial-grid { grid-template-columns: repeat(7, 1fr); } 
+    }
+    .serial-item {
+      padding: 8px;
+      text-align: center;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .serial-item.available { 
+      background: #dcfce7; 
+      color: #16a34a; 
+      border-color: #16a34a; 
+    }
+    .serial-item.available:hover { 
+      background: #bbf7d0; 
+      transform: scale(1.05); 
+    }
+    .serial-item.booked { 
+      background: #fecaca; 
+      color: #dc2626; 
+      border-color: #dc2626; 
+      cursor: not-allowed; 
+      opacity: 0.7; 
+    }
+    .serial-item.pending { 
+      background: #dbeafe; 
+      color: #3b82f6; 
+      border-color: #3b82f6; 
+      cursor: not-allowed; 
+      opacity: 0.7; 
+    }
+    .serial-item.selected { 
+      background: #fef3c7; 
+      color: #d97706; 
+      border-color: #d97706; 
+      box-shadow: 0 0 0 3px rgba(245,158,11,0.3); 
+    }
+
+    /* বুকিং কার্ড */
+    .book-section { max-width: 600px; margin: 0 auto; }
+    .book-section .card { 
+      background: white; 
+      border-radius: 16px; 
+      padding: 28px; 
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04); 
+      border: 1px solid #f1f5f9; 
+    }
+    .book-section .card h3 { 
+      font-size: 20px; 
+      font-weight: 700; 
+      margin-bottom: 20px; 
+    }
+    .book-section .form-group { 
+      margin-bottom: 16px; 
+    }
+    .book-section .form-group label { 
+      display: block; 
+      font-weight: 600; 
+      margin-bottom: 4px; 
+      font-size: 14px; 
+      color: #334155; 
+    }
+    .book-section .form-group input, 
+    .book-section .form-group select {
+      width: 100%; 
+      padding: 10px 14px;
+      border: 2px solid #e2e8f0; 
+      border-radius: 10px;
+      font-size: 14px; 
+      outline: none; 
+      font-family: inherit;
+    }
+    .book-section .form-group input:focus, 
+    .book-section .form-group select:focus {
+      border-color: #3b82f6; 
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    }
+
+    .btn-primary {
+      width: 100%; 
+      padding: 12px; 
+      border: none; 
+      border-radius: 10px;
+      background: #3b82f6; 
+      color: white; 
+      font-weight: 700; 
+      font-size: 16px;
+      cursor: pointer; 
+      transition: 0.15s;
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* কন্টেইনার লেআউট */
+    .main-wrap {
+      display: flex;
+      min-height: calc(100vh - 64px);
+    }
+    #sidebar-container {
+      flex-shrink: 0;
+      width: 280px;
+    }
+    .content-area {
+      flex: 1;
+      padding: 16px 20px 40px;
+      background: #f0f4f8;
+    }
+    @media (max-width: 768px) {
+      .main-wrap { flex-direction: column; }
+      #sidebar-container { width: 100%; }
+      .content-area { padding: 12px 8px 40px; }
+    }
+    #header-container, #footer-container { width: 100%; }
+
+    /* মোবাইল অ্যাডজাস্ট */
+    @media (max-width: 768px) {
+      .book-section .card { padding: 16px; }
+    }
+
+    /* লোডিং স্কেলেটন */
+    .loading-skeleton { text-align: center; padding: 40px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+<!-- ===== হেডার ===== -->
+<div id="header-container"></div>
+
+<!-- ===== মেইন র‍্যাপ ===== -->
+<div class="main-wrap">
+  <!-- সাইডবার -->
+  <div id="sidebar-container"></div>
+
+  <!-- কন্টেন্ট এরিয়া -->
+  <div class="content-area" id="contentArea">
+    <!-- পেজ হেডার -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+      <div>
+        <h2 style="font-size:20px; font-weight:700; color:#1e293b;">সিরিয়াল বুকিং</h2>
+        <p style="font-size:13px; color:#94a3b8;">নতুন সিরিয়াল বুক করুন</p>
+      </div>
+      <span style="font-size:13px; font-weight:500; color:#475569;">
+        <i class="far fa-calendar-alt"></i> <span id="headerDate"></span>
+      </span>
+    </div>
+
+    <!-- ===== বুকিং সেকশন ===== -->
+    <div class="book-section">
+      <div class="card">
+        <h3><i class="fas fa-calendar-plus text-blue-500"></i> নতুন সিরিয়াল বুকিং</h3>
+        
+        <div class="form-group">
+          <label>📅 দিন</label>
+          <select id="bookDay">
+            <option value="Thursday">বৃহস্পতিবার</option>
+            <option value="Friday">শুক্রবার</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>👤 রোগীর ধরন</label>
+          <select id="bookType">
+            <option value="new">নতুন রোগী</option>
+            <option value="old">পুরাতন রোগী</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>⏰ সময়</label>
+          <select id="bookTime">
+            <option value="">প্রথমে দিন ও ধরন নির্বাচন করুন</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>🔢 সিরিয়াল নির্বাচন করুন</label>
+          <div class="serial-grid" id="serialGrid">
+            <div style="grid-column:1/-1; text-align:center; padding:20px; color:#94a3b8;">
+              দিন, ধরন এবং সময় নির্বাচন করুন
+            </div>
+          </div>
+          <input type="hidden" id="selectedSerial">
+          <small style="color:#94a3b8; font-size:12px;">
+            <i class="fas fa-info-circle"></i> সবুজ = উপলব্ধ, লাল = বুক করা, নীল = পেন্ডিং, হলুদ = নির্বাচিত
+          </small>
+        </div>
+        
+        <button class="btn-primary" id="confirmBookBtn" disabled>
+          <i class="fas fa-check-circle"></i> সিরিয়াল নিশ্চিত করুন
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ফুটার ===== -->
+<div id="footer-container"></div>
+
+<script>
+// ============================================================
+// FIREBASE কনফিগ
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+  authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+  projectId: "doctor-appointment-syste-23828",
+  storageBucket: "doctor-appointment-syste-23828.appspot.com",
+  messagingSenderId: "79600391014",
+  appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+};
+
+const archiveFirebaseConfig = {
+  apiKey: "AIzaSyCigxjHdYfYNDizaSKDGUPCaBs39Ff-awM",
+  authDomain: "asraful-704b9.firebaseapp.com",
+  projectId: "asraful-704b9",
+  storageBucket: "asraful-704b9.firebasestorage.app",
+  messagingSenderId: "418467079550",
+  appId: "1:418467079550:web:9454a5851d477e3ad4bf2f"
+};
+
+let db, archiveDb;
+try {
+  if (!firebase.apps.length) {
+    const defaultApp = firebase.initializeApp(firebaseConfig);
+    db = defaultApp.firestore();
+  } else {
+    db = firebase.firestore();
+  }
+  let archiveApp = firebase.apps.find(app => app.name === "archiveApp");
+  if (!archiveApp) {
+    archiveApp = firebase.initializeApp(archiveFirebaseConfig, "archiveApp");
+  }
+  archiveDb = archiveApp.firestore();
+  window.db = db;
+  console.log('✅ Firebase connected');
+} catch (err) {
+  console.error('❌ Firebase init error:', err);
+}
+
+// ============================================================
+// গ্লোবাল ভেরিয়েবল
+// ============================================================
+let currentUser = sessionStorage.getItem('userPhone') || sessionStorage.getItem('loggedInUser') || null;
+let gridRanges = {};
+let bookingGridSystem = null;
+
+// ============================================================
+// হেল্পার ফাংশন
+// ============================================================
+function formatDate(date) {
+  return date.toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function getNextDateByDay(targetDay) {
+  const daysMap = {
+    "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3,
+    "Thursday": 4, "Friday": 5, "Saturday": 6
+  };
+  
+  const targetDayIndex = daysMap[targetDay];
+  const today = new Date();
+  const todayIndex = today.getDay();
+  let daysToAdd = targetDayIndex - todayIndex;
+  if (daysToAdd < 0) daysToAdd += 7;
+  
+  const nextDate = new Date(today);
+  nextDate.setDate(today.getDate() + daysToAdd);
+  
+  const year = nextDate.getFullYear();
+  const month = String(nextDate.getMonth() + 1).padStart(2, '0');
+  const day = String(nextDate.getDate()).padStart(2, '0');
+  
+  const banglaMonths = ['জানুয়ারী', 'ফেব্রুয়ারী', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+  const banglaDays = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+  const banglaDate = `${banglaDays[nextDate.getDay()]}, ${nextDate.getDate()} ${banglaMonths[nextDate.getMonth()]} ${year}`;
+  
+  return {
+    date: nextDate,
+    dateString: `${year}-${month}-${day}`,
+    displayDate: nextDate.toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+    banglaDate: banglaDate,
+    isToday: daysToAdd === 0
+  };
+}
+
+// ============================================================
+// লোড সিরিয়াল রেঞ্জ
+// ============================================================
+async function loadRanges() {
+  try {
+    const doc = await db.collection('settings').doc('serialRanges').get();
+    if (doc.exists) {
+      gridRanges = doc.data();
+      if (!gridRanges.Thursday) gridRanges.Thursday = { new: {}, old: {} };
+      if (!gridRanges.Friday) gridRanges.Friday = { new: {}, old: {} };
+    } else {
+      gridRanges = { Thursday: { new: {}, old: {} }, Friday: { new: {}, old: {} } };
+    }
+    console.log('✅ সিরিয়াল রেঞ্জ লোড হয়েছে:', gridRanges);
+  } catch (e) { 
+    console.error('Ranges error:', e); 
+  }
+}
+
+// ============================================================
+// টাইম অপশন আপডেট - AM/PM ফরম্যাট সহ
+// ============================================================
+function updateBookingTimeOptions() {
+  const day = document.getElementById('bookDay').value;
+  const type = document.getElementById('bookType').value;
+  const timeSelect = document.getElementById('bookTime');
+  
+  timeSelect.innerHTML = '<option value="">-- সময় নির্বাচন করুন --</option>';
+  
+  if (!day || !type) {
+    timeSelect.innerHTML = '<option value="">প্রথমে দিন ও ধরন নির্বাচন করুন</option>';
+    return;
+  }
+  
+  if (gridRanges[day] && gridRanges[day][type]) {
+    // 🔥 সময়গুলো সাজানোর জন্য Array
+    const times = Object.keys(gridRanges[day][type]);
+    
+    // ✅ সঠিকভাবে সাজান (ঘন্টা অনুযায়ী)
+    times.sort((a, b) => {
+      return convertTimeToMinutes(a) - convertTimeToMinutes(b);
+    });
+    
+    times.forEach(time => {
+      const option = document.createElement('option');
+      option.value = time;
+      // 🔥 AM/PM ফরম্যাটে দেখান
+      option.textContent = formatTimeAMPM(time);
+      timeSelect.appendChild(option);
+    });
+  }
+  
+  if (timeSelect.options.length <= 1) {
+    timeSelect.innerHTML = '<option value="">-- কোনো সময় নেই --</option>';
+  }
+}
+
+// ============================================================
+// সময়কে মিনিটে কনভার্ট করার ফাংশন (সাজানোর জন্য)
+// ============================================================
+function convertTimeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  // "10:00 AM" বা "10:00" বা "10:00 am" সব ফরম্যাট সাপোর্ট
+  let cleaned = timeStr.trim().toUpperCase();
+  let hours = 0, minutes = 0;
+  let isPM = cleaned.includes('PM');
+  
+  // শুধু সংখ্যা বের করা
+  const parts = cleaned.match(/(\d+):?(\d+)?/);
+  if (parts) {
+    hours = parseInt(parts[1]);
+    minutes = parseInt(parts[2] || 0);
+  }
+  
+  // ১২ ঘন্টা ফরম্যাট কনভার্ট
+  if (isPM && hours < 12) hours += 12;
+  if (!isPM && hours === 12) hours = 0;
+  
+  return hours * 60 + minutes;
+}
+
+// ============================================================
+// সময়কে AM/PM ফরম্যাটে দেখানোর ফাংশন
+// ============================================================
+function formatTimeAMPM(timeStr) {
+  if (!timeStr) return timeStr;
+  
+  let cleaned = timeStr.trim().toUpperCase();
+  // ইতিমধ্যে AM/PM থাকলে সেটাই রিটার্ন
+  if (cleaned.includes('AM') || cleaned.includes('PM')) {
+    return timeStr;
+  }
+  
+  // শুধু সংখ্যা বের করা
+  const parts = cleaned.match(/(\d+):?(\d+)?/);
+  if (!parts) return timeStr;
+  
+  let hours = parseInt(parts[1]);
+  let minutes = parseInt(parts[2] || 0);
+  let ampm = hours >= 12 ? 'PM' : 'AM';
+  
+  // ১২ ঘন্টা ফরম্যাটে কনভার্ট
+  let displayHour = hours % 12;
+  if (displayHour === 0) displayHour = 12;
+  
+  const minStr = minutes.toString().padStart(2, '0');
+  return `${displayHour}:${minStr} ${ampm}`;
+}
+
+// ============================================================
+// বুকিং গ্রিড সিস্টেম ইনিশিয়ালাইজ
+// ============================================================
+function initializeBookingGridSystem() {
+  if (bookingGridSystem) {
+    bookingGridSystem.cleanup();
+    bookingGridSystem = null;
+  }
+
+  bookingGridSystem = new RealTimeGridSystem({
+    db: db,
+    gridContainerId: 'serialGrid',
+    selectedSerialInputId: 'selectedSerial',
+    dayElementId: 'bookDay',
+    timeElementId: 'bookTime',
+    typeElementId: 'bookType',
+    mode: 'user',
+    userPendingExpiry: 1 * 60 * 1000,
+    
+    onSerialClick: function(data) {
+      console.log('✅ সিরিয়াল সিলেক্টেড:', data);
+      const btn = document.getElementById('confirmBookBtn');
+      if (data.status === 'selected' || data.status === 'pending') {
+        document.getElementById('selectedSerial').value = data.serial;
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+      }
+    },
+    
+    onGridUpdate: function(type, data) {
+      console.log('📊 গ্রিড আপডেট হয়েছে:', type, data);
+      // গ্রিড আপডেট হলে কনফর্ম বাটন ডিসেবল করুন
+      const btn = document.getElementById('confirmBookBtn');
+      if (!document.getElementById('selectedSerial').value) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+      }
+    }
+  });
+  
+  return bookingGridSystem.init().then(success => {
+    if (success) {
+      console.log('✅ বুকিং গ্রিড সিস্টেম রেডি');
+      return true;
+    }
+    return false;
+  });
+}
+
+// ============================================================
+// গ্রিড রিফ্রেশ (ডে/টাইপ/টাইম চেঞ্জ হলে)
+// ============================================================
+function refreshBookingGrid() {
+  const day = document.getElementById('bookDay').value;
+  const type = document.getElementById('bookType').value;
+  const time = document.getElementById('bookTime').value;
+  
+  const gridContainer = document.getElementById('serialGrid');
+  const btn = document.getElementById('confirmBookBtn');
+  
+  // বাটন ডিসেবল করুন
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+  btn.style.cursor = 'not-allowed';
+  document.getElementById('selectedSerial').value = '';
+  
+  // গ্রিড ক্লিয়ার করুন
+  if (gridContainer) {
+    if (!day || !type || !time) {
+      let msg = 'দিন, ধরন এবং সময় নির্বাচন করুন';
+      if (day && type && !time) msg = 'সময় নির্বাচন করুন';
+      else if (day && !type) msg = 'ধরন নির্বাচন করুন';
+      else if (!day) msg = 'দিন নির্বাচন করুন';
+      
+      gridContainer.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;">
+          ${msg}
+        </div>
+      `;
+      return;
+    }
+  }
+  
+  // Grid System আপডেট
+  if (bookingGridSystem) {
+    bookingGridSystem.updateGrid();
+  }
+}
+
+// ============================================================
+// সিরিয়াল বুকিং কনফার্ম
+// ============================================================
+async function confirmBooking() {
+  let serial = document.getElementById('selectedSerial').value;
+  
+  if (serial && serial.startsWith('[')) {
+    try {
+      const serials = JSON.parse(serial);
+      serial = serials[0] || null;
+    } catch(e) {
+      serial = null;
+    }
+  }
+  
+  serial = parseInt(serial);
+  if (!serial || isNaN(serial)) { 
+    Swal.fire({ title: 'সতর্কতা!', text: 'সিরিয়াল নির্বাচন করুন', icon: 'warning' });
+    return; 
+  }
+  
+  const day = document.getElementById('bookDay').value;
+  const time = document.getElementById('bookTime').value;
+  const type = document.getElementById('bookType').value;
+  
+  if (!day || !time || !type) { 
+    Swal.fire({ title: 'সতর্কতা!', text: 'সব তথ্য দিন', icon: 'warning' });
+    return; 
+  }
+
+  const nextDateInfo = getNextDateByDay(day);
+  const typeText = type === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+  
+  const confirmResult = await Swal.fire({
+    title: 'সিরিয়াল বুকিং কনফার্ম',
+    html: `
+      <div style="text-align:left;padding:10px;">
+        <p><strong>📅 তারিখ:</strong> ${nextDateInfo.banglaDate}</p>
+        <p><strong>⏰ সময়:</strong> ${time}</p>
+        <p><strong>🔢 সিরিয়াল:</strong> #${serial}</p>
+        <p><strong>👤 ধরন:</strong> ${typeText}</p>
+      </div>
+    `,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonColor: '#3b82f6',
+    cancelButtonColor: '#64748b',
+    confirmButtonText: '✅ হ্যাঁ, বুক করুন',
+    cancelButtonText: '❌ বাতিল'
+  });
+
+  if (!confirmResult.isConfirmed) return;
+
+  try {
+    // ইউজার ডেটা লোড
+    const userDoc = await db.collection('users').doc(currentUser).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+    const name = userData.name || 'রোগী';
+    const age = userData.age || '';
+
+    const appointmentData = {
+      name: name,
+      phone: currentUser,
+      age: age,
+      serial: serial,
+      day: day,
+      time: time,
+      patientType: type,
+      status: 'pending',
+      tokenGiven: false,
+      appointmentDate: nextDateInfo.dateString,
+      appointmentDateDisplay: nextDateInfo.banglaDate,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    // ডুপ্লিকেট চেক
+    const duplicateCheck = await db.collection('appointments')
+      .where('appointmentDate', '==', nextDateInfo.dateString)
+      .where('day', '==', day)
+      .where('time', '==', time)
+      .where('serial', '==', serial)
+      .get();
+    
+    if (!duplicateCheck.empty) {
+      Swal.fire({
+        title: 'দুঃখিত!',
+        text: `সিরিয়াল ${serial} ইতিমধ্যে বুক করা হয়েছে`,
+        icon: 'error'
+      });
+      if (bookingGridSystem) bookingGridSystem.updateGrid();
+      return;
+    }
+
+    // অ্যাপয়েন্টমেন্ট সংরক্ষণ
+    await db.collection('appointments').add(appointmentData);
+
+    // ফর্ম রিসেট
+    document.getElementById('selectedSerial').value = '';
+    const btn = document.getElementById('confirmBookBtn');
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+    
+    if (bookingGridSystem) {
+      bookingGridSystem.currentSelection = null;
+      bookingGridSystem.userPendingId = null;
+      bookingGridSystem.updateGrid();
+    }
+    
+    Swal.fire({
+      title: '✅ সফল!',
+      text: `সিরিয়াল ${serial} বুক করা হয়েছে!`,
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false
+    });
+
+    // ইভেন্ট ট্রিগার - সাইডবার স্ট্যাট আপডেটের জন্য
+    if (typeof updateSidebarStats === 'function') {
+      setTimeout(() => updateSidebarStats(), 500);
+    }
+    
+  } catch (e) {
+    console.error('❌ বুকিং এরর:', e);
+    Swal.fire({ 
+      title: 'সমস্যা!', 
+      text: 'বুকিং করতে সমস্যা হয়েছে: ' + e.message, 
+      icon: 'error' 
+    });
+  }
+}
+
+// ============================================================
+// সাইডবার স্ট্যাট আপডেট - components-inline.js এর ফাংশন ব্যবহার
+// ============================================================
+function updateSidebarStats() {
+  // components-inline.js এর window.updateSidebarStats ফাংশন কল
+  if (typeof window.updateSidebarStats === 'function') {
+    // ফাংশনটি components-inline.js এ ডিফাইন করা আছে
+    // এটি sideTotal এবং sidePending আপডেট করবে
+    window.updateSidebarStats(0, 0);
+  }
+}
+
+// ============================================================
+// কম্পোনেন্ট লোডার রেডি হওয়ার জন্য অপেক্ষা
+// ============================================================
+function waitForComponentLoader(callback, retries = 15) {
+  if (typeof ComponentLoader !== 'undefined' && ComponentLoader.loadAllComponents) {
+    callback();
+    return;
+  }
+  if (retries <= 0) {
+    console.warn('⚠️ ComponentLoader পাওয়া যায়নি, ডিফল্ট UI লোড হচ্ছে');
+    return;
+  }
+  setTimeout(() => waitForComponentLoader(callback, retries - 1), 300);
+}
+
+// ============================================================
+// DOM লোড হলে
+// ============================================================
+document.addEventListener('DOMContentLoaded', async function() {
+  // সেশন চেক
+  if (!currentUser) {
+    currentUser = sessionStorage.getItem('userPhone') || sessionStorage.getItem('loggedInUser');
+    if (!currentUser) {
+      window.location.href = 'login.html';
+      return;
+    }
+  }
+
+  // হেডার ডেট
+  const now = new Date();
+  document.getElementById('headerDate').textContent = formatDate(now);
+
+  // কম্পোনেন্ট লোড
+  waitForComponentLoader(() => {
+    ComponentLoader.loadAllComponents('সিরিয়াল বুকিং');
+    console.log('✅ কম্পোনেন্ট লোড সম্পন্ন');
+  });
+
+  // ===== ইভেন্ট লিসেনার =====
+  
+  // দিন পরিবর্তন
+  document.getElementById('bookDay').addEventListener('change', function() {
+    updateBookingTimeOptions();
+    document.getElementById('selectedSerial').value = '';
+    const gridContainer = document.getElementById('serialGrid');
+    if (gridContainer) {
+      gridContainer.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;">
+          সময় নির্বাচন করুন...
+        </div>
+      `;
+    }
+    setTimeout(refreshBookingGrid, 100);
+  });
+
+  // ধরন পরিবর্তন
+  document.getElementById('bookType').addEventListener('change', function() {
+    updateBookingTimeOptions();
+    document.getElementById('selectedSerial').value = '';
+    const gridContainer = document.getElementById('serialGrid');
+    if (gridContainer) {
+      gridContainer.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;">
+          ${document.getElementById('bookDay').value ? 'সময় নির্বাচন করুন...' : 'দিন নির্বাচন করুন...'}
+        </div>
+      `;
+    }
+    setTimeout(refreshBookingGrid, 100);
+  });
+
+  // সময় পরিবর্তন
+  document.getElementById('bookTime').addEventListener('change', function() {
+    document.getElementById('selectedSerial').value = '';
+    const btn = document.getElementById('confirmBookBtn');
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+    refreshBookingGrid();
+  });
+
+  // কনফর্ম বুকিং বাটন
+  document.getElementById('confirmBookBtn').addEventListener('click', confirmBooking);
+
+  // ===== ডাটা লোড =====
+  await loadRanges();
+  updateBookingTimeOptions();
+  
+  // গ্রিড সিস্টেম ইনিশিয়ালাইজ
+  await initializeBookingGridSystem();
+  
+  // প্রাথমিক গ্রিড অবস্থা
+  const gridContainer = document.getElementById('serialGrid');
+  if (gridContainer && !gridContainer.querySelector('.serial-item')) {
+    gridContainer.innerHTML = `
+      <div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;">
+        দিন, ধরন এবং সময় নির্বাচন করুন
+      </div>
+    `;
+  }
+});
+
+// ============================================================
+// ক্লিনআপ
+// ============================================================
+window.addEventListener('beforeunload', function() {
+  if (bookingGridSystem) {
+    bookingGridSystem.cleanup();
+    bookingGridSystem = null;
+  }
+});
+</script>
+
+</body>
+</html>
