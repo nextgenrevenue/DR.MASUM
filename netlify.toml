@@ -1,12 +1,7 @@
 [build]
   functions = "netlify/functions"
-
-[[functions]]
-  # এটি আপনার ফাংশনটি কোথায় আছে তা নির্দেশ করে
-  name = "check-schedule" 
+  publish = "."
 
 [[scheduled_functions]]
-  # এখানে আপনার ফাংশনের নাম (যেটি ফাইলের নাম) দিতে হবে
   function = "check-schedule"
-  # প্রতিদিন ১ মিনিট পর পর চেক করার জন্য
   schedule = "* * * * *"
