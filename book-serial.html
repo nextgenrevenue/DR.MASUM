@@ -262,30 +262,25 @@ const firebaseConfig = {
   appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
 };
 
-const archiveFirebaseConfig = {
-  apiKey: "AIzaSyCigxjHdYfYNDizaSKDGUPCaBs39Ff-awM",
-  authDomain: "asraful-704b9.firebaseapp.com",
-  projectId: "asraful-704b9",
-  storageBucket: "asraful-704b9.firebasestorage.app",
-  messagingSenderId: "418467079550",
-  appId: "1:418467079550:web:9454a5851d477e3ad4bf2f"
-};
+let db, analytics;
 
-let db, archiveDb;
 try {
+  // ১. Firebase অ্যাপ ইনিশিয়ালাইজ করা
   if (!firebase.apps.length) {
-    const defaultApp = firebase.initializeApp(firebaseConfig);
-    db = defaultApp.firestore();
+    const app = firebase.initializeApp(firebaseConfig);
+    db = app.firestore();
+    analytics = firebase.analytics(); // অ্যানালিটিক্স ইনিশিয়ালাইজ করা হলো
   } else {
-    db = firebase.firestore();
+    const app = firebase.app();
+    db = app.firestore();
+    analytics = firebase.analytics();
   }
-  let archiveApp = firebase.apps.find(app => app.name === "archiveApp");
-  if (!archiveApp) {
-    archiveApp = firebase.initializeApp(archiveFirebaseConfig, "archiveApp");
-  }
-  archiveDb = archiveApp.firestore();
+
+  // গ্লোবালি অ্যাক্সেস করার জন্য
   window.db = db;
-  console.log('✅ Firebase connected');
+  window.analytics = analytics;
+
+  console.log('✅ Firebase & Analytics connected successfully');
 } catch (err) {
   console.error('❌ Firebase init error:', err);
 }
@@ -545,17 +540,14 @@ function refreshBookingGrid() {
 // সিরিয়াল বুকিং কনফার্ম
 // ============================================================
 async function confirmBooking() {
+  // ১. সিরিয়াল ভ্যালিডেশন
   let serial = document.getElementById('selectedSerial').value;
-  
   if (serial && serial.startsWith('[')) {
     try {
       const serials = JSON.parse(serial);
       serial = serials[0] || null;
-    } catch(e) {
-      serial = null;
-    }
+    } catch(e) { serial = null; }
   }
-  
   serial = parseInt(serial);
   if (!serial || isNaN(serial)) { 
     Swal.fire({ title: 'সতর্কতা!', text: 'সিরিয়াল নির্বাচন করুন', icon: 'warning' });
@@ -574,102 +566,80 @@ async function confirmBooking() {
   const nextDateInfo = getNextDateByDay(day);
   const typeText = type === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
   
-  const confirmResult = await Swal.fire({
-    title: 'সিরিয়াল বুকিং কনফার্ম',
-    html: `
-      <div style="text-align:left;padding:10px;">
-        <p><strong>📅 তারিখ:</strong> ${nextDateInfo.banglaDate}</p>
-        <p><strong>⏰ সময়:</strong> ${time}</p>
-        <p><strong>🔢 সিরিয়াল:</strong> #${serial}</p>
-        <p><strong>👤 ধরন:</strong> ${typeText}</p>
-      </div>
-    `,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonColor: '#3b82f6',
-    cancelButtonColor: '#64748b',
-    confirmButtonText: '✅ হ্যাঁ, বুক করুন',
-    cancelButtonText: '❌ বাতিল'
-  });
+  // কনফার্মেশন পপআপ
+ const confirmResult = await Swal.fire({
+ title: 'সিরিয়াল বুকিং কনফার্ম',
+ html: `
+ <div style="text-align:left;padding:10px;">
+ <p><strong>📅 তারিখ:</strong> ${nextDateInfo.banglaDate}</p>
+ <p><strong>⏰ সময়:</strong> ${time}</p>
+ <p><strong>🔢 সিরিয়াল:</strong> #${serial}</p>
+ <p><strong>👤 ধরন:</strong> ${typeText}</p>
+ </div>
+ `,
+icon: 'question',
+ showCancelButton: true,
+ confirmButtonColor: '#3b82f6',
+ cancelButtonColor: '#64748b',
+ confirmButtonText: '✅ হ্যাঁ, বুক করুন',
+ cancelButtonText: '❌ বাতিল'
+ });
 
-  if (!confirmResult.isConfirmed) return;
+if (!confirmResult.isConfirmed) return;
 
   try {
     // ইউজার ডেটা লোড
     const userDoc = await db.collection('users').doc(currentUser).get();
     const userData = userDoc.exists ? userDoc.data() : {};
-    const name = userData.name || 'রোগী';
-    const age = userData.age || '';
+    
+    // নতুন সিস্টেম অনুযায়ী আইডি তৈরি (yymmdd-serial)
+    const yymmdd = nextDateInfo.dateString.replace(/-/g, '').slice(2);
+    const formattedSerial = String(serial).padStart(2, '0');
+    const customId = `${yymmdd}-${formattedSerial}`;
 
+    // ২. ডুপ্লিকেট চেক (সরাসরি ডক আইডি দিয়ে চেক করা অনেক দ্রুত)
+    const docRef = db.collection('appointments').doc(customId);
+    const duplicateCheck = await docRef.get();
+    
+    if (duplicateCheck.exists) {
+      Swal.fire({ title: 'দুঃখিত!', text: 'এই সিরিয়ালটি ইতিমধ্যে বুক হয়ে গেছে।', icon: 'error' });
+      if (bookingGridSystem) bookingGridSystem.updateGrid();
+      return;
+    }
+
+    // ৩. নতুন সিস্টেমের ডেটা ফরম্যাট
     const appointmentData = {
-      name: name,
+      appointmentId: customId,
+      name: userData.name || 'রোগী',
       phone: currentUser,
-      age: age,
+      age: userData.age || '',
       serial: serial,
       day: day,
       time: time,
+      timeSlot: time,
       patientType: type,
-      status: 'pending',
-      tokenGiven: false,
+      status: 'confirmed',
       appointmentDate: nextDateInfo.dateString,
       appointmentDateDisplay: nextDateInfo.banglaDate,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    // ডুপ্লিকেট চেক
-    const duplicateCheck = await db.collection('appointments')
-      .where('appointmentDate', '==', nextDateInfo.dateString)
-      .where('day', '==', day)
-      .where('time', '==', time)
-      .where('serial', '==', serial)
-      .get();
-    
-    if (!duplicateCheck.empty) {
-      Swal.fire({
-        title: 'দুঃখিত!',
-        text: `সিরিয়াল ${serial} ইতিমধ্যে বুক করা হয়েছে`,
-        icon: 'error'
-      });
-      if (bookingGridSystem) bookingGridSystem.updateGrid();
-      return;
-    }
+    // ৪. ডেটা সেট করা
+    await docRef.set(appointmentData);
 
-    // অ্যাপয়েন্টমেন্ট সংরক্ষণ
-    await db.collection('appointments').add(appointmentData);
-
-    // ফর্ম রিসেট
+    // ৫. সাকসেস এবং রিসেট
     document.getElementById('selectedSerial').value = '';
-    const btn = document.getElementById('confirmBookBtn');
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-    btn.style.cursor = 'not-allowed';
     
+    Swal.fire({ title: '✅ সফল!', text: `সিরিয়াল ${serial} বুক করা হয়েছে!`, icon: 'success', timer: 2000 });
+
     if (bookingGridSystem) {
       bookingGridSystem.currentSelection = null;
-      bookingGridSystem.userPendingId = null;
       bookingGridSystem.updateGrid();
-    }
-    
-    Swal.fire({
-      title: '✅ সফল!',
-      text: `সিরিয়াল ${serial} বুক করা হয়েছে!`,
-      icon: 'success',
-      timer: 2000,
-      showConfirmButton: false
-    });
-
-    // ইভেন্ট ট্রিগার - সাইডবার স্ট্যাট আপডেটের জন্য
-    if (typeof updateSidebarStats === 'function') {
-      setTimeout(() => updateSidebarStats(), 500);
     }
     
   } catch (e) {
     console.error('❌ বুকিং এরর:', e);
-    Swal.fire({ 
-      title: 'সমস্যা!', 
-      text: 'বুকিং করতে সমস্যা হয়েছে: ' + e.message, 
-      icon: 'error' 
-    });
+    Swal.fire({ title: 'সমস্যা!', text: 'বুকিং করতে সমস্যা হয়েছে: ' + e.message, icon: 'error' });
   }
 }
 
