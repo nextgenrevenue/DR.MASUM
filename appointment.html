@@ -596,13 +596,12 @@
     
     <form id="appointmentForm" novalidate>
       <div class="form-group">
-    <label for="name">রোগীর নাম</label>
-    <div class="input-field">
-        <input type="text" id="name" name="name" placeholder="আপনার পুরো নাম লিখুন" required
+        <label for="name">রোগীর নাম</label>
+        <div class="input-field">
+          <input type="text" id="name" name="name" placeholder="আপনার পুরো নাম লিখুন" required
             pattern="[a-zA-Z\u0980-\u09FF\.\s]{3,50}" 
-            title="শুধুমাত্র বাংলা/ইংরেজি অক্ষর, ডট (.) ও স্পেস ব্যবহার করুন (3-50 অক্ষর)"
-            onblur="this.value = this.value.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')">
-    </div>
+            title="শুধুমাত্র বাংলা/ইংরেজি অক্ষর, ডট (.) ও স্পেস ব্যবহার করুন (3-50 অক্ষর)">
+        </div>
         <small id="nameError" class="error-msg">সঠিক নাম লিখুন (বিশেষ চিহ্ন বা সংখ্যা দেওয়া যাবে না)</small>
       </div>
 
@@ -741,7 +740,6 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
 
   <script src="grid.js"></script>
 
@@ -757,7 +755,6 @@
     };
 
     let db;
-    let analytics;
     let firebaseDisabledSlots = {}; 
     let gridSystem = null;
     let serialRanges = {};
@@ -765,15 +762,6 @@
     let realtimeListeners = [];
     let currentUserPendingId = null; 
     let currentAppointmentData = null;
-
-     try {
-      const app = firebase.initializeApp(firebaseConfig);
-      db = firebase.firestore(app);
-      analytics = firebase.analytics();
-      console.log("✅ Firebase initialized");
-    } catch (e) {
-      console.error("❌ Firebase initialization error:", e);
-    }
 
     // DOM Elements
     const daySelect = document.getElementById('day');
@@ -1500,20 +1488,20 @@
       
       if(!confirmed) return;
 
-     try {
+      try {
         submitBtn.classList.add('loading');
         submitBtn.textContent = 'সাবমিট হচ্ছে...';
 
-        // আইডি ফরম্যাট তৈরির লজিক
-        const yymmdd = appointmentDate.replace(/-/g, '').slice(2);
-        const formattedSerial = String(selectedSerial).padStart(2, '0');
-        const customId = `${yymmdd}-${formattedSerial}`;
-
-        const docRef = db.collection('appointments').doc(customId);
-        const duplicateCheck = await docRef.get();
+        const duplicateCheck = await db.collection('appointments')
+          .where('appointmentDate', '==', appointmentDate)
+          .where('day', '==', selectedDay)
+          .where('timeSlot', '==', selectedTime)
+          .where('patientType', '==', selectedType)
+          .where('serial', '==', selectedSerial)
+          .get();
           
-        if (duplicateCheck.exists) {
-          showPopup('error', 'দুঃখিত!', 'এই সিরিয়ালটি এইমাত্র বুক হয়ে গেছে। অন্য সিরিয়াল বেছে নিন।');
+        if (!duplicateCheck.empty) {
+          showPopup('error', 'দুঃখিত!', 'এই সিরিয়ালটি এইমাত্র বুক হয়ে গেছে। অন্য সিরিয়াল বেছে নিন।');
           submitBtn.classList.remove('loading');
           submitBtn.textContent = 'সাবমিট করুন';
           if(gridSystem) gridSystem.updateGrid();
@@ -1525,7 +1513,6 @@
         }
         
         const appointmentData = {
-          appointmentId: customId,
           name: patientName,
           phone: selectedPhone,
           ageYears: ageValidationData.dbYears,
@@ -1547,7 +1534,7 @@
           age: ageValidationData.ageDisplay
         };
 
-        await docRef.set(appointmentData);
+        await db.collection('appointments').add(appointmentData);
         currentAppointmentData = appointmentData;
 
 // ==================== SMS Integration ====================
@@ -1559,7 +1546,7 @@ try {
 const appointmentTime = selectedTime || ""; 
 
   // সম্পূর্ণ ইংরেজি মেসেজ টেমপ্লেট
-  const smsMessage = `Dear ${patientName},your Serial No: ${selectedSerial}, Date: ${englishDateStr}, Estimated Time: ${appointmentTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
+  const smsMessage = `Dear ${patientName},your Serial No: ${selectedSerial}, Date: ${englishDateStr}, Please Present At: ${appointmentTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
 
 
   const apiKey = '74a82f2a949057f0e67fa4b672f75275';

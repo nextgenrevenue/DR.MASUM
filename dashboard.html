@@ -7,8 +7,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
 
   <script src="components-inline.js"></script>
   <script src="grid.js"></script>
@@ -1520,7 +1523,7 @@
     <div style="display: flex; flex-direction: column; gap: 12px;">
       
       <div style="display: flex; gap: 10px; align-items: center;">
-        <input type="text" class="patient-name" placeholder="রোগীর নাম *" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;" required>
+       <input type="text" class="patient-name"  placeholder="রোগীর নাম *" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;" required onblur="this.value = this.value.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')"></div>
         
         <button type="button" class="remove-patient-btn" style="background: #ef4444; color: white; border: none; border-radius: 6px; width: 38px; height: 38px; cursor: pointer; display: none; align-items: center; justify-content: center;">
           <i class="fas fa-trash"></i>
@@ -1614,6 +1617,7 @@ const firebaseConfig = {
     };
 
     let db;
+    let analytics;
     let allAppointmentsSnapshot = null;
     let serialRanges = {};
     let appointments = [];
@@ -1637,6 +1641,7 @@ const firebaseConfig = {
     try {
       const app = firebase.initializeApp(firebaseConfig);
       db = firebase.firestore(app);
+      analytics = firebase.analytics();
       console.log("✅ Firebase initialized");
     } catch (e) {
       console.error("❌ Firebase initialization error:", e);
@@ -2593,6 +2598,7 @@ function renderAppointments() {
   filteredDocs.forEach(item => {
     const { id, data } = item;
     const row = elements.appointmentsBody.insertRow();
+
     
     // স্ট্যাটাস
     const isCalled = data.called === true;
@@ -2621,7 +2627,7 @@ function renderAppointments() {
         day: 'numeric'
       });
     }
-    
+
     row.innerHTML = `
       <td>${toBengaliNumber(data.serial || 'N/A')}</td>
       <td><span class="status-badge ${callStatusClass}">${callStatusText}</span></td>
@@ -2876,7 +2882,7 @@ let isTokenSaving = false;
 async function saveAndPrintToken(shouldPrint) {
   // ✅ যদি ইতিমধ্যেই সেভ চলছে, তাহলে আরেকটি কল ব্লক করুন
   if (isTokenSaving) {
-    showAlert('দয়া করে অপেক্ষা করুন, টোকেন সংরক্ষণ করা হচ্ছে...', 'warning');
+    showAlert('দয়া করে অপেক্ষা করুন, টোকেন সংরক্ষণ করা হচ্ছে...', 'warning');
     return;
   }
 
@@ -2905,6 +2911,9 @@ async function saveAndPrintToken(shouldPrint) {
     const appointmentDoc = await db.collection('appointments').doc(currentTokenId).get();
     const appointmentData = appointmentDoc.data();
     const originalSerial = appointmentData.serial;
+    
+    const now = new Date();
+    const yymmdd = now.toISOString().slice(2, 10).replace(/-/g, '');
     
     const existingTokenQuery = await db.collection('paymentHistories')
       .where('appointmentId', '==', currentTokenId)
@@ -2953,14 +2962,8 @@ async function saveAndPrintToken(shouldPrint) {
       showAlert(`✅ টোকেন ${tokenNumber} সফলভাবে আপডেট করা হয়েছে!`, 'success');
       
     } else {
-      const today = new Date();
-      const yy = String(today.getFullYear()).slice(-2);
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const datePrefix = `${yy}${mm}${dd}`;
-      
       const allTokensQuery = await db.collection('paymentHistories')
-        .where('tokenDatePrefix', '==', datePrefix)
+        .where('tokenDatePrefix', '==', yymmdd)
         .get();
       
       let maxCounter = 0;
@@ -2971,8 +2974,8 @@ async function saveAndPrintToken(shouldPrint) {
       });
       
       const newTokenSerial = maxCounter + 1;
-      const padding = newTokenSerial >= 100 ? 3 : 2;
-      tokenNumber = `T-${datePrefix}-${String(newTokenSerial).padStart(padding, '0')}`;
+      tokenNumber = `T-${yymmdd}-${String(newTokenSerial).padStart(2, '0')}`;
+      const tokenDocId = `${yymmdd}-${String(newTokenSerial).padStart(2, '0')}`; // নির্দিষ্ট আইডি
       
       const initialPaymentHistory = [{
         id: Date.now().toString(),
@@ -2985,10 +2988,10 @@ async function saveAndPrintToken(shouldPrint) {
         source: 'dashboard'
       }];
       
-      await db.collection('paymentHistories').add({
+      await db.collection('paymentHistories').doc(tokenDocId).set({
         tokenNumber: tokenNumber,
         tokenCounter: newTokenSerial,
-        tokenDatePrefix: datePrefix,
+        tokenDatePrefix: yymmdd,
         tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
         patientName: name,
         patientAge: age,
@@ -3013,13 +3016,14 @@ async function saveAndPrintToken(shouldPrint) {
         createdBy: sessionStorage.getItem('adminEmail') || 'admin'
       });
       
-      showAlert(`✅ টোকেন ${tokenNumber} তৈরি করা হয়েছে! (সিরিয়াল: ${originalSerial})`, 'success');
+      showAlert(`✅ টোকেন ${tokenNumber} তৈরি করা হয়েছে! (সিরিয়াল: ${originalSerial})`, 'success');
     }
     
     await db.collection('appointments').doc(currentTokenId).update({
       tokenGiven: true,
       tokenNumber: tokenNumber,
       tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      appointmentId: currentTokenId,
       tokenFee: fee,
       tokenPaid: paid,
       givenBy: givenBy,
@@ -3028,12 +3032,11 @@ async function saveAndPrintToken(shouldPrint) {
     
     closeTokenModal();
     
-    // শুধু shouldPrint এর মান true হলেই প্রিন্ট উইন্ডো ওপেন হবে
     if (shouldPrint === true) {
       printTokenReceipt(tokenNumber, name, age, patientType, fee, paid);
     }
     
-    if (allAppointmentsSnapshot) {
+    if (typeof allAppointmentsSnapshot !== 'undefined' && allAppointmentsSnapshot) {
       renderAppointments();
       updateDashboardCards(allAppointmentsSnapshot);
     }
@@ -3042,11 +3045,9 @@ async function saveAndPrintToken(shouldPrint) {
     console.error("❌ Error saving token:", error);
     showAlert("সংরক্ষণ করতে সমস্যা হয়েছে: " + error.message, "error");
   } finally {
-    // ✅ সব শেষে বাটন আবার সক্রিয় করুন এবং ফ্ল্যাগ রিসেট করুন
     isTokenSaving = false;
     if (saveBtn) {
       saveBtn.disabled = false;
-      // আগের টেক্সট ফিরিয়ে দিন (আমরা জানি না আসল টেক্সট কি, তাই সাধারণ রাখা)
       if (saveBtn.innerHTML.includes('সংরক্ষণ হচ্ছে')) {
         if (saveBtn.textContent.includes('আপডেট')) {
           saveBtn.innerHTML = '<i class="fas fa-edit"></i> তথ্য আপডেট করুন';
@@ -3186,44 +3187,105 @@ async function showTokenDetailsModal(button) {
   document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
-function printTokenReceipt(tokenNumber, name, age, patientType, fee, paid) {
+async function printTokenReceipt(tokenNumber, name, age, patientType, fee) {
   const adminName = sessionStorage.getItem('adminName') || 'অ্যাডমিন';
-  const win = window.open('', '_blank');
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>টোকেন প্রিন্ট</title>
-      <meta charset="UTF-8">
-      <style>
-        @page { size: 60mm auto; margin: 0; }
-        body { font-family: 'Noto Sans Bengali', sans-serif; width: 56mm; padding: 10px; margin: 0 auto; }
-        .card { border: 1px dashed #2563eb; border-radius: 8px; padding: 12px; text-align: center; }
-        .header { border-bottom: 1px dashed #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; }
-        .header h2 { font-size: 12px; font-weight: bold; color: #2563eb; margin: 0 0 3px 0; }
-        .token-num { font-size: 20px; font-weight: bold; color: #2563eb; margin: 8px 0; }
-        .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e5e7eb; font-size: 12px; }
-        .footer { margin-top: 10px; font-size: 9px; color: #9ca3af; text-align: center; }
-      </style>
-    </head>
-    <body>
-      <div class="card">
-        <div class="header"><h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2></div>
-        <div class="token-num">${tokenNumber}</div>
-        <div class="info-row"><span>রোগীর নাম:</span><span>${name || '—'}</span></div>
-        <div class="info-row"><span>বয়স:</span><span>${age || '—'}</span></div>
-        <div class="info-row"><span>ধরন:</span><span>${patientType === 'new' ? 'নতুন' : 'পুরাতন'}</span></div>
-        <div class="info-row"><span>ফি:</span><span>${fee} টাকা</span></div>
-        <div class="footer"><p>Printed by: ${adminName}</p><p>${new Date().toLocaleString('bn-BD')}</p></div>
+
+  // ডিভাইস শনাক্ত করা: মোবাইল কি না চেক করা
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  if (!isMobile) {
+    // --- পিসির জন্য ডাইরেক্ট প্রিন্ট সিস্টেম ---
+const win = window.open('', '_blank');
+ win.document.write(`
+ <!DOCTYPE html>
+ <html>
+ <head>
+ <title>${tokenNumber}</title>
+ <meta charset="UTF-8">
+ <style>
+ @page { size: 60mm auto; margin: 0; }
+ body { font-family: 'Noto Sans Bengali', sans-serif; width: 56mm; padding: 10px; margin: 0 auto; }
+ .card { border: 1px dashed #2563eb; border-radius: 8px; padding: 12px; text-align: center; }
+.header { border-bottom: 1px dashed #e5e7eb; padding-bottom: 8px; margin-bottom: 8px; }
+ .header h2 { font-size: 12px; font-weight: bold; color: #2563eb; margin: 0 0 3px 0; }
+ .token-num { font-size: 20px; font-weight: bold; color: #2563eb; margin: 8px 0; }
+ .info-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e5e7eb; font-size: 12px; }
+ .footer { margin-top: 10px; font-size: 9px; color: #9ca3af; text-align: center; }
+ </style>
+ </head>
+ <body>
+ <div class="card">
+ <div class="header"><h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2></div>
+ <div class="token-num">${tokenNumber}</div>
+ <div class="info-row"><span>রোগীর নাম:</span><span>${name || '—'}</span></div>
+ <div class="info-row"><span>বয়স:</span><span>${age || '—'}</span></div>
+ <div class="info-row"><span>ধরন:</span><span>${patientType === 'new' ? 'নতুন' : 'পুরাতন'}</span></div>
+ <div class="info-row"><span>ফি:</span><span>${fee} টাকা</span></div>
+ <div class="footer"><p>Printed by: ${adminName}</p><p>${new Date().toLocaleString('bn-BD')}</p></div>
+ </div>
+<div class="no-print" style="text-align:center;margin-top:20px;">
+ <button onclick="window.print()" style="padding:10px 20px;background:#2563eb;color:white;border:none;border-radius:8px;">🖨️ প্রিন্ট করুন</button>
+ </div>
+ <script>window.onload = function() { setTimeout(() => window.print(), 500); }<\/script>
+ </body>
+ </html>
+ `);
+ win.document.close();
+    return; // পিসির কাজ শেষ, মোবাইল কোড চলবে না
+  }
+
+  // ১. একটি অস্থায়ী কন্টেইনার তৈরি করা যাতে স্টাইল ঠিক থাকে
+  const container = document.createElement('div');
+  container.style.width = '2.10in'; // ২.১০ ইঞ্চি প্রস্থ
+  container.style.backgroundColor = 'white';
+  container.style.padding = '10px';
+  container.innerHTML = `
+    <div style="font-family: sans-serif; border: 1px dashed #2563eb; padding: 10px; text-align: center; border-radius: 8px;">
+      <div style="border-bottom: 1px dashed #ccc; margin-bottom: 10px;">
+        <h2 style="font-size: 12px; color: #2563eb; margin: 0;">ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
+        <p style="font-size: 10px; margin: 2px 0;">টোকেন নাম্বার</p>
       </div>
-      <div class="no-print" style="text-align:center;margin-top:20px;">
-        <button onclick="window.print()" style="padding:10px 20px;background:#2563eb;color:white;border:none;border-radius:8px;">🖨️ প্রিন্ট করুন</button>
+      <div style="font-size: 24px; font-weight: bold; color: #2563eb; margin: 10px 0;">${tokenNumber}</div>
+      <div style="font-size: 12px; text-align: left;">
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span>রোগীর নাম:</span><span>${name || '—'}</span></div>
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>বয়স:</span><span>${age || '—'}</span></div>
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>ধরন:</span><span>${patientType === 'new' ? 'নতুন' : 'পুরাতন'}</span></div>
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>ফি:</span><span>${toBengaliNumber(fee)} টাকা</span></div>
       </div>
-      <script>window.onload = function() { setTimeout(() => window.print(), 500); }<\/script>
-    </body>
-    </html>
-  `);
-  win.document.close();
+      <div style="margin-top: 15px; font-size: 8px; color: #666;">
+        <p>Printed by: ${adminName}</p>
+        <p>${new Date().toLocaleString('bn-BD')}</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(container);
+
+  // ২. html2canvas দিয়ে ছবি তৈরি করা
+  const canvas = await html2canvas(container, { scale: 3 });
+  const imgData = canvas.toDataURL('image/png');
+
+  // ৩. jsPDF দিয়ে PDF তৈরি করা
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: [53.34, 76.2] });
+  doc.addImage(imgData, 'PNG', 0, 0, 53.34, 76.2);
+  
+  // ৪. ফাইল হিসেবে সেভ বা শেয়ার করা
+  const pdfBlob = doc.output('blob');
+  const file = new File([pdfBlob], `${tokenNumber}.pdf`, { type: 'application/pdf' });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    await navigator.share({ files: [file] });
+  } else {
+    doc.save(`${tokenNumber}.pdf`);
+  }
+
+  // পরিষ্কার করা
+  document.body.removeChild(container);
 }
     
     function closeTokenModal() {
@@ -3621,19 +3683,6 @@ function getNextDateByDay(targetDay) {
 }
     
 async function addQuickSerial() {
-  const startTime = Date.now();
-  console.log('🚀 সিরিয়াল বুকিং শুরু...');
-  
-  if (!db) {
-    showAlert('Firebase সংযোগ নেই', 'error');
-    return;
-  }
-  
-  if (!gridSystem) {
-    showAlert('গ্রিড সিস্টেম লোড হয়নি', 'error');
-    return;
-  }
-  
   const day = elements.quickDay.value;
   const time = elements.quickTime.value;
   const type = elements.selectedPatientType.value;
@@ -3700,19 +3749,23 @@ async function addQuickSerial() {
   submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> যুক্ত করা হচ্ছে...';
   submitBtn.disabled = true;
   
+  const startTime = Date.now();
+  
   try {
     const appointmentDateInfo = getNextDateByDay(day);
     const allSelectedDetails = gridSystem.getAllSelectedSerialsWithDetails();
     
-    // ✅ BATCH WRITE - সব অপারেশন একসাথে
+    // ✅ BATCH WRITE
     const batch = db.batch();
+    
+    const yymmdd = appointmentDateInfo.dateString.replace(/-/g, '').slice(2);
     
     for (let i = 0; i < allPatients.length; i++) {
       const patient = allPatients[i];
       const serial = selectedSerials[i];
       const pendingDetail = allSelectedDetails.find(d => d.serial === serial && d.patientIndex === i);
       
-      // বয়স নরমালাইজ করুন
+      // বয়স নরমালাইজ
       const normalized = normalizeAge(patient.ageYears, patient.ageMonths, patient.ageDays);
       let ageParts = [];
       if (normalized.years > 0) ageParts.push(`${normalized.years} বছর`);
@@ -3720,9 +3773,14 @@ async function addQuickSerial() {
       if (normalized.days > 0) ageParts.push(`${normalized.days} দিন`);
       const ageString = ageParts.join(', ');
       
-      // নতুন ডকুমেন্ট রেফারেন্স তৈরি
-      const newDocRef = db.collection('appointments').doc();
+      const formattedSerial = String(serial).padStart(2, '0');
+      const customId = `${yymmdd}-${formattedSerial}`;
+      
+      // 🛠️ ডকুমেন্টের আইডি হিসেবে customId সেট করা হয়েছে
+      const newDocRef = db.collection('appointments').doc(customId);
+      
       batch.set(newDocRef, {
+        appointmentId: customId,
         name: patient.name,
         age: ageString,
         ageYears: normalized.years,
@@ -3742,18 +3800,16 @@ async function addQuickSerial() {
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       });
       
-      // পেন্ডিং সিলেকশন ডিলিট (যদি থাকে)
       if (pendingDetail && pendingDetail.pendingId) {
         const pendingRef = db.collection('pendingSelections').doc(pendingDetail.pendingId);
         batch.delete(pendingRef);
       }
     }
     
-    // ✅ একবারেই কমিট করুন (একটিমাত্র নেটওয়ার্ক কল)
     await batch.commit();
     
-    const elapsed = Date.now() - startTime;
-    console.log(`✅ বুকিং সম্পন্ন: ${elapsed}ms`);
+    console.log(`✅ বুকিং সম্পন্ন: ${Date.now() - startTime}ms`);
+    showAlert('সিরিয়াল সফলভাবে বুক করা হয়েছে!', 'success');
 
 // ==================== SMS Integration (Multi-Serial Supported) ====================
 try {
