@@ -594,14 +594,15 @@
       <h2>অ্যাপয়েন্টমেন্ট ফর্ম</h2>
     </div>
     
-    <form id="appointmentForm" novalidate>
+   <form id="appointmentForm" novalidate>
       <div class="form-group">
-        <label for="name">রোগীর নাম</label>
-        <div class="input-field">
-          <input type="text" id="name" name="name" placeholder="আপনার পুরো নাম লিখুন" required
+    <label for="name">রোগীর নাম</label>
+    <div class="input-field">
+        <input type="text" id="name" name="name" placeholder="আপনার পুরো নাম লিখুন" required
             pattern="[a-zA-Z\u0980-\u09FF\.\s]{3,50}" 
-            title="শুধুমাত্র বাংলা/ইংরেজি অক্ষর, ডট (.) ও স্পেস ব্যবহার করুন (3-50 অক্ষর)">
-        </div>
+            title="শুধুমাত্র বাংলা/ইংরেজি অক্ষর, ডট (.) ও স্পেস ব্যবহার করুন (3-50 অক্ষর)"
+            onblur="this.value = this.value.toLowerCase().split(/[. ]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('. ') == '' ? '' : this.value.toLowerCase().split(/[. ]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('. ')">
+    </div>
         <small id="nameError" class="error-msg">সঠিক নাম লিখুন (বিশেষ চিহ্ন বা সংখ্যা দেওয়া যাবে না)</small>
       </div>
 
@@ -740,6 +741,7 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
 
   <script src="grid.js"></script>
 
@@ -755,6 +757,7 @@
     };
 
     let db;
+    let analytics;
     let firebaseDisabledSlots = {}; 
     let gridSystem = null;
     let serialRanges = {};
@@ -762,6 +765,15 @@
     let realtimeListeners = [];
     let currentUserPendingId = null; 
     let currentAppointmentData = null;
+
+     try {
+      const app = firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore(app);
+      analytics = firebase.analytics();
+      console.log("✅ Firebase initialized");
+    } catch (e) {
+      console.error("❌ Firebase initialization error:", e);
+    }
 
     // DOM Elements
     const daySelect = document.getElementById('day');
@@ -1448,94 +1460,118 @@
       }
     });
 
-    // ==================== FORM SUBMISSION ====================
-    document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      if (!db) return;
-      
-      let isValid = true;
-      if(!nameInput.value.trim()) { nameError.style.display = 'block'; isValid = false; }
-      
-      const ageValidationData = getAgeData();
-      if (!ageValidationData.isValid) isValid = false;
-      if(!/^01[0-9]{9}$/.test(phoneInput.value)) { phoneError.style.display = 'block'; isValid = false; }
-      if(!serialInput.value) { serialError.style.display = 'block'; isValid = false; }
-      
-      if(!isValid) {
-        showPopup('error', 'ফর্ম ত্রুটি', 'অনুগ্রহ করে ফর্মের সকল তথ্য সঠিকভাবে পূরণ করুন।');
-        return;
-      }
-      
-      const patientName = nameInput.value.trim(); 
-      const selectedPhone = phoneInput.value;
-      const selectedDay = daySelect.value;
-      const selectedSerial = parseInt(serialInput.value);
-      const selectedTime = timeSelect.value;
-      const selectedType = typeSelect.value;
-      
-      const nextDateInfo = getNextDateByDay(selectedDay);
-      const appointmentDate = nextDateInfo.dateString;
-      const typeText = selectedType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
-      
-      const confirmed = await showPopup('confirm', 'কনফার্মেশন', 
-        `আপনি কি নিশ্চিত যে সিরিয়াল বুক করতে চান?<br><br>
-         • নাম: ${patientName}<br>
-         • দিন: ${nextDateInfo.banglaDate}<br> 
-         • সময়: ${selectedTime}<br> 
-         • সিরিয়াল: ${selectedSerial} নং<br>
-         • ধরন: ${typeText}<br>
-         • ফোন: ${selectedPhone}`, { showConfirm: true });
-      
-      if(!confirmed) return;
+// ==================== FORM SUBMISSION ====================
+document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  if (!db) return;
+  
+  let isValid = true;
+  if(!nameInput.value.trim()) { nameError.style.display = 'block'; isValid = false; }
+  
+  const ageValidationData = getAgeData();
+  if (!ageValidationData.isValid) isValid = false;
+  if(!/^01[0-9]{9}$/.test(phoneInput.value)) { phoneError.style.display = 'block'; isValid = false; }
+  if(!serialInput.value) { serialError.style.display = 'block'; isValid = false; }
+  
+  if(!isValid) {
+    showPopup('error', 'ফর্ম ত্রুটি', 'অনুগ্রহ করে ফর্মের সকল তথ্য সঠিকভাবে পূরণ করুন।');
+    return;
+  }
+  
+  const patientName = nameInput.value.trim(); 
+  const selectedPhone = phoneInput.value;
+  const selectedDay = daySelect.value;
+  const selectedSerial = parseInt(serialInput.value);
+  const selectedTime = timeSelect.value;
+  const selectedType = typeSelect.value;
+  
+  const nextDateInfo = getNextDateByDay(selectedDay);
+  const appointmentDate = nextDateInfo.dateString;
+  const typeText = selectedType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+  
+  const confirmed = await showPopup('confirm', 'কনফার্মেশন', 
+    `আপনি কি নিশ্চিত যে সিরিয়াল বুক করতে চান?<br><br>
+     • নাম: ${patientName}<br>
+     • দিন: ${nextDateInfo.banglaDate}<br> 
+     • সময়: ${selectedTime}<br> 
+     • সিরিয়াল: ${selectedSerial} নং<br>
+     • ধরন: ${typeText}<br>
+     • ফোন: ${selectedPhone}`, { showConfirm: true });
+  
+  if(!confirmed) return;
 
-      try {
-        submitBtn.classList.add('loading');
-        submitBtn.textContent = 'সাবমিট হচ্ছে...';
+  try {
+    submitBtn.classList.add('loading');
+    submitBtn.textContent = 'সাবমিট হচ্ছে...';
 
-        const duplicateCheck = await db.collection('appointments')
-          .where('appointmentDate', '==', appointmentDate)
-          .where('day', '==', selectedDay)
-          .where('timeSlot', '==', selectedTime)
-          .where('patientType', '==', selectedType)
-          .where('serial', '==', selectedSerial)
-          .get();
-          
-        if (!duplicateCheck.empty) {
-          showPopup('error', 'দুঃখিত!', 'এই সিরিয়ালটি এইমাত্র বুক হয়ে গেছে। অন্য সিরিয়াল বেছে নিন।');
-          submitBtn.classList.remove('loading');
-          submitBtn.textContent = 'সাবমিট করুন';
-          if(gridSystem) gridSystem.updateGrid();
-          return;
-        }
+    // 📅 আইডি ফরম্যাট তৈরির লজিক
+    const yymmdd = appointmentDate.replace(/-/g, '').slice(2);
+    const formattedSerial = String(selectedSerial).padStart(2, '0');
+    const docId = `${yymmdd}-${formattedSerial}`;
 
-        if (gridSystem && gridSystem.userPendingId) {
-          await gridSystem.removePendingSelection(gridSystem.userPendingId);
-        }
-        
-        const appointmentData = {
-          name: patientName,
-          phone: selectedPhone,
-          ageYears: ageValidationData.dbYears,
-          ageMonths: ageValidationData.dbMonths,
-          ageDays: ageValidationData.dbDays,
-          ageString: ageValidationData.ageDisplay,
-          ageDisplay: ageValidationData.ageDisplay,
-          originalInput: ageValidationData.ageInputText,
-          patientType: selectedType,
-          day: selectedDay,
-          date: appointmentDate,
-          appointmentDate: appointmentDate,
-          appointmentDateDisplay: nextDateInfo.banglaDate,
-          timeSlot: selectedTime,  
-          time: selectedTime,
-          serial: selectedSerial,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          status: 'confirmed',
-          age: ageValidationData.ageDisplay
-        };
+    // 🆕 রোগীর ধরন অনুযায়ী সাবকলেকশন নির্বাচন
+    const patientTypeSubcollection = selectedType === 'new' ? 'new' : 'old';
+    
+    // 🆕 নতুন ডকুমেন্ট রেফারেন্স (সাবকলেকশন সহ)
+    const docRef = db
+      .collection('appointments')
+      .doc(yymmdd)
+      .collection(patientTypeSubcollection)
+      .doc(docId);
+    
+    const duplicateCheck = await docRef.get();
+      
+    if (duplicateCheck.exists) {
+      showPopup('error', 'দুঃখিত!', 'এই সিরিয়ালটি এইমাত্র বুক হয়ে গেছে। অন্য সিরিয়াল বেছে নিন।');
+      submitBtn.classList.remove('loading');
+      submitBtn.textContent = 'সাবমিট করুন';
+      if(gridSystem) gridSystem.updateGrid();
+      return;
+    }
 
-        await db.collection('appointments').add(appointmentData);
-        currentAppointmentData = appointmentData;
+    // 🆕 তারিখের মূল ডকুমেন্ট তৈরি (যদি না থাকে)
+    const mainDateDocRef = db.collection('appointments').doc(yymmdd);
+    const mainDateDoc = await mainDateDocRef.get();
+    if (!mainDateDoc.exists) {
+      await mainDateDocRef.set({
+        date: appointmentDate,
+        dateDisplay: nextDateInfo.banglaDate,
+        day: selectedDay,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    // 🗑️ পেন্ডিং সিলেকশন রিমুভ
+    if (gridSystem && gridSystem.userPendingId) {
+      await gridSystem.removePendingSelection(gridSystem.userPendingId);
+    }
+    
+    // 📝 অ্যাপয়েন্টমেন্ট ডেটা
+    const appointmentData = {
+      appointmentId: docId,
+      name: patientName,
+      phone: selectedPhone,
+      ageYears: ageValidationData.dbYears,
+      ageMonths: ageValidationData.dbMonths,
+      ageDays: ageValidationData.dbDays,
+      ageString: ageValidationData.ageDisplay,
+      ageDisplay: ageValidationData.ageDisplay,
+      originalInput: ageValidationData.ageInputText,
+      patientType: selectedType,
+      day: selectedDay,
+      date: appointmentDate,
+      appointmentDate: appointmentDate,
+      appointmentDateDisplay: nextDateInfo.banglaDate,
+      timeSlot: selectedTime,  
+      time: selectedTime,
+      serial: selectedSerial,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      status: 'confirmed',
+      age: ageValidationData.ageDisplay
+    };
+
+    await docRef.set(appointmentData);
+    currentAppointmentData = appointmentData;
 
 // ==================== SMS Integration ====================
 try {
@@ -1546,7 +1582,7 @@ try {
 const appointmentTime = selectedTime || ""; 
 
   // সম্পূর্ণ ইংরেজি মেসেজ টেমপ্লেট
-  const smsMessage = `Dear ${patientName},your Serial No: ${selectedSerial}, Date: ${englishDateStr}, Please Present At: ${appointmentTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
+  const smsMessage = `Dear ${patientName},your Serial No: ${selectedSerial}, Date: ${englishDateStr}, Estimated Time: ${appointmentTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
 
 
   const apiKey = '74a82f2a949057f0e67fa4b672f75275';

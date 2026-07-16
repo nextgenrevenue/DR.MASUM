@@ -1523,7 +1523,7 @@
     <div style="display: flex; flex-direction: column; gap: 12px;">
       
       <div style="display: flex; gap: 10px; align-items: center;">
-       <input type="text" class="patient-name"  placeholder="রোগীর নাম *" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;" required onblur="this.value = this.value.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')"></div>
+        <input type="text" class="patient-name" placeholder="রোগীর নাম *" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;" required  onblur="formatName(this)">
         
         <button type="button" class="remove-patient-btn" style="background: #ef4444; color: white; border: none; border-radius: 6px; width: 38px; height: 38px; cursor: pointer; display: none; align-items: center; justify-content: center;">
           <i class="fas fa-trash"></i>
@@ -1732,6 +1732,9 @@ const firebaseConfig = {
       }).replace(/\d/g, toBengaliNumber);
     };
     
+     function formatName(input) {
+    input.value = input.value.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
     // বয়স নরমালাইজেশনের জন্য ফাংশন
 function normalizeAge(years, months, days) {
   let normalizedYears = years || 0;
@@ -1779,7 +1782,7 @@ function addPatientField() {
     <div style="display: flex; flex-direction: column; gap: 12px;">
       
       <div style="display: flex; gap: 10px; align-items: center;">
-        <input type="text" class="patient-name" placeholder="রোগীর নাম *" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;" required>
+        <input type="text" class="patient-name" placeholder="রোগীর নাম *" style="flex: 1; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;" required  onblur="formatName(this)">
         
         <button type="button" class="remove-patient-btn" style="background: #ef4444; color: white; border: none; border-radius: 6px; width: 38px; height: 38px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
           <i class="fas fa-trash"></i>

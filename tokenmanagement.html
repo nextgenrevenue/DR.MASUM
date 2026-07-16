@@ -6,8 +6,11 @@
   <title>টোকেন ম্যানেজমেন্ট</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
   
   <style>
     * {
@@ -693,7 +696,7 @@
   
   <script src="components-inline.js"></script>
 <script>
-  // ==================== অথেন্টিকেশন ====================
+   // ==================== অথেন্টিকেশন ====================
   function checkAuthentication() {
     const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
     const loginTime = sessionStorage.getItem('loginTime');
@@ -714,25 +717,31 @@
   if (!checkAuthentication()) throw new Error('Authentication failed');
 
   // ==================== ফায়ারবেস কনফিগার ====================
-  const firebaseConfig = {
-    apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
-    authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
-    projectId: "doctor-appointment-syste-23828",
-    storageBucket: "doctor-appointment-syste-23828.appspot.com",
-    messagingSenderId: "79600391014",
-    appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+  authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+  projectId: "doctor-appointment-syste-23828",
+  storageBucket: "doctor-appointment-syste-23828.appspot.com",
+  messagingSenderId: "79600391014",
+  appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+};
 
-  let db, currentTokenDoc = null, currentTokenId = null;
+// ভেরিয়েবলগুলো সঠিকভাবে ডিক্লেয়ার করুন
+let db, analytics; 
+let currentTokenDoc = null, currentTokenId = null;
 
-  try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    console.log("✅ Firebase connected");
-  } catch (e) {
-    console.error("Firebase error:", e);
-  }
-
+try {
+  // Firebase App ইনিশিয়ালাইজ করুন
+  firebase.initializeApp(firebaseConfig);
+  
+  // সার্ভিসগুলো ইনিশিয়ালাইজ করুন
+  db = firebase.firestore();
+  analytics = firebase.analytics(); // এটি এখন সঠিকভাবে কাজ করবে
+  
+  console.log("✅ Firebase and Analytics connected");
+} catch (e) {
+  console.error("Firebase error:", e);
+}
   // ==================== ইউটিলিটি ফাংশন ====================
   function toBengaliNumber(num) {
     if (num === null || num === undefined) return '০';
@@ -921,9 +930,14 @@ async function loadTokenData() {
           </div>
           <div class="token-detail">
             <div class="token-detail-row">
-              <span class="token-detail-label">রোগীর নাম:</span>
-              <span class="token-detail-value"><input type="text" id="newTokenName" placeholder="রোগীর নাম লিখুন" style="width:100%;"></span>
-            </div>
+  <span class="token-detail-label">রোগীর নাম:</span>
+  <span class="token-detail-value">
+    <input type="text" id="newTokenName" name="newTokenName" placeholder="রোগীর নাম লিখুন" style="width:100%;" required
+           pattern="[a-zA-Z\u0980-\u09FF\.\s]{3,50}" 
+           title="শুধুমাত্র বাংলা/ইংরেজি অক্ষর, ডট (.) ও স্পেস ব্যবহার করুন (3-50 অক্ষর)"
+           onblur="this.value = this.value.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')">
+  </span>
+</div>
             <div class="token-detail-row">
               <span class="token-detail-label">বয়স:</span>
               <span class="token-detail-value"><input type="text" id="newTokenAge" placeholder="বয়স" style="width:100%;"></span>
@@ -1001,20 +1015,18 @@ async function saveAndPrintNewToken() {
   const saveBtn = document.querySelector('#tokenGiveBlankModal .btn-save');
   const originalText = saveBtn?.innerHTML;
   if (saveBtn) {
-    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> প্রিন্ট প্রস্তুত...';
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> সংরক্ষণ হচ্ছে...';
     saveBtn.disabled = true;
   }
   
   try {
-    // --- ১. নতুন টোকেন তৈরি (ঠিক saveNewToken()-এর মতো) ---
-    const today = new Date();
-    const yy = String(today.getFullYear()).slice(-2);
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const datePrefix = `${yy}${mm}${dd}`;
+    // ১. বর্তমান তারিখের জন্য yymmdd ফরম্যাট তৈরি
+    const now = new Date();
+    const yymmdd = now.toISOString().slice(2, 10).replace(/-/g, '');
     
+    // ২. ওই দিনের সব টোকেন চেক করে সর্বোচ্চ কাউন্টার বের করা
     const allTokensQuery = await db.collection('paymentHistories')
-      .where('tokenDatePrefix', '==', datePrefix)
+      .where('tokenDatePrefix', '==', yymmdd)
       .get();
     
     let maxCounter = 0;
@@ -1024,10 +1036,13 @@ async function saveAndPrintNewToken() {
       if (counter > maxCounter) maxCounter = counter;
     });
     
+    // ৩. নতুন সিরিয়াল এবং ডকুমেন্ট আইডি তৈরি
     const newTokenSerial = maxCounter + 1;
-    const padding = newTokenSerial >= 100 ? 3 : 2;
-    const tokenNumber = `T-${datePrefix}-${String(newTokenSerial).padStart(padding, '0')}`;
+    const serialStr = String(newTokenSerial).padStart(2, '0');
+    const tokenDocId = `${yymmdd}-${serialStr}`; // যেমন: 260713-02
+    const tokenNumber = `T-${tokenDocId}`; 
     
+    // ৪. ইনপুট ডেটা সংগ্রহ
     const patientType = document.getElementById('newTokenPatientType').value;
     const feeInput = parseInt(document.getElementById('newTokenFee').value);
     const fee = (feeInput && feeInput > 0) ? feeInput : (patientType === 'new' ? 800 : 600);
@@ -1037,10 +1052,11 @@ async function saveAndPrintNewToken() {
     const givenBy = document.getElementById('newTokenGivenBy')?.value || '';
     const due = fee - paid;
     
-    const docRef = await db.collection('paymentHistories').add({
+    // ৫. ফায়ারবেসে সরাসরি সেভ করা
+    await db.collection('paymentHistories').doc(tokenDocId).set({
       tokenNumber: tokenNumber,
       tokenCounter: newTokenSerial,
-      tokenDatePrefix: datePrefix,
+      tokenDatePrefix: yymmdd,
       tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
       patientName: name,
       patientAge: age,
@@ -1057,27 +1073,27 @@ async function saveAndPrintNewToken() {
       source: 'tokenmanagement',
       givenBy: givenBy,
       reference: givenBy,
-      serial: null,
+      serial: null, // অ্যাপয়েন্টমেন্ট সিরিয়াল নাল রাখা হয়েছে
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: sessionStorage.getItem('adminEmail') || 'admin'
     });
     
-    showAlert(`✅ টোকেন ${tokenNumber} তৈরি হয়েছে`, 'success');
+    showAlert(`✅ টোকেন ${tokenNumber} সফলভাবে তৈরি হয়েছে!`, 'success');
     
-    // --- ২. তৈরি হওয়া টোকেনটি পড়ে প্রিন্ট করা ---
-    const newDoc = await docRef.get();
+    // ৬. প্রিন্ট ফাংশন কল করা
+    const newDoc = await db.collection('paymentHistories').doc(tokenDocId).get();
     if (newDoc.exists) {
       const tokenData = { id: newDoc.id, ...newDoc.data() };
-      printTokenDirect(tokenData); // প্রিন্ট ফাংশন কল
+      printTokenDirect(tokenData);
     }
     
-    // --- ৩. মোডাল বন্ধ ও টেবিল রিফ্রেশ ---
+    // ৭. মোডাল বন্ধ ও টেবিল রিফ্রেশ
     closeTokenGiveBlankModal();
     loadTokenData();
     
   } catch (err) {
     console.error('Save & Print error:', err);
-    showAlert('❌ সমস্যা হয়েছে: ' + err.message, 'error');
+    showAlert('❌ সমস্যা হয়েছে: ' + err.message, 'error');
   } finally {
     if (saveBtn) {
       saveBtn.innerHTML = originalText;
@@ -1400,17 +1416,23 @@ async function saveTokenDetails() {
   }
 }
 
-function printTokenDirect(tokenData) {
+async function printTokenDirect(tokenData) {
   const t = tokenData;
   const tokenNumber = t.tokenNumber || '—';
   const adminName = sessionStorage.getItem('adminName') || 'অ্যাডমিন';
+
+  // ডিভাইস শনাক্ত করা: মোবাইল কি না চেক করা
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  if (!isMobile) {
+    // --- পিসির জন্য ডাইরেক্ট প্রিন্ট সিস্টেম ---
   
   const win = window.open('', '_blank');
   win.document.write(`
     <!DOCTYPE html>
     <html>
     <head>
-      <title>টোকেন প্রিন্ট</title>
+      <title>${tokenNumber}</title>
       <meta charset="UTF-8">
       <style>
         @page { size: 60mm auto; margin: 0; }
@@ -1448,6 +1470,61 @@ function printTokenDirect(tokenData) {
     </html>
   `);
   win.document.close();
+return; // পিসির কাজ শেষ, মোবাইল কোড চলবে না
+  }
+
+  // ১. একটি অস্থায়ী কন্টেইনার তৈরি করা যাতে স্টাইল ঠিক থাকে
+  const container = document.createElement('div');
+  container.style.width = '2.10in'; // ২.১০ ইঞ্চি প্রস্থ
+  container.style.backgroundColor = 'white';
+  container.style.padding = '10px';
+  container.innerHTML = `
+    <div style="font-family: sans-serif; border: 1px dashed #2563eb; padding: 10px; text-align: center; border-radius: 8px;">
+      <div style="border-bottom: 1px dashed #ccc; margin-bottom: 10px;">
+        <h2 style="font-size: 12px; color: #2563eb; margin: 0;">ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
+        <p style="font-size: 10px; margin: 2px 0;">টোকেন নাম্বার</p>
+      </div>
+      <div style="font-size: 24px; font-weight: bold; color: #2563eb; margin: 10px 0;">${tokenNumber}</div>
+      <div style="font-size: 12px; text-align: left;">
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span>রোগীর নাম:</span><span>${escapeHtml(t.patientName || '—')}</span></div>
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>বয়স:</span><span>${t.patientAge || '—'}</span></div>
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>ধরন:</span><span>${t.patientType === 'new' ? 'নতুন' : 'পুরাতন'}</span></div>
+
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>ফি:</span><span>${toBengaliNumber(t.tokenFee)} টাকা</span></div>
+      </div>
+      <div style="margin-top: 15px; font-size: 8px; color: #666;">
+        <p>Printed by: ${adminName}</p>
+        <p>${new Date().toLocaleString('bn-BD')}</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(container);
+
+  // ২. html2canvas দিয়ে ছবি তৈরি করা
+  const canvas = await html2canvas(container, { scale: 3 });
+  const imgData = canvas.toDataURL('image/png');
+
+  // ৩. jsPDF দিয়ে PDF তৈরি করা
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: [53.34, 76.2] });
+  doc.addImage(imgData, 'PNG', 0, 0, 53.34, 76.2);
+  
+  // ৪. ফাইল হিসেবে সেভ বা শেয়ার করা
+  const pdfBlob = doc.output('blob');
+  const file = new File([pdfBlob], `${tokenNumber}.pdf`, { type: 'application/pdf' });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    await navigator.share({ files: [file] });
+  } else {
+    doc.save(`${tokenNumber}.pdf`);
+  }
+
+  // পরিষ্কার করা
+  document.body.removeChild(container);
 }
 
   function closeTokenModal() {
@@ -1627,73 +1704,202 @@ function updateCardPreview() {
   }
 }
 
-function generateCardPrint() {
+async function generateCardPrint() {
+  // ---------- ১. ডেটা সংগ্রহ ও প্রসেসিং ----------
   const tokens = getFilteredTokensSync();
   const feeCount = {};
   tokens.forEach(token => {
     const fee = token.tokenFee || 0;
     feeCount[fee] = (feeCount[fee] || 0) + 1;
   });
+
+  const sortedFees = Object.keys(feeCount).sort((a, b) => Number(b) - Number(a));
   
-  const sortedFees = Object.keys(feeCount).sort((a,b) => Number(b) - Number(a));
   let calculationRows = '';
   let totalAmount = 0;
-  
+
   for (let fee of sortedFees) {
     const count = feeCount[fee];
     const subtotal = Number(fee) * count;
     totalAmount += subtotal;
+    
     calculationRows += `
-      <tr>
-        <td>${toBengaliNumber(fee)} টাকা</td>
-        <td style="text-align:center">× ${toBengaliNumber(count)}</td>
-        <td style="text-align:right">${toBengaliNumber(subtotal)} টাকা</td>
-      </tr>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed #ddd; font-size: 11px;">
+        <span style="width: 38%; text-align: left; white-space: normal; word-break: break-all;">${toBengaliNumber(fee)} টাকা</span>
+        <span style="width: 22%; text-align: center;">× ${toBengaliNumber(count)}</span>
+        <span style="width: 40%; text-align: right; padding-right: 15px;">${toBengaliNumber(subtotal)} টাকা</span>
+      </div>
     `;
   }
-  
-  // খরচ ও রিটার্ন ক্যালকুলেশন
+
   const cost = parseInt(document.getElementById('costAmount')?.value) || 0;
-  
   let returnTotal = 0;
   let returnRows = '';
-  for (let i = 0; i < returnItemCount; i++) {
+  
+  for (let i = 0; i < (typeof returnItemCount !== 'undefined' ? returnItemCount : 0); i++) {
     const feeInput = document.getElementById(`returnFee${i}`);
     const qtyInput = document.getElementById(`returnQty${i}`);
-    if (feeInput && qtyInput && feeInput.value && qtyInput.value) {
+    if (feeInput?.value && qtyInput?.value) {
       const feeVal = parseInt(feeInput.value) || 0;
       const qtyVal = parseInt(qtyInput.value) || 0;
       const subtotal = feeVal * qtyVal;
       returnTotal += subtotal;
+      
       returnRows += `
-        <tr>
-          <td>${toBengaliNumber(feeVal)} টাকা</td>
-          <td style="text-align:center">× ${toBengaliNumber(qtyVal)}</td>
-          <td style="text-align:right">${toBengaliNumber(subtotal)} টাকা</td>
-        </tr>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed #ddd; font-size: 11px;">
+          <span style="width: 38%; text-align: left; white-space: normal; word-break: break-all;">${toBengaliNumber(feeVal)} টাকা</span>
+          <span style="width: 22%; text-align: center;">× ${toBengaliNumber(qtyVal)}</span>
+          <span style="width: 40%; text-align: right; padding-right: 15px;">${toBengaliNumber(subtotal)} টাকা</span>
+        </div>
       `;
     }
   }
-  
+
   const netTotal = totalAmount - cost - returnTotal;
-  
-  const printHtml = `
+
+  // ==========================================
+  // 🖥️ 📱 স্মার্ট ডিভাইস ডিটেক্টর এবং ডাইনামিক উইডথ
+  // ==========================================
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (!isMobile) {
+    // --- পিসির জন্য ডাইরেক্ট প্রিন্ট সিস্টেম ---
+
+  const win = window.open('', '_blank');
+  win.document.write(`
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>কার্ড প্রিন্ট</title>
+      <meta name="viewport" content="width=210, initial-scale=1.0">
       <style>
-        @page { size: 60mm auto; margin: 0; }
-        body { font-family: 'Noto Sans Bengali', sans-serif; width: 56mm; margin: 0 auto; padding: 5px; font-size: 12px; }
-        .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 12px; }
-        .header h2 { font-size: 12px; margin: 0; color: #2563eb; }
-        .header p { font-size: 10px; margin: 3px 0 0; color: #666; }
-        table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-        td { padding: 5px 0; }
-        .total-row { border-top: 2px solid #333; margin-top: 5px; padding-top: 5px; font-weight: bold; }
-        .footer { text-align: center; font-size: 9px; margin-top: 15px; color: #999; border-top: 1px dashed #ccc; padding-top: 8px; }
-        hr { margin: 8px 0; border-color: #ddd; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+          font-family: 'Noto Sans Bengali', sans-serif; 
+          font-size: 10px;           
+          width: 210px;            
+          margin: 0 auto;
+          padding: 10px;
+          background: #fff;
+        }
+        .header { 
+          text-align: center; 
+          border-bottom: 2px solid #2563eb; 
+          padding-bottom: 5px; 
+          margin-bottom: 8px; 
+        }
+        .header h2 { font-size: 12px; font-weight: bold; margin: 0; }
+
+        .table-header { 
+          display: flex; 
+          justify-content: space-between; 
+          font-weight: bold; 
+          border-bottom: 2px solid #000; 
+          padding-bottom: 5px; 
+          margin-bottom: 5px; 
+          font-size: 12px; }
+
+        table { 
+          width: 95%; 
+          border-collapse: collapse; 
+          margin: 5px 0;
+        }
+        td, th {
+          padding: 4px 5px;
+          word-wrap: break-word;
+          word-break: break-word;
+          font-size: 9px;
+        }
+        .footer { 
+          text-align: center; 
+          font-size: 8px; 
+          margin-top: 10px; 
+          border-top: 1px dashed #ccc; 
+          padding-top: 5px; 
+        }
+        .summary-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 10px;
+          margin: 4px 5px;
+        }
+        .net-total {
+          font-weight: bold;
+          font-size: 13px;
+          border-top: 1px solid #000;
+          padding-top: 5px;
+        }
+        @media print {
+          @page { size: 2.10in auto; margin: 0; }
+          body { margin: 0; padding: 5px; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
+        <p>ফি সমারী রিপোর্ট</p>
+        <p>${new Date().toLocaleDateString('bn-BD')}</p>
+      </div>
+      <table>
+        <thead>
+           <!-- হেডার কলাম -->
+      <div class="table-header">
+        <span style="width: 38%; text-align: left;">ফি</span>
+        <span style="width: 22%; text-align: center;">সংখ্যা</span>
+        <span style="width: 40%; text-align: right; padding-right: 15px;">মোট</span>
+      </div>
+        </thead>
+        <tbody>${calculationRows}</tbody>
+      </table>
+      <div style="margin: 8px 0;">
+        <div class="summary-row"><span>মোট প্রাপ্ত:</span><span>${toBengaliNumber(totalAmount)} টাকা</span></div>
+        ${cost > 0 ? `<div class="summary-row" style="color:#ef4444;"><span>➖ খরচ:</span><span>${toBengaliNumber(cost)} টাকা</span></div>` : ''}
+        ${returnTotal > 0 ? `<div class="summary-row" style="color:#f59e0b;"><span>➖ রিটার্ন:</span><span>${toBengaliNumber(returnTotal)} টাকা</span></div>` : ''}
+        <hr>
+        <div class="summary-row net-total"><span>নিট পরিমাণ:</span><span>${toBengaliNumber(netTotal)} টাকা</span></div>
+      </div>
+      ${returnRows ? `<div style="background:#fef3c7; padding:5px; border-radius:5px; margin-top:5px;"><strong>📋 রিটার্ন বিস্তারিত:</strong><table>${returnRows}</table></div>` : ''}
+      <div class="footer">প্রিন্টের তারিখ: ${new Date().toLocaleString('bn-BD')}</div>
+       <script>window.onload = function() { setTimeout(() => window.print(), 500); }<\/script>
+    </body>
+    </html>
+  `); 
+    win.document.close();
+return; 
+  }
+  
+  // মোবাইল হলে আপনার দেওয়া ২৭২px, পিসি হলে স্ট্যান্ডার্ড ৫০০px (আপনি চাইলে বাড়াতে/কমাতে পারেন)
+  const targetWidth = isMobile ? 272 : 500; 
+  const container = document.createElement('div');
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  container.style.top = '0px';
+  container.style.width = `${targetWidth}px`; // ডাইনামিক উইডথ
+  container.style.boxSizing = 'border-box';
+  container.style.backgroundColor = 'white';
+  container.style.padding = '12px 15px 12px 10px';
+
+  container.innerHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+          font-family: 'Noto Sans Bengali', sans-serif; 
+          width: 100%; 
+          background: #fff; 
+          color: #000;
+        }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px; }
+        .header h2 { font-size: 14px; font-weight: bold; margin: 0; white-space: normal; word-break: break-word; }
+        .header p { font-size: 11px; margin-top: 3px; }
+        
+        .table-header { display: flex; justify-content: space-between; font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 5px; font-size: 12px; }
+        .summary-row { display: flex; justify-content: space-between; font-size: 12px; margin: 6px 0; padding-right: 15px; }
+        .net-total { font-weight: bold; font-size: 14px; border-top: 2px solid #000; padding-top: 6px; margin-top: 6px; }
+        .footer { text-align: center; font-size: 10px; margin-top: 15px; border-top: 1px dashed #000; padding-top: 6px; }
       </style>
     </head>
     <body>
@@ -1703,50 +1909,87 @@ function generateCardPrint() {
         <p>${new Date().toLocaleDateString('bn-BD')}</p>
       </div>
       
-      <table>
-        <thead>
-          <tr><th style="text-align:left">ফি</th><th></th><th style="text-align:right">মোট</th></tr>
-        </thead>
-        <tbody>
-          ${calculationRows}
-        </tbody>
-      </table>
-      
-      <div style="margin: 8px 0;">
-        <div style="display:flex; justify-content:space-between;"><span>মোট প্রাপ্ত:</span><span>${toBengaliNumber(totalAmount)} টাকা</span></div>
-        ${cost > 0 ? `<div style="display:flex; justify-content:space-between; color:#ef4444;"><span>➖ খরচ:</span><span>${toBengaliNumber(cost)} টাকা</span></div>` : ''}
-        ${returnTotal > 0 ? `<div style="display:flex; justify-content:space-between; color:#f59e0b;"><span>➖ রিটার্ন:</span><span>${toBengaliNumber(returnTotal)} টাকা</span></div>` : ''}
-        <hr>
-        <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:14px;"><span>নিট পরিমাণ:</span><span>${toBengaliNumber(netTotal)} টাকা</span></div>
+      <!-- হেডার কলাম -->
+      <div class="table-header">
+        <span style="width: 38%; text-align: left;">ফি</span>
+        <span style="width: 22%; text-align: center;">সংখ্যা</span>
+        <span style="width: 40%; text-align: right; padding-right: 15px;">মোট</span>
       </div>
       
-      ${returnRows ? `
-        <div style="margin-top:10px;">
-          <div style="background:#fef3c7; padding:5px; border-radius:5px;">
-            <strong>📋 রিটার্ন বিস্তারিত:</strong>
-            <table style="margin-top:5px">
-              ${returnRows}
-            </table>
-          </div>
-        </div>
-      ` : ''}
+      <!-- ডাইনামিক রো সমূহ -->
+      <div style="margin-bottom: 10px;">
+        ${calculationRows}
+      </div>
       
-      <div class="footer">
-        প্রিন্টের তারিখ: ${new Date().toLocaleString('bn-BD')}
+      <div style="margin: 10px 0;">
+        <div class="summary-row"><span>মোট প্রাপ্ত:</span><span>${toBengaliNumber(totalAmount)} টাকা</span></div>
+        ${cost > 0 ? `<div class="summary-row" style="color:#ef4444;"><span>➖ খরচ:</span><span>${toBengaliNumber(cost)} টাকা</span></div>` : ''}
+        ${returnTotal > 0 ? `<div class="summary-row" style="color:#f59e0b;"><span>➖ রিটার্ন:</span><span>${toBengaliNumber(returnTotal)} টাকা</span></div>` : ''}
+        <div class="summary-row net-total"><span>নিট পরিমাণ:</span><span>${toBengaliNumber(netTotal)} টাকা</span></div>
       </div>
-      <div class="no-print" style="text-align:center; margin-top:15px;">
-        <button onclick="window.print()" style="padding:8px 16px; background:#2563eb; color:white; border:none; border-radius:6px;">🖨️ প্রিন্ট করুন</button>
-      </div>
-      <script>window.onload = function() { setTimeout(() => window.print(), 300); }<\/script>
+      
+      ${returnRows ? `<div style="background:#fef3c7; padding:8px; border-radius:5px; margin-top:10px;"><strong>📋 রিটার্ন বিস্তারিত:</strong><div style="margin-top:5px;">${returnRows}</div></div>` : ''}
+      
+      <div class="footer">প্রিন্টের তারিখ: ${new Date().toLocaleString('bn-BD')}</div>
     </body>
     </html>
   `;
-  
-  const win = window.open('', '_blank');
-  win.document.write(printHtml);
-  win.document.close();
-  closeCardPrintModal();
+
+  document.body.appendChild(container);
+
+  // ফোনের রেশিও লক হ্যাক
+  const originalDevicePixelRatio = window.devicePixelRatio;
+  Object.defineProperty(window, 'devicePixelRatio', {
+    get: function() { return 1; },
+    configurable: true
+  });
+
+  setTimeout(() => {
+    html2canvas(container, {
+      scale: 3, 
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      width: targetWidth, 
+      windowWidth: targetWidth 
+    }).then(canvas => {
+      delete window.devicePixelRatio;
+      Object.defineProperty(window, 'devicePixelRatio', {
+        value: originalDevicePixelRatio,
+        writable: true,
+        configurable: true
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdfWidth = 58; 
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', [pdfWidth, pdfHeight]);
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      
+      const pdfBlob = pdf.output('blob');
+      const file = new File([pdfBlob], "Report.pdf", { type: "application/pdf" });
+      
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          files: [file],
+          title: 'ফি সমারী রিপোর্ট'
+        }).then(() => {
+          document.body.removeChild(container);
+        }).catch((err) => {
+          console.error(err);
+          document.body.removeChild(container);
+        });
+      } else {
+        pdf.save('Report.pdf');
+        document.body.removeChild(container);
+      }
+    });
+  }, 400);
 }
+
 
 function openTokenPrint() {
   closePrintOptionsModal();
@@ -1755,201 +1998,240 @@ function openTokenPrint() {
 
 async function generateTokenPrint() {
   console.log("generateTokenPrint started");
-  
+
   const startTokenIdInput = document.getElementById('startTokenId');
   const endTokenIdInput = document.getElementById('endTokenId');
-  
   let startTokenId = startTokenIdInput ? startTokenIdInput.value.trim() : '';
   let endTokenId = endTokenIdInput ? endTokenIdInput.value.trim() : '';
-  
-  // সব টোকেন লোড করুন (ফিল্টার অনুযায়ী)
+
   const allTokens = await getFilteredTokens();
   if (allTokens.length === 0) {
-    showAlert('❌ কোনো টোকেন পাওয়া যায়নি!', 'warning');
+    showAlert('❌ কোনো টোকেন পাওয়া যায়নি!', 'warning');
     closeTokenPrintModal();
     return;
   }
 
-  // ---------- রেঞ্জ ফিল্টার (tokenCounter দিয়ে) ----------
+  // ---------- রেঞ্জ ফিল্টার ----------
   let filteredTokens = [...allTokens];
-  
   if (startTokenId && endTokenId) {
-    // টোকেন আইডি থেকে সিরিয়াল নম্বর (counter) বের করা
     const extractCounter = (tokenId) => {
       const parts = tokenId.split('-');
-      if (parts.length === 3) {
-        return parseInt(parts[2], 10);
-      }
-      return NaN;
+      return parts.length === 3 ? parseInt(parts[2], 10) : NaN;
     };
-    
     const startCounter = extractCounter(startTokenId);
     const endCounter = extractCounter(endTokenId);
-    
+
     if (!isNaN(startCounter) && !isNaN(endCounter)) {
-      filteredTokens = allTokens.filter(t => {
-        const counter = t.tokenCounter || 0;
-        return counter >= startCounter && counter <= endCounter;
-      });
-      
+      filteredTokens = allTokens.filter(t => (t.tokenCounter || 0) >= startCounter && (t.tokenCounter || 0) <= endCounter);
       if (filteredTokens.length === 0) {
         showAlert(`⚠️ "${startTokenId}" থেকে "${endTokenId}" এর মধ্যে কোনো টোকেন নেই!`, 'warning');
         return;
       }
     } else {
-      showAlert('⚠️ টোকেন আইডি ফরম্যাট সঠিক নয় (যেমন: T-260626-170)', 'error');
+      showAlert('⚠️ টোকেন আইডি ফরম্যাট সঠিক নয়!', 'error');
       return;
     }
-  } else {
-    if (startTokenId || endTokenId) {
-      showAlert('⚠️ টোকেন রেঞ্জের জন্য দুটি আইডি প্রয়োজন। সব টোকেন প্রিন্ট হচ্ছে।', 'info');
-    }
   }
 
-  filteredTokens.sort((a, b) => (a.tokenCounter || 0) - (b.tokenCounter || 0));
+  filteredTokens.sort((a, b) => (a.tokenCounter || 0) - (b.tokenCounter || 0)); 
 
-  // ---------- প্রিন্ট HTML তৈরি ----------
-  const printHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>টোকেন প্রিন্ট</title>
-      <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  @page { size: 60mm auto; margin: 0; }
-  body { 
-    font-family: 'Noto Sans Bengali', monospace;
-    padding: 0;
-    font-size: 11px;
-    background: #fff;
+  // ডিভাইস শনাক্ত করা: মোবাইল কি না চেক করা
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  if (!isMobile) {
+    // --- পিসির জন্য ডাইরেক্ট প্রিন্ট সিস্টেম (আগের মতোই ফিক্সড) ---
+    const win = window.open('', '_blank');
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          html, body { margin: 0 !important; padding: 0 !important; height: auto !important; width: 2.10in; }
+          .print-wrapper { width: 2.10in; margin: 0 !important; padding: 2px; display: block; }
+          .header { text-align: center; margin-bottom: 5px; border-bottom: 1px dashed #000; padding-bottom: 2px; }
+          .header h2 { font-size: 12px; font-weight: bold; margin: 0 0 3px 0; }
+          .filter-info { font-size: 9px; margin-bottom: 5px; background: #f0f0f0; padding: 2px; text-align: center; }
+          table { width: 100%; border-collapse: collapse; margin: 2px 0; table-layout: fixed; }
+          th, td { border: 1px solid #ccc; padding: 4px 2px; font-size: 10px; text-align: center; word-wrap: break-word; }
+          tr { page-break-inside: avoid; break-inside: avoid; }
+          .footer { text-align: center; font-size: 8px; margin-top: 5px; border-top: 1px dashed #000; padding-top: 2px; }
+          @media print { @page { size: 2.10in auto; margin: 0 !important; } }
+        </style>
+      </head>
+      <body>
+        <div class="print-wrapper">
+          <div class="header">
+            <h2>ডাঃ মোঃ ওয়াহিדוজ্জামান মাসুম</h2>
+            <p>টোকেন তালিকা</p>
+          </div>
+          <div class="filter-info">
+            📅 ${document.getElementById('dateFrom')?.value || 'সব'} থেকে ${document.getElementById('dateTo')?.value || 'সব'}<br>
+            🎫 মোট টোকেন: ${filteredTokens.length}টি
+          </div>
+          <table>
+            <thead>
+             <tr>
+              <th style="width:35%">টোকেন নং</th>
+              <th style="width:45%">রোগীর নাম</th>
+              <th style="width:20%">বয়স</th>
+            </tr>
+            </thead>
+            <tbody>
+              ${filteredTokens.map(t => `
+                <tr>
+                  <td>${t.tokenNumber || '—'}</td>
+                  <td>${(t.patientName || '—').substring(0, 18)}</td>
+                  <td>${(t.patientAge || '—') + (t.patientAge && !t.patientAge.toString().includes('বছর') ? 'বছর' : '')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="footer">প্রিন্ট সময়: ${new Date().toLocaleString('bn-BD')}</div>
+        </div>
+        <script>window.onload = function() { setTimeout(() => window.print(), 500); }<\/script>      
+      </body>
+      </html>
+    `);
+    win.document.close();
+    return; 
   }
-  .print-wrapper {
-    max-width: 56mm;
-    margin: 0 auto;
-    padding: 3mm 2mm;
-  }
-        .header { text-align: center; margin-bottom: 8px; border-bottom: 1px dashed #000; padding-bottom: 5px; }
-        .header h2 { font-size: 12px; margin: 0; }
-        .divider { border-top: 1px dashed #000; margin: 5px 0; }
-        .filter-info { 
-          font-size: 9px; 
-          margin-bottom: 8px; 
-          padding: 4px; 
-          background: #f0f0f0; 
-          text-align: center;
-          border-radius: 4px;
-        }
-        table { width: 100%; border-collapse: collapse; margin: 5px 0; }
-        th { 
-          background: #ddd; 
-          padding: 5px 3px; 
-          font-size: 10px; 
-          border: 1px solid #999;
-          text-align: center;
-        }
-        td { 
-          border: 1px solid #ccc; 
-          padding: 4px 3px; 
-          font-size: 10px; 
-          text-align: center;
-        }
-        .total-row { background: #ddd; font-weight: bold; }
-        .total-row td { font-weight: bold; padding: 6px; }
-        .footer { 
-          text-align: center; 
-          font-size: 8px; 
-          margin-top: 8px; 
-          border-top: 1px dashed #000; 
-          padding-top: 5px;
-        }
-        @media print {
-          body { margin: 0; padding: 2mm; }
-          .no-print { display: none; }
-          th { background: #ddd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .total-row { background: #ddd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        }
-      </style>
-    </head>
-    <body>
-       <div class="print-wrapper">
-      <div class="header">
-        <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
-        <p>টোকেন তালিকা</p>
-      </div>
+
+  if (isMobile) {
+    // 🔴 ১. ডাইনামিক টোকেন রো জেনারেশন (ফ্লেক্সবক্স লেআউট - ডানে বিন্দুমাত্র কাটবে না)
+    let tokenRows = '';
+    filteredTokens.forEach(t => {
+      const ageDisplay = (t.patientAge || '—') + (t.patientAge && !t.patientAge.toString().includes('বছর') ? ' বছর' : '');
+      tokenRows += `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed #ddd; font-size: 11px;">
+          <span style="width: 30%; text-align: left; white-space: normal; word-break: break-all;">${toBengaliNumber(t.tokenNumber || '—')}</span>
+          <span style="width: 45%; text-align: left; padding-left: 5px; white-space: normal; word-break: break-word;">${(t.patientName || '—').substring(0, 18)}</span>
+          <span style="width: 25%; text-align: right; padding-right: 15px;">${toBengaliNumber(ageDisplay)}</span>
+        </div>
+      `;
+    });
+
+    // 🔴 ২. কন্টেইনার তৈরি – আপনার সেই জাদুকরী ২৭২px চওড়া সাইজে লক
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '0px';
+    container.style.width = '272px'; // মোবাইল থার্মালের জন্য আপনার পারফেক্ট ফিক্সড সাইজ
+    container.style.boxSizing = 'border-box';
+    container.style.backgroundColor = 'white';
+    container.style.padding = '12px 15px 12px 10px';
+    document.body.appendChild(container);
+
+    container.innerHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: 'Noto Sans Bengali', sans-serif; 
+            width: 100%; 
+            background: #fff; 
+            color: #000;
+          }
+          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px; }
+          .header h2 { font-size: 14px; font-weight: bold; margin: 0; white-space: normal; word-break: break-word; }
+          .header p { font-size: 11px; margin-top: 3px; }
+          
+          .table-header { display: flex; justify-content: space-between; font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 5px; font-size: 12px; }
+          .footer { text-align: center; font-size: 10px; margin-top: 15px; border-top: 1px dashed #000; padding-top: 6px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h2>
+          <p>টোকেন তালিকা</p>
+        </div>
+        <div style="font-size: 10px; background: #f0f0f0; padding: 4px; text-align: center; margin-bottom: 8px; border-radius: 4px; padding-right: 15px;">
+          📅 ${document.getElementById('dateFrom')?.value || 'সব'} – ${document.getElementById('dateTo')?.value || 'সব'} <br> 🎫 মোট: ${toBengaliNumber(filteredTokens.length)}টি
+        </div>
+        
+        <!-- ফ্লেক্স হেডার কলাম (৩০% + ৪৫% + ২৫% = ১০০% লকড) -->
+        <div class="table-header">
+          <span style="width: 30%; text-align: left;">টোকেন নং</span>
+          <span style="width: 45%; text-align: left; padding-left: 5px;">রোগীর নাম</span>
+          <span style="width: 25%; text-align: right; padding-right: 15px;">বয়স</span>
+        </div>
+        
+        <!-- ডাইনামিক টোকেন লিস্ট -->
+        <div style="margin-bottom: 10px;">
+          ${tokenRows}
+        </div>
+        
+        <div class="footer">প্রিন্ট সময়: ${new Date().toLocaleString('bn-BD')}</div>
+      </body>
+      </html>
+    `;
+
+    // 🔴 ৩. ডিভাইস পিক্সেল রেশিও ক্রাশ হ্যাক
+    const originalDevicePixelRatio = window.devicePixelRatio;
+    Object.defineProperty(window, 'devicePixelRatio', {
+      get: function() { return 1; },
+      configurable: true
+    });
+
+    setTimeout(async () => {
+      const canvas = await html2canvas(container, { 
+        scale: 3, // স্কেল ১ রেখেছি যাতে ২৭২px এর বিন্দুমাত্র নড়চড় না হয়
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        width: 272,
+        windowWidth: 272
+      });
       
-      <div class="filter-info">
-        📅 ${document.getElementById('dateFrom')?.value || 'সব'} থেকে ${document.getElementById('dateTo')?.value || 'সব'}<br>
-        🎫 মোট টোকেন: <strong>${toBengaliNumber(filteredTokens.length)}টি</strong>
-        ${startTokenId && endTokenId ? `<br>🔢 টোকেন রেঞ্জ: ${startTokenId} - ${endTokenId}` : '<br>📌 সব টোকেন দেখানো হচ্ছে'}
-      </div>
+      // রেশিও রিস্টোর
+      delete window.devicePixelRatio;
+      Object.defineProperty(window, 'devicePixelRatio', {
+        value: originalDevicePixelRatio,
+        writable: true,
+        configurable: true
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+
+      // ৪. PDF সাইজ জেনারেশন
+      const pdfWidth = 58; 
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       
-      <table>
-        <thead>
-          <tr>
-            <th style="width:35%">টোকেন নং</th>
-            <th style="width:45%">রোগীর নাম</th>
-            <th style="width:20%">বয়স</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${filteredTokens.map(t => {
-            let ageText = t.patientAge || '—';
-            if (ageText !== '—' && ageText !== '' && !ageText.toString().includes('বছর')) {
-              ageText = ageText + 'বছর';
-            }
-            return `
-              <tr>
-                <td style="font-size:9px; font-weight:bold;">${t.tokenNumber || '—'}</td>
-                <td style="text-align:center;">${escapeHtml((t.patientName || '—').substring(0, 18))}</td>
-                <td style="font-size:9px;">${ageText}</td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
-      
-      <div class="footer">
-        প্রিন্ট সময়: ${new Date().toLocaleString('bn-BD')}
-      </div>
-      
-      <div class="no-print" style="text-align:center; margin-top:15px;">
-        <button onclick="window.print()" style="padding:10px 25px; background:#2563eb; color:white; border:none; border-radius:5px; cursor:pointer; font-size:12px;">
-          🖨️ প্রিন্ট করুন
-        </button>
-        <button onclick="window.close()" style="padding:10px 25px; background:#ef4444; color:white; border:none; border-radius:5px; cursor:pointer; margin-left:10px; font-size:12px;">
-          ✖ বন্ধ করুন
-        </button>
-      </div>
-      
-      <script>
-        window.onload = function() { 
-          setTimeout(function() { 
-            window.print(); 
-          }, 500);
-        };
-      <\/script>
-     </div>       
-    </body>
-    </html>
-  `;
-  
-  const win = window.open('', '_blank');
-  if (!win) {
-    showAlert('❌ পপ-আপ ব্লকার চালু আছে! দয়া করে পপ-আপ অনুমতি দিন।', 'error');
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF('p', 'mm', [pdfWidth, pdfHeight]);
+      doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+      // ৫. ফাইল শেয়ার বা ডাউনলোড
+      const pdfBlob = doc.output('blob');
+      const file = new File([pdfBlob], "Token_list.pdf", { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'টোকেন তালিকা' });
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        doc.save("Token_list.pdf");
+      }
+
+      document.body.removeChild(container);
+
+      if (startTokenId && endTokenId) {
+        showAlert(`✅ ${filteredTokens.length}টি টোকেন (${startTokenId} – ${endTokenId}) প্রিন্ট হয়েছে`, 'success');
+      } else {
+        showAlert(`✅ সব ${filteredTokens.length}টি টোকেন প্রিন্ট হয়েছে`, 'success');
+      }
+    }, 400);
+    
     return;
   }
-  
-  win.document.write(printHtml);
-  win.document.close();
-  closeTokenPrintModal();
-  
-  if (startTokenId && endTokenId) {
-    showAlert(`✅ ${filteredTokens.length}টি টোকেন প্রিন্ট হচ্ছে (${startTokenId} - ${endTokenId})`, 'success');
-  } else {
-    showAlert(`✅ সব ${filteredTokens.length}টি টোকেন প্রিন্ট হচ্ছে`, 'success');
-  }
 }
+
 
 // 🔥 print এর জন্য হেল্পার ফাংশন (খুব সিম্পল)
 async function getFilteredTokens() {
