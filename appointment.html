@@ -601,7 +601,7 @@
         <input type="text" id="name" name="name" placeholder="আপনার পুরো নাম লিখুন" required
             pattern="[a-zA-Z\u0980-\u09FF\.\s]{3,50}" 
             title="শুধুমাত্র বাংলা/ইংরেজি অক্ষর, ডট (.) ও স্পেস ব্যবহার করুন (3-50 অক্ষর)"
-            onblur="this.value = this.value.toLowerCase().split(/[. ]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('. ') == '' ? '' : this.value.toLowerCase().split(/[. ]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('. ')">
+            onblur="this.value = this.value.toLowerCase().split(/[. ]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') == '' ? '' : this.value.toLowerCase().split(/[. ]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')">
     </div>
         <small id="nameError" class="error-msg">সঠিক নাম লিখুন (বিশেষ চিহ্ন বা সংখ্যা দেওয়া যাবে না)</small>
       </div>
