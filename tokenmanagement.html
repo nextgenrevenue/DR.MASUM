@@ -521,6 +521,7 @@
                 <option value="all">সকল ধরন</option>
                 <option value="new">নতুন রোগী</option>
                 <option value="old">পুরাতন রোগী</option>
+                <option value="due">বাকি রোগী</option>
               </select>
             </div>
             <div class="filter-group search-box">
@@ -541,13 +542,14 @@
                 <label>তারিখ পর্যন্ত</label>
                 <input type="date" id="dateToMobile">
               </div>
-            </div>
+            </div> 
             <div class="filter-row">
               <div class="filter-group">
                 <select id="patientTypeFilterMobile">
                   <option value="all">সকল ধরন</option>
                   <option value="new">নতুন রোগী</option>
                   <option value="old">পুরাতন রোগী</option>
+                  <option value="due">বাকি রোগী</option>
                 </select>
               </div>
               <div class="filter-group search-box">
@@ -774,19 +776,24 @@ try {
     return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
   }
 
-  // ==================== স্ট্যাটস আপডেট ====================
+// ==================== স্ট্যাটস আপডেট ====================
   function updateStats(tokens) {
     const feeMap = new Map();
     let totalAmount = 0;
     let duePatientsCount = 0;
     
     tokens.forEach(token => {
-      const fee = token.tokenFee || 0;
-      const paid = token.tokenPaid || 0;
+      const fee = Number(token.tokenFee) || 0;
+      const paid = Number(token.tokenPaid) || 0;
       const due = fee - paid;
+      
       feeMap.set(fee, (feeMap.get(fee) || 0) + 1);
       totalAmount += paid;
-      if (due > 0) duePatientsCount++;
+      
+      // ফি এবং পেইড সমান না হলেই (কম বা বেশি যা-ই হোক) সে বাকি রোগী হিসেবে কাউন্ট হবে
+      if (due !== 0) {
+        duePatientsCount++;
+      }
     });
     
     const container = document.getElementById('statsCards');
@@ -846,10 +853,19 @@ async function loadTokenData() {
       }
     });
     
-    // ফিল্টার প্রয়োগ
-    if (patientType !== 'all') {
-      tokens = tokens.filter(t => t.patientType === patientType);
-    }
+// ফিল্টার প্রয়োগ
+if (patientType !== 'all') {
+  if (patientType === 'due') {
+    // ফি এবং পেইড সমান না হলেই (কম হোক বা বেশি) সে বাকি রোগী হিসেবে ফিল্টার হবে
+    tokens = tokens.filter(t => {
+      const fee = Number(t.tokenFee) || 0;
+      const paid = Number(t.tokenPaid) || 0;
+      return fee !== paid; // ফি ও পেইড সমান না হলে ট্রু (True) হবে
+    });
+  } else {
+    tokens = tokens.filter(t => t.patientType === patientType);
+  }
+}
     
     if (search) {
       tokens = tokens.filter(t => {
@@ -1108,27 +1124,59 @@ async function deleteToken(tokenId, tokenName) {
   
   try {
     const tokenDoc = await db.collection('paymentHistories').doc(tokenId).get();
+    
+    // সেফটি চেক: টোকেনটি আসলেই ডেটাবেজে আছে কিনা
+    if (!tokenDoc.exists) {
+      showAlert('❌ টোকেনটি খুঁজে পাওয়া যায়নি!', 'error');
+      return;
+    }
+    
     const tokenData = tokenDoc.data();
-    const appointmentId = tokenData.appointmentId;
+    const appointmentId = tokenData ? tokenData.appointmentId : null;
     
     const batch = db.batch();
     
-    // 1. paymentHistories থেকে টোকেন ডিলিট
+    // ১. paymentHistories থেকে মূল টোকেন ডিলিট
     batch.delete(db.collection('paymentHistories').doc(tokenId));
     
-    // 2. appointments আপডেট (এটাই যথেষ্ট, dashboard auto রিফ্রেশ হবে)
+    // ২. নতুন নেস্টেড স্ট্রাকচার অনুযায়ী appointments আপডেট
     if (appointmentId) {
-      batch.update(db.collection('appointments').doc(appointmentId), {
-        tokenGiven: false,
-        tokenNumber: null,
-        tokenTimestamp: null,
-        tokenFee: null,
-        tokenPaid: null,
-        lastTokenUpdate: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      // appointmentId থেকে প্রথম অংশ (yymmdd) আলাদা করা হচ্ছে (যেমন: 260724-03 থেকে 260724)
+      const dateFolder = appointmentId.split('-')[0]; 
+      
+      // প্রথমে 'new' সাব-কলেকশনের রেফারেন্স তৈরি
+      let appointmentRef = db.collection('appointments')
+                             .doc(dateFolder)
+                             .collection('new')
+                             .doc(appointmentId);
+                             
+      let appointmentDoc = await appointmentRef.get();
+      
+      // যদি 'new' সাব-কলেকশনে না পাওয়া যায়, তবে 'old' এ চেক করবে
+      if (!appointmentDoc.exists) {
+        appointmentRef = db.collection('appointments')
+                           .doc(dateFolder)
+                           .collection('old')
+                           .doc(appointmentId);
+        appointmentDoc = await appointmentRef.get();
+      }
+      
+      // যদি দুই জায়গার যেকোনো এক জায়গায় ডকুমেন্টটি পাওয়া যায়, তবেই ব্যাচে আপডেট করা হবে
+      if (appointmentDoc.exists) {
+        batch.update(appointmentRef, {
+          tokenGiven: false,
+          tokenNumber: null,
+          tokenTimestamp: null,
+          tokenFee: null,
+          tokenPaid: null,
+          lastTokenUpdate: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } else {
+        console.warn(`সতর্কতা: appointments/${dateFolder}/(new or old)/${appointmentId} পাথে কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি।`);
+      }
     }
     
-    // 3. সম্পর্কিত পেমেন্ট হিস্ট্রি ডিলিট
+    // ৩. সম্পর্কিত পেমেন্ট হিস্ট্রি ডিলিট
     const relatedPayments = await db.collection('paymentHistories')
       .where('parentTokenId', '==', tokenId)
       .get();
@@ -1137,12 +1185,11 @@ async function deleteToken(tokenId, tokenName) {
       batch.delete(doc.ref);
     });
     
+    // ব্যাচ কমিট বা এক্সিকিউট করা
     await batch.commit();
     
     showAlert(`✅ টোকেন ডিলিট করা হয়েছে!`, 'success');
-    loadTokenData(); // শুধু tokenmanagement টেবিল রিফ্রেশের জন্য
-    
-    // 🔥 dashboard auto রিফ্রেশ হবে, আলাদা কিছু লাগবে না!
+    if (typeof loadTokenData === 'function') loadTokenData(); // টেবিল রিফ্রেশ
     
   } catch (err) {
     console.error('Delete error:', err);
@@ -1313,12 +1360,38 @@ async function saveTokenDetails() {
       lastUpdated: new Date().toISOString()
     });
     
+    // ২. নতুন নেস্টেড স্ট্রাকচার অনুযায়ী appointments আপডেট
     if (currentTokenDoc.appointmentId) {
-      await db.collection('appointments').doc(currentTokenDoc.appointmentId).update({
-        tokenFee: newFee,
-        tokenPaid: newPaid,
-        lastTokenUpdate: new Date().toISOString()
-      });
+      const appointmentId = currentTokenDoc.appointmentId;
+      const dateFolder = appointmentId.split('-')[0]; // yymmdd বের করা হচ্ছে
+      
+      // প্রথমে 'new' সাব-কলেকশনে রেফারেন্স তৈরি
+      let appointmentRef = db.collection('appointments')
+                             .doc(dateFolder)
+                             .collection('new')
+                             .doc(appointmentId);
+                             
+      let appointmentDoc = await appointmentRef.get();
+      
+      // 'new' তে না থাকলে 'old' এ চেক করবে
+      if (!appointmentDoc.exists) {
+        appointmentRef = db.collection('appointments')
+                           .doc(dateFolder)
+                           .collection('old')
+                           .doc(appointmentId);
+        appointmentDoc = await appointmentRef.get();
+      }
+      
+      // যেকোনো এক জায়গায় পাওয়া গেলেই কেবল আপডেট করবে
+      if (appointmentDoc.exists) {
+        await appointmentRef.update({
+          tokenFee: newFee,
+          tokenPaid: newPaid,
+          lastTokenUpdate: new Date().toISOString()
+        });
+      } else {
+        console.warn(`সতর্কতা: appointments/${dateFolder}/(new or old)/${appointmentId} পাথে কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি।`);
+      }
     }
     
     showAlert('✅ টোকেন তথ্য আপডেট হয়েছে', 'success');
@@ -1333,11 +1406,11 @@ async function saveTokenDetails() {
 
   async function printToken() {
   if (!currentTokenId || !currentTokenDoc) {
-    showAlert('টোকেন তথ্য পাওয়া যায়নি', 'error');
+    showAlert('টোকেন তথ্য পাওয়া যায়নি', 'error');
     return;
   }
   
-  // ১. মোডালের ইনপুট ফিল্ড থেকে ডেটা নেওয়া
+  // ১. মোডালের ইনপুট ফিল্ড থেকে ডেটা নেওয়া
   const newName = document.getElementById('editName')?.value || '';
   const newAge = document.getElementById('editAge')?.value || '';
   const newPhone = document.getElementById('editPhone')?.value || '';
@@ -1387,15 +1460,41 @@ async function saveTokenDetails() {
       lastUpdated: new Date().toISOString()
     });
     
+    // নতুন নেস্টেড স্ট্রাকচার অনুযায়ী appointments আপডেট
     if (currentTokenDoc.appointmentId) {
-      await db.collection('appointments').doc(currentTokenDoc.appointmentId).update({
-        tokenFee: newFee,
-        tokenPaid: newPaid,
-        lastTokenUpdate: new Date().toISOString()
-      });
+      const appointmentId = currentTokenDoc.appointmentId;
+      const dateFolder = appointmentId.split('-')[0]; // yymmdd বের করা হচ্ছে
+      
+      // প্রথমে 'new' সাব-কলেকশনে রেফারেন্স তৈরি
+      let appointmentRef = db.collection('appointments')
+                             .doc(dateFolder)
+                             .collection('new')
+                             .doc(appointmentId);
+                             
+      let appointmentDoc = await appointmentRef.get();
+      
+      // 'new' তে না থাকলে 'old' এ চেক করবে
+      if (!appointmentDoc.exists) {
+        appointmentRef = db.collection('appointments')
+                           .doc(dateFolder)
+                           .collection('old')
+                           .doc(appointmentId);
+        appointmentDoc = await appointmentRef.get();
+      }
+      
+      // যেকোনো এক জায়গায় পাওয়া গেলেই কেবল আপডেট করবে
+      if (appointmentDoc.exists) {
+        await appointmentRef.update({
+          tokenFee: newFee,
+          tokenPaid: newPaid,
+          lastTokenUpdate: new Date().toISOString()
+        });
+      } else {
+        console.warn(`সতর্কতা: appointments/${dateFolder}/(new or old)/${appointmentId} পাথে কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি।`);
+      }
     }
     
-    showAlert('✅ পরিবর্তন সেভ করা হয়েছে', 'success');
+    showAlert('✅ পরিবর্তন সেভ করা হয়েছে', 'success');
     loadTokenData(); // টেবিল রিফ্রেশ
     
     // ৪. এখন প্রিন্ট করুন (আপডেটেড ডেটা ব্যবহার করে)
@@ -1404,15 +1503,14 @@ async function saveTokenDetails() {
       const updatedToken = { id: updatedDoc.id, ...updatedDoc.data() };
       printTokenDirect(updatedToken);
     } else {
-      // যদি কোনো কারণে আপডেট ডক না পাওয়া যায়, তাহলে currentTokenDoc ব্যবহার করি
       printTokenDirect(currentTokenDoc);
     }
 
-      closeTokenModal();
+    closeTokenModal();
     
   } catch (err) {
-    console.error('প্রিন্টের সময় সেভ করতে সমস্যা:', err);
-    showAlert('❌ সেভ করতে সমস্যা হয়েছে: ' + err.message, 'error');
+    console.error('প্রিন্টের সময় সেভ করতে সমস্যা:', err);
+    showAlert('❌ সেভ করতে সমস্যা হয়েছে: ' + err.message, 'error');
   }
 }
 
@@ -2117,7 +2215,7 @@ async function generateTokenPrint() {
     container.style.position = 'absolute';
     container.style.left = '-9999px';
     container.style.top = '0px';
-    container.style.width = '272px'; // মোবাইল থার্মালের জন্য আপনার পারফেক্ট ফিক্সড সাইজ
+    container.style.width = '260px'; // মোবাইল থার্মালের জন্য আপনার পারফেক্ট ফিক্সড সাইজ
     container.style.boxSizing = 'border-box';
     container.style.backgroundColor = 'white';
     container.style.padding = '12px 15px 12px 10px';
