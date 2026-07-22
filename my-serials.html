@@ -573,47 +573,67 @@ async function loadRanges() {
 }
 
 // ============================================================
-// ফেচ অ্যাপয়েন্টমেন্ট
+// ফেচ অ্যাপয়েন্টমেন্ট (শুধুমাত্র নতুন সাব-কালেকশন স্ট্রাকচার)
 // ============================================================
 async function fetchAppointments() {
   if (!currentUser) {
-    console.warn('No user');
+    console.warn('⚠️ কোনো ইউজার লগইন করা নেই');
     return;
   }
+  
   try {
-    let primaryData = [];
-    const primarySnap = await db.collection('appointments')
+    // ১. new এবং old সাব-কালেকশন থেকে ডাটা ফেচ করা
+    const newSnapPromise = db.collectionGroup('new')
       .where('phone', '==', currentUser)
       .get();
-    primaryData = primarySnap.docs.map(d => ({ 
-      id: d.id, 
-      ...d.data(), 
-      isArchived: false,
-      source: 'appointments'
-    }));
 
-    let archiveData = [];
-    if (archiveDb) {
-      const archiveSnap = await archiveDb.collection('archived_appointments')
-        .where('phone', '==', currentUser)
-        .get();
-      archiveData = archiveSnap.docs.map(d => ({ 
-        id: d.id, 
-        ...d.data(), 
-        isArchived: true,
-        source: 'archived_appointments'
-      }));
-    }
-    allAppointments = [...primaryData, ...archiveData];
+    const oldSnapPromise = db.collectionGroup('old')
+      .where('phone', '==', currentUser)
+      .get();
+
+    // দুটি ক্যোয়ারি একসাথে চালানো
+    const [newSnap, oldSnap] = await Promise.all([newSnapPromise, oldSnapPromise]);
+
+    const appointmentsMap = new Map();
+
+    // 'new' সাব-কালেকশনের ডাটা সেট করা
+    newSnap.forEach(doc => {
+      appointmentsMap.set(doc.id, { 
+        id: doc.id, 
+        ...doc.data(), 
+        patientType: doc.data().patientType || 'new',
+        isArchived: false, 
+        source: 'new' 
+      });
+    });
+
+    // 'old' সাব-কালেকশনের ডাটা সেট করা
+    oldSnap.forEach(doc => {
+      appointmentsMap.set(doc.id, { 
+        id: doc.id, 
+        ...doc.data(), 
+        patientType: doc.data().patientType || 'old',
+        isArchived: false, 
+        source: 'old' 
+      });
+    });
+
+    // Map থেকে অ্যারেতে রূপান্তর
+    allAppointments = Array.from(appointmentsMap.values());
+
+    // ২. অ্যাপয়েন্টমেন্ট তারিখ অনুযায়ী সাজানো (Newest First)
     allAppointments.sort((a, b) => {
       const dateA = a.appointmentDate || a.date || '';
       const dateB = b.appointmentDate || b.date || '';
       return dateB.localeCompare(dateA);
     });
+
+    // ৩. টেবিল ও সাইডবার আপডেট
     renderTable();
     updateSidebarStats();
+
   } catch (e) {
-    console.error('Fetch error:', e);
+    console.error('❌ Fetch error:', e);
     allAppointments = [];
     renderTable();
   }
@@ -1049,13 +1069,33 @@ async function viewTokenHistory(appointmentId) {
 // ============================================================
 // রিয়েল-টাইম লিসেনার
 // ============================================================
-let primaryListener = null;
+// ============================================================
+// রিয়েল-টাইম লিসেনার (শুধুমাত্র নতুন স্ট্রাকচার)
+// ============================================================
+let unsubs = [];
+
 function setupListeners() {
-  if (primaryListener) primaryListener();
+  // আগের লিসেনার থাকলে বন্ধ করা
+  unsubs.forEach(unsub => unsub());
+  unsubs = [];
+
   if (!currentUser) return;
-  primaryListener = db.collection('appointments')
+
+  // 'new' সাব-কালেকশনের লাইভ লিসেনার
+  const unsubNew = db.collectionGroup('new')
     .where('phone', '==', currentUser)
-    .onSnapshot(() => { fetchAppointments(); }, (error) => console.error('Listener error:', error));
+    .onSnapshot(() => { 
+      fetchAppointments(); 
+    }, err => console.error('New listener error:', err));
+
+  // 'old' সাব-কালেকশনের লাইভ লিসেনার
+  const unsubOld = db.collectionGroup('old')
+    .where('phone', '==', currentUser)
+    .onSnapshot(() => { 
+      fetchAppointments(); 
+    }, err => console.error('Old listener error:', err));
+
+  unsubs.push(unsubNew, unsubOld);
 }
 
 // ============================================================
