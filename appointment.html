@@ -896,6 +896,23 @@
       }
     }
 
+    function syncAppointmentsFromGrid() {
+      if (gridSystem && gridSystem.appointments) {
+        const tempAppointments = [];
+        Object.values(gridSystem.appointments).forEach(group => {
+          if (Array.isArray(group)) {
+            tempAppointments.push(...group);
+          }
+        });
+
+        appointments = tempAppointments;
+
+        if (daySelect && daySelect.value && typeSelect && typeSelect.value) {
+          updateTimeOptions();
+        }
+      }
+    }
+
     // Initialize grid system
     function initializeGridSystem() {
       if (!db) {
@@ -927,6 +944,10 @@
         
         onGridUpdate: function(type, data) {
           console.log('Grid updated:', type);
+          
+          // 🟢 গ্রিড থেকে নতুন অ্যাপয়েন্টমেন্ট ডেটা সিঙ্ক করা
+          syncAppointmentsFromGrid();
+
           if (type === 'grid') {
             loadingMessage.style.display = 'none';
             const gridContainer = document.getElementById('serialGrid');
@@ -972,11 +993,9 @@
       
       console.log('🕒 Updating time options for:', day, type);
       
+      const currentSelectedTime = timeSelect.value; // বর্তমান সিলেক্ট করা টাইম ব্যাকআপ
       timeSelect.innerHTML = '<option value="">-- সময় নির্বাচন করুন --</option>';
-      serialGrid.innerHTML = '';
-      serialInput.value = '';
-      noSlotsMessage.style.display = 'none';
-
+      
       let hasTimeSlots = false;
       const disabledSlots = firebaseDisabledSlots || {};
 
@@ -995,7 +1014,9 @@
           
           sortedTimes.forEach(time => {
             const option = document.createElement('option');
-            option.value = time;
+            
+            // 🛑 মূল ফিক্স: value তে শুধুমাত্র খাঁটি time (যেমন "07:00 AM") থাকবে
+            option.value = time; 
             option.textContent = time;
 
             const slotKey = `${day}_${time}_${type}`;
@@ -1079,6 +1100,7 @@
               option.disabled = false;
               const available = totalSeatsAllowed - bookedCountInRange;
               if (available > 0 && available < totalSeatsAllowed) {
+                // 🛑 শুধুমাত্র textContent এ দেখাবে, value তে হাত দিবে না!
                 option.textContent = time + ` (${available}টি খালি)`;
               }
             }
@@ -1088,10 +1110,10 @@
         }
       }
 
-       if (!hasTimeSlots) {
-        const dayText = day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
-        const typeText = type === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
-        timeSelect.innerHTML = '<option value="">-- রোগীর ধরণ নির্বাচন করুন --</option>';
+      if (!hasTimeSlots) {
+        timeSelect.innerHTML = '<option value="">-- সময় নির্বাচন করুন --</option>';
+      } else if (currentSelectedTime) {
+        timeSelect.value = currentSelectedTime; // আগে সিলেক্ট করা থাকলে সেটা ধরে রাখবে
       }
     }
 
@@ -1378,79 +1400,6 @@
       });
     }
 
-function loadAppointmentsFromFirebase() {
-  if (!db) return;
-  console.log('🔄 রোগীদের জন্য সপ্তাহের চক্র অনুযায়ী ডেটা লোড হচ্ছে (সাব-কালেকশন ফ্রেন্ডলি)...');
-  
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const lastSaturday = new Date(today);
-  const daysSinceSaturday = (dayOfWeek + 1) % 7; 
-  lastSaturday.setDate(today.getDate() - daysSinceSaturday);
-  lastSaturday.setHours(0, 0, 0, 0);
-
-  const startTimestamp = firebase.firestore.Timestamp.fromDate(lastSaturday);
-
-  // গ্লোবাল appointments অবজেক্ট বা ম্যাপ মেইনটেইন করার জন্য (যাতে ডুপ্লিকেট বা ওভাররাইট না হয়)
-  let appointmentsMap = {};
-
-  // হেল্পার ফাংশন: নতুন ও পুরাতন উভয় সাব-কালেকশনের ডাটা একসাথে প্রসেস করার জন্য
-  function processSnapshot() {
-    // ম্যাপ থেকে ডেটা কনভার্ট করে মূল appointments অ্যারেতে নেওয়া হচ্ছে
-    appointments = Object.values(appointmentsMap);
-    
-    // UI এবং গ্রিড আপডেট করা
-    if (daySelect && daySelect.value && typeSelect && typeSelect.value) {
-      updateTimeOptions();
-    }
-    if (gridSystem) {
-      gridSystem.updateGrid();
-    }
-    
-    // আপনার যদি কোনো টেবিল রেন্ডার ফাংশন থাকে (যেমন renderAppointments) তা এখানে কল করতে পারেন
-    if (typeof renderAppointments === 'function') {
-      renderAppointments();
-    }
-  }
-
-  // 🛠️ ১. 'new' সাব-কালেকশন ট্র্যাক করার লিসেনার
-  const newAppointmentsListener = db.collectionGroup('new')
-    .where('timestamp', '>=', startTimestamp)
-    .onSnapshot(snapshot => {
-      snapshot.docChanges().forEach(change => {
-        const doc = change.doc;
-        if (change.type === 'added' || change.type === 'modified') {
-          appointmentsMap[doc.id] = { id: doc.id, collectionType: 'new', ...doc.data() };
-        } else if (change.type === 'removed') {
-          delete appointmentsMap[doc.id];
-        }
-      });
-      processSnapshot();
-    }, error => {
-      console.error('❌ Error loading new appointments:', error);
-    });
-
-  // 🛠️ ২. 'old' সাব-কালেকশন ট্র্যাক করার লিসেনার
-  const oldAppointmentsListener = db.collectionGroup('old')
-    .where('timestamp', '>=', startTimestamp)
-    .onSnapshot(snapshot => {
-      snapshot.docChanges().forEach(change => {
-        const doc = change.doc;
-        if (change.type === 'added' || change.type === 'modified') {
-          appointmentsMap[doc.id] = { id: doc.id, collectionType: 'old', ...doc.data() };
-        } else if (change.type === 'removed') {
-          delete appointmentsMap[doc.id];
-        }
-      });
-      processSnapshot();
-    }, error => {
-      console.error('❌ Error loading old appointments:', error);
-    });
-
-  // লিসেনারগুলো গ্লোবাল ট্র্যাকিং অ্যারেতে পুশ করে রাখা হচ্ছে
-  realtimeListeners.push(newAppointmentsListener);
-  realtimeListeners.push(oldAppointmentsListener);
-}
     // ==================== EVENT LISTENERS ====================
     daySelect.addEventListener('change', () => {
       checkDayAvailability();
@@ -1677,7 +1626,6 @@ const appointmentTime = selectedTime || "";
       setTimeout(() => {
         if (initializeFirebase()) {
           loadSerialRanges();
-          loadAppointmentsFromFirebase();
           initializeGridSystem();
         }
       }, 1000);

@@ -1182,75 +1182,92 @@
     }
 
     // ==================== SEARCH FUNCTIONS ====================
-    async function searchAppointments() {
-      const phone = searchPhone.value.trim();
-      
-      // Validation
-      if (!phone) {
-        phoneError.textContent = 'ফোন নম্বর লিখতে হবে';
-        phoneError.style.display = 'block';
-        searchPhone.focus();
-        return;
-      }
-      
-      if (!/^01[0-9]{9}$/.test(phone)) {
-        phoneError.textContent = 'অনুগ্রহ করে সঠিক ফোন নম্বর লিখুন (01XXXXXXXXX)';
-        phoneError.style.display = 'block';
-        searchPhone.focus();
-        return;
-      }
-      
-      phoneError.style.display = 'none';
-      
-      if (!db) {
-        showPopup('error', 'ত্রুটি', 'ডেটাবেস সংযোগ সমস্যা। পৃষ্ঠাটি রিফ্রেশ করুন।');
-        return;
-      }
-      
-      try {
-        // Show loading
-        searchBtn.classList.add('loading');
-        searchBtn.textContent = '🔍 খুঁজছি...';
-        
-        console.log(`🔍 Searching CONFIRMED appointments for phone: ${phone}`);
-        
-        // শুধুমাত্র কনফার্মড অ্যাপয়েন্টমেন্ট খোঁজা (পেন্ডিং নয়)
-        const snapshot = await db.collection('appointments')
-          .where('phone', '==', phone)
-          .where('status', '==', 'confirmed')
-          .get();
-        
-        const appointments = [];
-        snapshot.forEach(doc => {
-          appointments.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
-        
-        // Hide loading
-        searchBtn.classList.remove('loading');
-        searchBtn.textContent = '🔍 সিরিয়াল খুঁজুন';
-        
-        // Display results
-        displaySearchResults(appointments);
-        
-      } catch (error) {
-        console.error('❌ Error searching appointments:', error);
-        searchBtn.classList.remove('loading');
-        searchBtn.textContent = '🔍 সিরিয়াল খুঁজুন';
-        showPopup('error', 'ত্রুটি', 'ডেটা লোড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
-      }
-    }
+async function searchAppointments() {
+  const phone = searchPhone.value.trim();
+  
+  // Validation
+  if (!phone) {
+    phoneError.textContent = 'ফোন নম্বর লিখতে হবে';
+    phoneError.style.display = 'block';
+    searchPhone.focus();
+    return;
+  }
+  
+  if (!/^01[0-9]{9}$/.test(phone)) {
+    phoneError.textContent = 'অনুগ্রহ করে সঠিক ফোন নম্বর লিখুন (01XXXXXXXXX)';
+    phoneError.style.display = 'block';
+    searchPhone.focus();
+    return;
+  }
+  
+  phoneError.style.display = 'none';
+  
+  if (!db) {
+    showPopup('error', 'ত্রুটি', 'ডেটাবেস সংযোগ সমস্যা। পৃষ্ঠাটি রিফ্রেশ করুন।');
+    return;
+  }
+  
+  try {
+    // Show loading
+    searchBtn.classList.add('loading');
+    searchBtn.textContent = '🔍 খুঁজছি...';
+    
+    console.log(`🔍 Searching CONFIRMED appointments for phone: ${phone}`);
+    
+    // ১. ক্যোয়ারিতে শুধু একটি single-field ফিল্টার ব্যবহার করব (যাতে ইনডেক্স না চায়)
+    const newPromise = db.collectionGroup('new')
+      .where('phone', '==', phone)
+      .get();
 
-    // ==================== এক্সপায়ার্ড চেক ফাংশন (টাইমস্ট্যাম্প সহ) ====================
+    const oldPromise = db.collectionGroup('old')
+      .where('phone', '==', phone)
+      .get();
+
+    // দুটি কালেকশন থেকে ডাটা আনছি
+    const [newSnap, oldSnap] = await Promise.all([newPromise, oldPromise]);
+    
+    const appointmentsMap = new Map();
+
+    // ২. শুধুমাত্র 'confirmed' স্ট্যাটাসের ডাটা জাভাস্ক্রিপ্ট দিয়ে ফিল্টার করে নিচ্ছি
+    newSnap.forEach(doc => {
+      const data = doc.data();
+      if (data.status === 'confirmed') {
+        appointmentsMap.set(doc.id, { id: doc.id, ...data });
+      }
+    });
+
+    oldSnap.forEach(doc => {
+      const data = doc.data();
+      if (data.status === 'confirmed') {
+        appointmentsMap.set(doc.id, { id: doc.id, ...data });
+      }
+    });
+
+    // রেজাল্ট অ্যারে তৈরি করা
+    const appointments = Array.from(appointmentsMap.values());
+    
+    // Hide loading
+    searchBtn.classList.remove('loading');
+    searchBtn.textContent = '🔍 সিরিয়াল খুঁজুন';
+    
+    // Display results
+    displaySearchResults(appointments);
+    
+  } catch (error) {
+    console.error('❌ Error searching appointments:', error);
+    searchBtn.classList.remove('loading');
+    searchBtn.textContent = '🔍 সিরিয়াল খুঁজুন';
+    showPopup('error', 'ত্রুটি', 'ডেটা লোড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+  }
+}
+
+    // ==================== এক্সপায়ার্ড চেক ফাংশন ====================
     function checkIfAppointmentExpired(appointmentDay, appointmentTimestamp) {
       const now = new Date();
-      const today = now.getDay(); // 0=রবি, 1=সোম, 2=মঙ্গল, 3=বুধ, 4=বৃহস্পতি, 5=শুক্র, 6=শনি
+      const today = now.getDay(); 
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       
-      // ডে ম্যাপিং
       const dayMap = {
         "Thursday": 4,
         "Friday": 5
@@ -1258,17 +1275,14 @@
       
       const appDayIndex = dayMap[appointmentDay];
       
-      // যদি বৃহস্পতিবার বা শুক্রবার না হয়
       if (appDayIndex === undefined) {
         return false;
       }
       
-      // ✅ যদি টাইমস্ট্যাম্প থাকে, সেটা ব্যবহার করুন
       if (appointmentTimestamp) {
         try {
           const appointmentDate = appointmentTimestamp.toDate ? appointmentTimestamp.toDate() : new Date(appointmentTimestamp);
           
-          // অ্যাপয়েন্টমেন্টের আসল তারিখ বের করুন (বুকিং তারিখ থেকে)
           const daysMap = {
             "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3,
             "Thursday": 4, "Friday": 5, "Saturday": 6
@@ -1276,67 +1290,54 @@
           
           const targetDayIndex = daysMap[appointmentDay];
           const bookingDayIndex = appointmentDate.getDay();
-          
-          // বুকিং তারিখ থেকে অ্যাপয়েন্টমেন্ট দিন কতদিন পর
+
           let daysToAdd = targetDayIndex - bookingDayIndex;
           if (daysToAdd < 0) {
-            daysToAdd += 7; // পরের সপ্তাহে
+            daysToAdd += 7; 
           }
           
-          // অ্যাপয়েন্টমেন্টের আসল তারিখ
           const actualAppointmentDate = new Date(appointmentDate);
           actualAppointmentDate.setDate(appointmentDate.getDate() + daysToAdd);
           
-          // আজকের তারিখ (শুধু তারিখ, সময় বাদ)
           const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           
-          // অ্যাপয়েন্টমেন্ট তারিখ (শুধু তারিখ, সময় বাদ)
           const appointmentDateOnly = new Date(
             actualAppointmentDate.getFullYear(), 
             actualAppointmentDate.getMonth(), 
             actualAppointmentDate.getDate()
           );
-          
-          // ✅ তারিখের ভিত্তিতে চেক:
-          // 1. অ্যাপয়েন্টমেন্ট তারিখ < আজকের তারিখ → এক্সপায়ার্ড
+        
           if (appointmentDateOnly < todayDateOnly) {
             return true;
           }
-          // 2. অ্যাপয়েন্টমেন্ট তারিখ === আজকের তারিখ → রাত ১১:৫৯ পর্যন্ত কনফার্মড
+
           else if (appointmentDateOnly.getTime() === todayDateOnly.getTime()) {
             if (currentHour < 23 || (currentHour === 23 && currentMinute < 59)) {
-              return false; // এখনও কনফার্মড
+              return false; 
             } else {
-              return true; // এক্সপায়ার্ড
+              return true; 
             }
           }
-          // 3. অ্যাপয়েন্টমেন্ট তারিখ > আজকের তারিখ → কনফার্মড
           else {
             return false;
           }
           
         } catch (error) {
           console.error('Error calculating expired status with timestamp:', error);
-          // Error হলে পুরাতন লজিক ব্যবহার করুন
         }
       }
       
-      // ✅ যদি টাইমস্ট্যাম্প না থাকে, পুরাতন লজিক ব্যবহার করুন
-      // আজকের দিনের সাথে অ্যাপয়েন্টমেন্ট দিনের তুলনা
       if (today === appDayIndex) {
-        // আজকের দিনই অ্যাপয়েন্টমেন্টের দিন
-        // রাত ১১:৫৯ পর্যন্ত কনফার্মড থাকবে
         if (currentHour < 23 || (currentHour === 23 && currentMinute < 59)) {
-          return false; // এখনও কনফার্মড
+          return false; 
         } else {
-          return true; // এক্সপায়ার্ড
+          return true; 
         }
       } else if (today > appDayIndex) {
-        // অ্যাপয়েন্টমেন্টের দিন পার হয়ে গেছে
-        return true; // এক্সপায়ার্ড
+
+        return true; 
       } else {
-        // অ্যাপয়েন্টমেন্টের দিন এখনও আসেনি
-        return false; // কনফার্মড
+        return false; 
       }
     }
 
@@ -1356,15 +1357,11 @@
         return;
       }
       
-      // Sort appointments by day and serial
       appointments.sort((a, b) => {
-        // প্রথমে এক্সপায়ার্ড চেক (টাইমস্ট্যাম্প সহ)
         const aExpired = checkIfAppointmentExpired(a.day, a.timestamp);
         const bExpired = checkIfAppointmentExpired(b.day, b.timestamp);
-        
-        // কনফার্মড উপরে, এক্সপায়ার্ড নিচে
-        if (!aExpired && bExpired) return -1; // a কনফার্মড, b এক্সপায়ার্ড → a উপরে
-        if (aExpired && !bExpired) return 1;  // a এক্সপায়ার্ড, b কনফার্মড → b উপরে
+        if (!aExpired && bExpired) return -1; 
+        if (aExpired && !bExpired) return 1; 
         if (a.day !== b.day) {
           return a.day === 'Thursday' ? -1 : 1;
         }
@@ -1376,19 +1373,13 @@
       appointments.forEach(app => {
         const dayText = app.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার';
         const typeText = app.patientType === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
-        
-        // ✅ এক্সপায়ার্ড চেক (টাইমস্ট্যাম্প সহ)
         const isExpired = checkIfAppointmentExpired(app.day, app.timestamp);
         const statusText = isExpired ? 'এক্সপায়ার্ড' : 'কনফার্মড';
         const statusColor = isExpired ? 'background: var(--danger); color: white;' : 'background: var(--success); color: white;';
         
-        // ✅ তারিখ বের করুন - getDateForAppointment ব্যবহার করুন
         const dateInfo = getDateForAppointment(app.day, app.timestamp);
-        
-        // ✅ বয়স সিস্টেম
         let ageDisplayText = getAgeDisplay(app);
 
-        // ✅ এক্সপায়ার্ড হলে ডাউনলোড বাটন হাইড করা
         const downloadButtonHTML = isExpired 
           ? `<div class="expired-notice" style="color: var(--danger); font-style: italic; margin-top: 10px; padding: 10px; background: #fee; border-radius: 5px;">
               ⛔ এক্সপায়ার্ড - স্লিপ ডাউনলোড করা যাবে না<br>
@@ -1447,17 +1438,14 @@
     }
 
     function downloadAppointmentSlip(appointmentData) {
-      // ✅ প্রথমে এক্সপায়ার্ড চেক করুন (টাইমস্ট্যাম্প সহ)
       const isExpired = checkIfAppointmentExpired(appointmentData.day, appointmentData.timestamp);
       
       if (isExpired) {
         showPopup('error', 'এক্সপায়ার্ড', 'এই অ্যাপয়েন্টমেন্টটি এক্সপায়ার্ড হয়ে গেছে। স্লিপ ডাউনলোড করা যাবে না।');
         return;
       }
-      // Store for slip generation
       currentAppointmentData = appointmentData;
       
-      // Show popup with slip
       showPopup('success', 'আপনার অ্যাপয়েন্টমেন্ট স্লিপ', 
         'আপনার অ্যাপয়েন্টমেন্টের তথ্য নিচে দেখানো হয়েছে। আপনি চাইলে স্লিপ ডাউনলোড করতে পারেন।',
         { showSlip: true });

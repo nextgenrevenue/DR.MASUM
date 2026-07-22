@@ -2066,17 +2066,6 @@ function addPatientField() {
       });
     };
 
-    // ৪ দিনের বেশি পুরানো ডাটা চেক
-    function isExpiredAppointment(data) {
-      if (!data.timestamp || !data.timestamp.toDate) return false;
-      
-      const appointmentDate = data.timestamp.toDate();
-      const fourDaysAgo = new Date();
-      fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
-      
-      return appointmentDate < fourDaysAgo;
-    }
-
     // =======================================================
 // ৪. ড্যাশবোর্ড কার্ড আপডেট - UPDATED (সকল ডাটার জন্য)
 // =======================================================
@@ -4258,7 +4247,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // সংশোধন: const কেটে গ্লোবাল ভ্যারিয়েবল সেট করা হলো
-cleanupListeners = setupRealtimeListener();
+setupRealtimeListeners();
   
   // ✅ মোডালের বাইরে ক্লিক করলে বন্ধ
   window.addEventListener('click', (event) => {

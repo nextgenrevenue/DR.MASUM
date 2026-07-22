@@ -1,4 +1,4 @@
-// grid.js - DATE BASED VERSION WITH MULTI-SELECT FOR ADMIN (COMPLETE FIX)
+// grid.js - DATE BASED VERSION WITH MULTI-SELECT FOR ADMIN (FIXED SUBCOLLECTION LISTENERS)
 console.log("📅 তারিখ-ভিত্তিক Grid System লোড হচ্ছে...");
 
 class RealTimeGridSystem {
@@ -48,7 +48,7 @@ class RealTimeGridSystem {
     this._lastTime = null;
     this._lastType = null;
     
-    // ✅ গ্রিড রি-রেন্ডার ঠেকানোর জন্য ফ্ল্যাগ
+    // গ্রিড রি-রেন্ডার ঠেকানোর জন্য ফ্ল্যাগ
     this._skipNextGridRender = false;
     
     this.isProcessing = false;
@@ -155,7 +155,6 @@ class RealTimeGridSystem {
     }
   }
 
-  // 🛠️ ফিক্সড রিয়েল-টাইম লিসেনার (কালেকশন গ্রুপ সাপোর্টেড)
   setupRealtimeListeners() {
     if (!this.config.db) return;
     
@@ -164,67 +163,72 @@ class RealTimeGridSystem {
     const dateLimitString = this.formatDate(threeDaysAgo);
     
     if (this.realtimeListeners.length) {
-      this.realtimeListeners.forEach(unsub => { if(typeof unsub === 'function') unsub(); });
+      this.realtimeListeners.forEach(unsub => { if (typeof unsub === 'function') unsub(); });
       this.realtimeListeners = [];
     }
 
-    // রিসেট অ্যাপয়েন্টমেন্ট কন্টেইনার
-    this.appointments = {};
+    let allAppointments = {};
 
-    // ১. 'new' সাব-কালেকশন ট্র্যাক করার লিসেনার
-    const newAppointmentsListener = this.config.db
-      .collectionGroup('new')
-      .where('appointmentDate', '>=', dateLimitString)
-      .onSnapshot(snapshot => {
-        this.processGroupSnapshot(snapshot, 'new');
-      }, error => console.error("❌ নিউ অ্যাপয়েন্টমেন্ট লিসেনার ত্রুটি:", error));
-    
-    // ২. 'old' সাব-কালেকশন ট্র্যাক করার লিসেনার
-    const oldAppointmentsListener = this.config.db
-      .collectionGroup('old')
-      .where('appointmentDate', '>=', dateLimitString)
-      .onSnapshot(snapshot => {
-        this.processGroupSnapshot(snapshot, 'old');
-      }, error => console.error("❌ ওল্ড অ্যাপয়েন্টমেন্ট লিসেনার ত্রুটি:", error));
-    
-    this.realtimeListeners.push(newAppointmentsListener);
-    this.realtimeListeners.push(oldAppointmentsListener);
-    
-    // পেন্ডিং ট্র্যাকিং লিসেনার
-    const pendingListener = this.config.db
-      .collection(this.config.pendingSelectionsCollection)
+    const updateAppointments = () => {
+      this.appointments = {};
+      Object.values(allAppointments).forEach(doc => {
+        const data = doc.data;
+        const dateString = data.appointmentDate;
+        const day = data.day;
+        // ✅ টাইপ বের করা হচ্ছে
+        const type = data.patientType || data.type || '';
+        if (dateString && day && type) {
+          // ✅ কী-তে টাইপ যোগ করা হলো
+          const key = `${dateString}_${day}_${type}`;
+          if (!this.appointments[key]) this.appointments[key] = [];
+          this.appointments[key].push({ id: doc.id, ...data });
+          console.log(`📌 অ্যাপয়েন্টমেন্ট যুক্ত: ${key} -> সিরিয়াল ${data.serial}`);
+        }
+      });
+      console.log('🔍 বর্তমান appointments:', this.appointments);
+      this.safeUpdateGrid();
+      if (this.config.onGridUpdate) this.config.onGridUpdate('appointments', this.appointments);
+    };
+
+// 'new' সাব-কালেকশন লিসেনার
+const unsubscribeNew = this.config.db.collectionGroup('new')
+  .where('appointmentDate', '>=', dateLimitString)
+  .onSnapshot(snapshot => {
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      data.patientType = 'new';
+      data.type = 'new';
+      allAppointments[`${doc.id}_new`] = { id: doc.id, data: data };
+    });
+    updateAppointments();
+  }, error => console.error("❌ 'new' লিসেনার ত্রুটি:", error));
+
+// 'old' সাব-কালেকশন লিসেনার
+const unsubscribeOld = this.config.db.collectionGroup('old')
+  .where('appointmentDate', '>=', dateLimitString)
+  .onSnapshot(snapshot => {
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      data.patientType = 'old';
+      data.type = 'old';
+      allAppointments[`${doc.id}_old`] = { id: doc.id, data: data };
+    });
+    updateAppointments();
+  }, error => console.error("❌ 'old' লিসেনার ত্রুটি:", error));
+
+    this.realtimeListeners.push(unsubscribeNew);
+    this.realtimeListeners.push(unsubscribeOld);
+
+    // পেন্ডিং সিলেকশন (আগের মতো)
+    const unsubscribePending = this.config.db.collection(this.config.pendingSelectionsCollection)
       .where('expiresAt', '>', new Date())
       .onSnapshot(snapshot => {
         this.processPendingSelections(snapshot);
         this.safeUpdateGrid();
         if (this.config.onPendingUpdate) this.config.onPendingUpdate(this.pendingSelections);
-      }, error => console.error("❌ পেন্ডিং সিলেকশন লিসেনার ত্রুটি:", error));
+      }, error => console.error("❌ পেন্ডিং লিসেনার ত্রুটি:", error));
     
-    this.realtimeListeners.push(pendingListener);
-  }
-
-  // 🛠️ সাব-কালেকশন ডাটা মার্জ ও প্রসেস করার নতুন মেথড
-  processGroupSnapshot(snapshot, collectionType) {
-    snapshot.docChanges().forEach(change => {
-      const doc = change.doc;
-      const data = doc.data();
-      const dateString = data.appointmentDate;
-      const day = data.day;
-      
-      if (dateString && day) {
-        const key = `${dateString}_${day}`;
-        if (!this.appointments[key]) this.appointments[key] = [];
-
-        if (change.type === 'added' || change.type === 'modified') {
-          // ডুপ্লিকেট এড়াতে আগের এন্ট্রি রিমুভ করে নতুন ডাটা পুশ করা হচ্ছে
-          this.appointments[key] = this.appointments[key].filter(app => app.id !== doc.id);
-          this.appointments[key].push({ id: doc.id, collectionType, ...data });
-        } else if (change.type === 'removed') {
-          this.appointments[key] = this.appointments[key].filter(app => app.id !== doc.id);
-        }
-      }
-    });
-    this.safeUpdateGrid();
+    this.realtimeListeners.push(unsubscribePending);
   }
 
   processPendingSelections(snapshot) {
@@ -274,7 +278,6 @@ class RealTimeGridSystem {
     return element ? element.value : null;
   }
 
-  // 🛠️ ফিক্সড সিলেক্ট সিরিয়াল লজিক (টাইপ ইন্ডিপেন্ডেন্ট চেকিং)
   async selectSerial(serial) {
     console.log(`🎯 সিরিয়াল ${serial} সিলেক্ট করা হচ্ছে...`);
     
@@ -298,10 +301,9 @@ class RealTimeGridSystem {
     const nextDateInfo = this.getNextDateByDay(day);
     const dateString = nextDateInfo.dateString;
     
-    const key = `${dateString}_${day}`;
+    // ✅ টাইপ-সহ কী ব্যবহার করা হচ্ছে
+    const key = `${dateString}_${day}_${type}`;
     const dayAppointments = this.appointments[key] || [];
-    
-    // 🛠️ ফিক্সড: নতুন বা পুরাতন যেকোনো প্রকারের রোগীতে সিরিয়াল বুক থাকলে তা লক থাকবে
     const appointment = dayAppointments.find(app => app.time === time && app.serial === serial);
     
     if (appointment) {
@@ -333,15 +335,15 @@ class RealTimeGridSystem {
         );
         
         if (alreadySelectedForCurrentPatient) {
-            console.log(`⏭️ সিরিয়াল ${serial} ইতিমধ্যে সিলেক্টেড`);
+            console.log(`⏭️ সিরিয়াল ${serial} ইতিমধ্যে সিলেক্টেড, কিছু করা হচ্ছে না`);
             this._skipNextGridRender = false;
-            return true;
+            return true; 
         }
         
         const existingForOtherPatient = this.selectedSerials.find(s => s.serial === serial && s.patientIndex !== this.currentPatientIndex);
         
         if (existingForOtherPatient) {
-            console.log(`🔄 সিরিয়াল ${serial} অন্য রোগী থেকে রি-অ্যাসাইন হচ্ছে`);
+            console.log(`🔄 সিরিয়াল ${serial} অন্য রোগীর (${existingForOtherPatient.patientIndex}) থেকে রি-অ্যাসাইন করা হচ্ছে`);
             const otherElement = document.querySelector(`.serial-item[data-serial="${serial}"]`);
             if (otherElement) {
                 otherElement.classList.remove('selected');
@@ -420,6 +422,8 @@ class RealTimeGridSystem {
                     patientIndex: this.currentPatientIndex
                 });
             }
+            
+            console.log(`✅ সিরিয়াল ${serial} সিলেক্ট হয়েছে`);
         }
         
         if (typeof updateAllSerialDisplays === 'function') {
@@ -465,7 +469,7 @@ class RealTimeGridSystem {
 
   async updateGrid() {
     if (this._skipNextGridRender) {
-      console.log("⏭️ গ্রিড রি-রেন্ডার স্কিপ করা হয়েছে");
+      console.log("⏭️ গ্রিড রি-রেন্ডার স্কিপ করা হয়েছে (UI আপডেট ইতিমধ্যে হয়েছে)");
       this._skipNextGridRender = false;
       return;
     }
@@ -536,6 +540,10 @@ class RealTimeGridSystem {
     dateHeader.textContent = `📅 অ্যাপয়েন্টমেন্ট তারিখ: ${displayDate}`;
     gridContainer.appendChild(dateHeader);
     
+    // ডিবাগ: দেখুন কী কী অ্যাপয়েন্টমেন্ট আছে
+    const debugKey = `${dateString}_${day}_${type}`;
+    console.log(`🔍 গ্রিড রেন্ডার: কী=${debugKey}, অ্যাপয়েন্টমেন্ট=${this.appointments[debugKey] || []}`);
+    
     for (let serial = start; serial <= end; serial++) {
       const serialItem = document.createElement('div');
       serialItem.className = 'serial-item';
@@ -578,24 +586,35 @@ class RealTimeGridSystem {
     return null;
   }
 
-  // 🛠 Cortected: টাইপ ইন্ডিপেন্ডেন্ট স্ট্যাটাস চেকার
+  // ✅ ফিক্সড: টাইপ-সহ কী ব্যবহার করা হয়েছে
   getSerialStatus(serial, day, time, type, dateString, pendingData) {
     const status = {
-      isBooked: false, isOtherUserPending: false, isCurrentUserPending: false,
-      isAdminPending: false, isCurrentAdminPending: false
+      isBooked: false,
+      isOtherUserPending: false,
+      isCurrentUserPending: false,
+      isAdminPending: false,
+      isCurrentAdminPending: false
     };
-    
-    const key = `${dateString}_${day}`;
+
+    // টাইপ-সহ কী তৈরি
+    const key = `${dateString}_${day}_${type}`;
     const dayAppointments = this.appointments[key] || [];
-    
-    // 🛠 ফিক্সড: পুরো দিনের টাইম স্লটে যেকোনো টাইপ (new/old) লক থাকলে এই সিরিয়াল লক দেখাবে
+
+    // এখন শুধু সময় ও সিরিয়াল মিললেই বুকড (টাইপ তো কী-তেই আছে)
     const appointment = dayAppointments.find(app => app.time === time && app.serial === serial);
-    if (appointment) status.isBooked = true;
-    
+
+    if (appointment) {
+      status.isBooked = true;
+    }
+
+    // পেন্ডিং চেক (পেন্ডিং কী-তে আগে থেকেই টাইপ আছে)
     if (!status.isBooked) {
-      if (this.currentUserPendingSerial === serial) status.isCurrentUserPending = true;
-      else if (pendingData.user && pendingData.user.some(p => p.serial === serial)) status.isOtherUserPending = true;
-      
+      if (this.currentUserPendingSerial === serial) {
+        status.isCurrentUserPending = true;
+      } else if (pendingData.user && pendingData.user.some(p => p.serial === serial)) {
+        status.isOtherUserPending = true;
+      }
+
       if (pendingData.admin && pendingData.admin.some(p => p.serial === serial)) {
         status.isAdminPending = true;
         const adminPending = pendingData.admin.find(p => p.serial === serial);
@@ -604,6 +623,7 @@ class RealTimeGridSystem {
         }
       }
     }
+
     return status;
   }
 
