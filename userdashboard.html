@@ -7,9 +7,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  
+  <!-- Firebase SDK (v8/v9 compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
+  
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
   <!-- components-inline.js লোড -->
@@ -141,14 +145,14 @@
     <div class="content-area">
       <div class="container">
 
-                  <!-- PAGE HEADER -->
-  <div class="page-header">
-    <div>
-      <h2 id="pageTitle">রোগী ড্যাশবোর্ড</h2>
-      <p id="pageSubtitle">স্বাগতম! আপনার সিরিয়াল ও প্রোফাইল ম্যানেজ করুন</p>
-    </div>
-    <span class="date"><i class="far fa-calendar-alt"></i> <span id="headerDate"></span></span>
-  </div>
+        <!-- PAGE HEADER -->
+        <div class="page-header">
+          <div>
+            <h2 id="pageTitle">রোগী ড্যাশবোর্ড</h2>
+            <p id="pageSubtitle">স্বাগতম! আপনার সিরিয়াল ও প্রোফাইল ম্যানেজ করুন</p>
+          </div>
+          <span class="date"><i class="far fa-calendar-alt"></i> <span id="headerDate"></span></span>
+        </div>
         
         <!-- কার্ডস -->
         <div class="cards-grid">
@@ -199,7 +203,7 @@
 
 <script>
 // ============================================================
-// 1. FIREBASE CONFIG
+// 1. FIREBASE CONFIG & ANALYTICS INIT
 // ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
@@ -210,13 +214,20 @@ const firebaseConfig = {
   appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
 };
 
-let db;
+let db, analytics;
 try {
   if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
   }
   db = firebase.firestore();
-  console.log('✅ Firebase connected');
+  
+  if (firebase.analytics) {
+    analytics = firebase.analytics();
+    window.analytics = analytics;
+  }
+  
+  window.db = db;
+  console.log('✅ Firebase & Analytics connected');
 } catch (err) {
   console.error('❌ Firebase init error:', err);
 }
@@ -226,7 +237,8 @@ try {
 // ============================================================
 let currentUser = null;
 let allAppointments = [];
-let primaryListener = null;
+let newListener = null;
+let oldListener = null;
 
 // ============================================================
 // 3. HELPER FUNCTIONS
@@ -275,20 +287,21 @@ function getStatusBadge(app) {
 }
 
 // ============================================================
-// 4. FETCH APPOINTMENTS (শুধু Primary DB)
+// 4. FETCH APPOINTMENTS (Collection Group - New & Old)
 // ============================================================
 async function fetchAppointments() {
   try {
-    console.log('🔄 Fetching appointments for:', currentUser);
-    const primarySnap = await db.collection('appointments')
-      .where('phone', '==', currentUser)
-      .get();
+    console.log('🔄 Fetching appointments from subcollections for:', currentUser);
     
-    allAppointments = primarySnap.docs.map(d => ({ 
-      id: d.id, 
-      ...d.data(), 
-      isArchived: false 
-    }));
+    const [newSnap, oldSnap] = await Promise.all([
+      db.collectionGroup('new').where('phone', '==', currentUser).get(),
+      db.collectionGroup('old').where('phone', '==', currentUser).get()
+    ]);
+    
+    const newData = newSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const oldData = oldSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    
+    allAppointments = [...newData, ...oldData];
     
     allAppointments.sort((a, b) => {
       const dateA = a.appointmentDate || a.date || '';
@@ -296,7 +309,12 @@ async function fetchAppointments() {
       return dateB.localeCompare(dateA);
     });
 
-    console.log(`✅ Total: ${allAppointments.length} appointments`);
+    console.log(`✅ Total: ${allAppointments.length} appointments loaded`);
+    
+    if (analytics) {
+      analytics.logEvent('user_dashboard_loaded', { total_count: allAppointments.length });
+    }
+
     renderAll();
   } catch (e) {
     console.error('❌ Fetch error:', e);
@@ -344,7 +362,7 @@ function renderRecentTable() {
     <tr>
       <td>${a.appointmentDate || a.date || '-'}</td>
       <td><strong style="color:#3b82f6;">#${a.serial || '0'}</strong></td>
-      <td>${a.name || '-'}</td>
+      <td>${a.patientName || a.name || '-'}</td>
       <td>${a.age || '-'}</td>
       <td>${a.time || '-'}</td>
       <td><span style="background:#f1f5f9;padding:2px 10px;border-radius:4px;font-size:12px;">${a.patientType || a.type || 'General'}</span></td>
@@ -369,17 +387,28 @@ function updateSidebarStats() {
 }
 
 // ============================================================
-// 6. REAL-TIME LISTENER (Primary DB)
+// 6. REAL-TIME LISTENERS (Collection Group Queries)
 // ============================================================
 function setupListener() {
-  if (primaryListener) primaryListener();
-  primaryListener = db.collection('appointments')
+  if (newListener) newListener();
+  if (oldListener) oldListener();
+
+  newListener = db.collectionGroup('new')
     .where('phone', '==', currentUser)
     .onSnapshot(() => { 
-      console.log('🔄 Primary DB updated');
+      console.log('🔄 New subcollection updated');
       fetchAppointments(); 
     }, (error) => {
-      console.error('Primary listener error:', error);
+      console.error('New listener error:', error);
+    });
+
+  oldListener = db.collectionGroup('old')
+    .where('phone', '==', currentUser)
+    .onSnapshot(() => { 
+      console.log('🔄 Old subcollection updated');
+      fetchAppointments(); 
+    }, (error) => {
+      console.error('Old listener error:', error);
     });
 }
 
@@ -388,11 +417,11 @@ function setupListener() {
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
   
-  // 🔥 sessionStorage থেকে ইউজার ফোন নিন (হার্ডকোডেড নয়!)
+  // sessionStorage থেকে ইউজার ফোন নিন
   let userPhone = sessionStorage.getItem('userPhone') || 
                   sessionStorage.getItem('loggedInUser');
   
-  // 🔥 যদি ইউজার না থাকে, লগইন পেজে রিডাইরেক্ট করুন
+  // যদি ইউজার না থাকে, লগইন পেজে রিডাইরেক্ট করুন
   if (!userPhone) {
     console.warn('⚠️ No user found! Redirecting to login...');
     window.location.href = 'login.html';
@@ -410,13 +439,11 @@ document.addEventListener('DOMContentLoaded', function() {
   if (window.ComponentLoader) {
     window.ComponentLoader.loadAllComponents('ড্যাশবোর্ড');
     
-    // sessionStorage-এ ইউজার ফোন সেট করুন (যদি না থাকে)
     if (!sessionStorage.getItem('userPhone')) {
       sessionStorage.setItem('userPhone', userPhone);
       sessionStorage.setItem('loggedInUser', userPhone);
     }
     
-    // সাইডবার প্রোফাইল আপডেটের জন্য অপেক্ষা
     setTimeout(() => {
       if (window.ComponentLoader.initProfile) {
         window.ComponentLoader.initProfile();
@@ -430,7 +457,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.warn('⚠️ ComponentLoader পাওয়া যায়নি');
   }
   
-  // অ্যাপয়েন্টমেন্ট লোড
+  // অ্যাপয়েন্টমেন্ট লোড ও রিয়েলটাইম লিসেনার চালু
   fetchAppointments();
   setupListener();
 });
