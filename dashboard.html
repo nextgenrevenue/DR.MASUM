@@ -1573,7 +1573,6 @@ function checkAuthentication() {
   const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
   const loginTime = sessionStorage.getItem('loginTime');
   
-  // ডিবাগিং
   console.log('Auth check - isLoggedIn:', isLoggedIn, 'loginTime:', loginTime);
   
   if (!isLoggedIn || isLoggedIn !== 'true') {
@@ -1598,7 +1597,6 @@ function checkAuthentication() {
   return true;
 }
 
-// 🔴 IMMEDIATE AUTH CHECK
 if (!checkAuthentication()) {
   // Stop execution if not authenticated
   throw new Error('Authentication failed - redirecting to login');
@@ -1631,7 +1629,6 @@ const firebaseConfig = {
       search: ''
     };
     
-    // Grid System Instance
     let gridSystem = null;
     let currentTokenId = null;      
     let currentTokenDoc = null;     
@@ -1741,20 +1738,18 @@ function formatName(input) {
         .join(' ');               
 }
     
-    // বয়স নরমালাইজেশনের জন্য ফাংশন
 function normalizeAge(years, months, days) {
   let normalizedYears = years || 0;
   let normalizedMonths = months || 0;
   let normalizedDays = days || 0;
   
-  // দিন থেকে মাস (30 দিন = 1 মাস)
   if (normalizedDays >= 30) {
     const extraMonths = Math.floor(normalizedDays / 30);
     normalizedMonths += extraMonths;
     normalizedDays = normalizedDays % 30;
   }
   
-  // মাস থেকে বছর (12 মাস = 1 বছর)
+
   if (normalizedMonths >= 12) {
     const extraYears = Math.floor(normalizedMonths / 12);
     normalizedYears += extraYears;
@@ -1771,8 +1766,6 @@ function normalizeAge(years, months, days) {
     // =======================================================
     // ✅ মাল্টি পেশেন্ট ফাংশন (এখানে যোগ করুন)
     // =======================================================
-
-// রোগী যোগ করার ফাংশন
 function addPatientField() {
   const container = document.getElementById('patientsContainer');
   if (!container) return;
@@ -1809,15 +1802,13 @@ function addPatientField() {
   `;
   
   container.appendChild(patientDiv);
-  
-  // ডিলিট বাটনের ইভেন্ট লিসেনার
+
   const removeBtn = patientDiv.querySelector('.remove-patient-btn');
   removeBtn.addEventListener('click', (e) => {
-    e.stopPropagation(); // কার্ডের ক্লিক ইভেন্ট যেন বন্ধ থাকে
+    e.stopPropagation();
     removePatientField(patientDiv);
   });
-  
-  // কার্ডের বডিতে ক্লিক ইভেন্ট (অ্যাক্টিভ করার জন্য)
+
   patientDiv.addEventListener('click', (e) => {
     if (!e.target.closest('.remove-patient-btn')) {
       setActivePatient(patientDiv);
@@ -1827,7 +1818,6 @@ function addPatientField() {
   updatePatientIndices();
 }
 
-    // রোগী রিমুভ ফাংশন
     function removePatientField(patientDiv) {
       const patients = document.querySelectorAll('.patient-card');
       if (patients.length === 1) {
@@ -1843,7 +1833,6 @@ function addPatientField() {
       }
     }
 
-    // সক্রিয় রোগী সেট করুন
     function setActivePatient(patientDiv) {
       document.querySelectorAll('.patient-card').forEach(card => {
         card.classList.remove('active');
@@ -1862,7 +1851,6 @@ function addPatientField() {
       }
     }
 
-    // ইন্ডেক্স আপডেট
     function updatePatientIndices() {
       const patients = document.querySelectorAll('.patient-card');
       patients.forEach((patient, index) => {
@@ -1870,7 +1858,6 @@ function addPatientField() {
       });
     }
 
-    // সব সিরিয়াল ডিসপ্লে আপডেট
     function updateAllSerialDisplays() {
       if (!gridSystem) return;
       
@@ -1892,7 +1879,6 @@ function addPatientField() {
       });
     }
 
-    // সব রোগীর ডাটা সংগ্রহ
     function getAllPatientsData() {
       const patients = document.querySelectorAll('.patient-card');
       const patientsData = [];
@@ -1915,7 +1901,6 @@ function addPatientField() {
       return patientsData;
     }
 
-    // একটি মাত্র ফোন নম্বর নেওয়ার ফাংশন
     function getCommonPhoneNumber() {
       const skipPhoneCheckbox = document.getElementById('skipPhoneCheckbox');
       const skipPhone = skipPhoneCheckbox ? skipPhoneCheckbox.checked : false;
@@ -1936,7 +1921,6 @@ function addPatientField() {
       return phone;
     }
 
-    // সক্রিয় রোগীর ইন্ডেক্স বের করুন
     function getActivePatientIndex() {
       const activePatient = document.querySelector('.patient-card.active');
       if (activePatient) {
@@ -1950,8 +1934,7 @@ function addPatientField() {
     // =======================================================
    const getAgeDisplay = (data) => {
   let ageDisplay = '';
-  
-  // ✅ নরমালাইজড বয়স ফিল্ড ব্যবহার করুন
+
   const years = data.ageYears || 0;
   const months = data.ageMonths || 0;
   const days = data.ageDays || 0;
@@ -1967,7 +1950,6 @@ function addPatientField() {
       ageDisplay += `${toBengaliNumber(days)} দিন`;
     }
   } else if (data.age) {
-    // ব্যাকআপ: পুরনো ডাটার জন্য
     if (typeof data.age === 'number' && data.age > 0) {
       ageDisplay = `${toBengaliNumber(data.age)} বছর`;
     } else if (typeof data.age === 'string') {
@@ -1978,7 +1960,6 @@ function addPatientField() {
   return ageDisplay || '—';
 };
 
-    // demo.html এর মত showAlert ফাংশন
     const showAlert = (message, type = 'info') => {
       const alert = document.createElement('div');
       alert.style.cssText = `
@@ -2014,7 +1995,6 @@ function addPatientField() {
       }, 3000);
     };
 
-    // CSS অ্যানিমেশন যোগ (যদি না থাকে)
     if (!document.querySelector('style[data-alert-animation]')) {
       const style = document.createElement('style');
       style.setAttribute('data-alert-animation', 'true');
@@ -2031,7 +2011,6 @@ function addPatientField() {
       document.head.appendChild(style);
     }
 
-    // সময় সাজানোর ফাংশন
     const sortTimes = (times) => {
       return times.sort((a, b) => {
         const convertTo24Hour = (timeStr) => {
@@ -2071,8 +2050,7 @@ function addPatientField() {
 // =======================================================
 function updateDashboardCards(snapshot) {
   if (!snapshot) return;
-  
-  // রিসেট কাউন্টার
+
   let total = 0;
   let thursday = 0;
   let friday = 0;
@@ -2083,14 +2061,10 @@ function updateDashboardCards(snapshot) {
   let newPatientLastCallSerial = 0;
   let oldPatientLastCallSerial = 0;
   
-  // ✅ সপ্তাহের তারিখ রেঞ্জ বের করা (শনিবার থেকে শুক্রবার)
   const weekDateRange = getWeekDateRange();
-  
-  // সকল ডাটা প্রসেস
   snapshot.forEach(doc => {
     const data = doc.data();
-    
-    // ✅ তারিখ চেক: শুধুমাত্র বর্তমান সপ্তাহের ডাটা (শনিবার থেকে শুক্রবার)
+
     let appointmentDate = null;
     
     if (data.appointmentDate) {
@@ -2098,15 +2072,13 @@ function updateDashboardCards(snapshot) {
     } else if (data.timestamp && data.timestamp.toDate) {
       appointmentDate = data.timestamp.toDate();
     }
-    
-    // তারিখ না থাকলে বা বর্তমান সপ্তাহে না হলে স্কিপ
+
     if (!appointmentDate) {
-      // কিছু পুরানো ডাটা তারিখ ছাড়া থাকতে পারে, সেগুলোও গণনা করুন
+
     } else if (!isDateInCurrentWeek(appointmentDate)) {
-      return; // বর্তমান সপ্তাহের বাইরের ডাটা বাদ দিন
+      return; 
     }
-    
-    // ফিল্টার প্রয়োগ (UI ফিল্টার অনুযায়ী)
+
     const dayMatch = currentFilters.day === 'all' || data.day === currentFilters.day;
     const typeMatch = currentFilters.type === 'all' || (data.patientType || data.type) === currentFilters.type;
     const timeMatch = currentFilters.time === 'all' || data.time === currentFilters.time;
@@ -2122,28 +2094,23 @@ function updateDashboardCards(snapshot) {
       (data.serial && data.serial.toString().includes(currentFilters.search));
     
     if (dayMatch && typeMatch && timeMatch && callStatusMatch && tokenStatusMatch && searchMatch) {
-      // মোট কাউন্টার
       total++;
-      
-      // দিন অনুযায়ী
+
       if (data.day === 'Thursday') thursday++;
       if (data.day === 'Friday') friday++;
-      
-      // কল স্ট্যাটাস
+
       if (data.called === true) {
         called++;
       } else {
         notCalled++;
       }
       
-      // টোকেন স্ট্যাটাস
       if (data.tokenGiven === true) {
         tokenGiven++;
       } else {
         tokenNotGiven++;
       }
-      
-      // ✅ নতুন/পুরাতন রোগীর শেষ কল
+
       if (data.called === true) {
         const type = data.patientType || data.type || 'new';
         const serial = parseInt(data.serial) || 0;
@@ -2157,7 +2124,6 @@ function updateDashboardCards(snapshot) {
     }
   });
   
-  // কার্ড আপডেট
   elements.calledCount.textContent = toBengaliNumber(called);
   elements.notCalledCount.textContent = toBengaliNumber(notCalled);
   elements.tokenGivenCount.textContent = toBengaliNumber(tokenGiven);
@@ -2165,12 +2131,9 @@ function updateDashboardCards(snapshot) {
   elements.thursdayAppointments.textContent = toBengaliNumber(thursday);
   elements.fridayAppointments.textContent = toBengaliNumber(friday);
   elements.totalAppointments.textContent = toBengaliNumber(total);
-  
-  // নতুন/পুরাতন রোগী লাস্ট কল কার্ড
   elements.newPatientLastCall.textContent = toBengaliNumber(newPatientLastCallSerial);
   elements.oldPatientLastCall.textContent = toBengaliNumber(oldPatientLastCallSerial);
-  
-  // সিরিয়াল স্ট্যাটস আপডেট
+
   updateSerialStats();
 }
 
@@ -2178,18 +2141,15 @@ function updateDashboardCards(snapshot) {
 // নতুন হেল্পার ফাংশন যোগ করুন
 // =======================================================
 
-// ✅ বর্তমান সপ্তাহের তারিখ রেঞ্জ বের করা (শনিবার থেকে শুক্রবার)
 function getWeekDateRange() {
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
-  
-  // সপ্তাহের প্রথম দিন (শনিবার)
+
   const saturday = new Date(today);
   const daysToSaturday = dayOfWeek === 6 ? 0 : (dayOfWeek + 1) % 7;
   saturday.setDate(today.getDate() - daysToSaturday);
   saturday.setHours(0, 0, 0, 0);
-  
-  // সপ্তাহের শেষ দিন (শুক্রবার)
+
   const friday = new Date(saturday);
   friday.setDate(saturday.getDate() + 6);
   friday.setHours(23, 59, 59, 999);
@@ -2202,13 +2162,11 @@ function getWeekDateRange() {
   };
 }
 
-// ✅ তারিখ বর্তমান সপ্তাহে আছে কিনা চেক করা
 function isDateInCurrentWeek(date) {
   const weekRange = getWeekDateRange();
   return date >= weekRange.saturday && date <= weekRange.friday;
 }
 
-// ✅ তারিখ ফর্ম্যাট করা (ডিসপ্লে জন্য)
 function formatDateToDisplay(date) {
   return date.toLocaleDateString('bn-BD', {
     weekday: 'long',
@@ -2218,11 +2176,9 @@ function formatDateToDisplay(date) {
   });
 }
 
-// ✅ তারিখ রেঞ্জ মেসেজ আপডেট
 function updateDateRangeMessage(dateRange) {
   const rangeInfo = document.getElementById('dateRangeInfo');
   if (!rangeInfo) {
-    // নতুন এলিমেন্ট তৈরি করুন
     const newRangeInfo = document.createElement('div');
     newRangeInfo.id = 'dateRangeInfo';
     newRangeInfo.className = 'stats-info';
@@ -2231,14 +2187,12 @@ function updateDateRangeMessage(dateRange) {
     newRangeInfo.style.color = '#0369a1';
   }
   
-  // মেসেজ আপডেট
   const rangeElement = document.getElementById('dateRangeInfo');
   if (rangeElement) {
     rangeElement.textContent = `দেখানো হচ্ছে: ${dateRange.saturdayStr} থেকে ${dateRange.fridayStr} পর্যন্ত অ্যাপয়েন্টমেন্ট`;
   }
 }
 
-// ✅ নো রেজাল্ট মেসেজ
 function getNoResultsMessage(dateRange) {
   return `বর্তমান সপ্তাহে (${dateRange.saturdayStr} থেকে ${dateRange.fridayStr}) কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
 }
@@ -2248,12 +2202,10 @@ function getNoResultsMessage(dateRange) {
 // =======================================================
 async function updateSerialStats() {
   try {
-    // লোড সিরিয়াল রেঞ্জ
     await loadSerialRanges();
     
     let totalSerialCount = 0;
-    
-    // 🟢 গ্লোবাল filters অবজেক্ট অথবা ড্রপডাউন থেকে সিলেক্টেড দিন নেওয়া
+
     let selectedDay = 'all';
     if (typeof currentFilters !== 'undefined' && currentFilters && currentFilters.day) {
       selectedDay = currentFilters.day;
@@ -2270,12 +2222,9 @@ async function updateSerialStats() {
       if (desktopTypeFilter) selectedType = desktopTypeFilter.value;
     }
     
-    // ✅ মোট সিরিয়াল স্লট - শুধুমাত্র নির্বাচিত দিনের জন্য
     if (selectedDay === 'all') {
-      // সব দিনের স্লট গণনা
       for (const day in serialRanges) {
         for (const type in serialRanges[day]) {
-          // টাইপ ফিল্টার চেক
           if (selectedType !== 'all' && type !== selectedType) continue;
           
           for (const time in serialRanges[day][type]) {
@@ -2287,10 +2236,8 @@ async function updateSerialStats() {
         }
       }
     } else {
-      // শুধুমাত্র নির্বাচিত দিনের স্লট গণনা
       if (serialRanges && serialRanges[selectedDay]) {
         for (const type in serialRanges[selectedDay]) {
-          // টাইপ ফিল্টার চেক
           if (selectedType !== 'all' && type !== selectedType) continue;
           
           for (const time in serialRanges[selectedDay][type]) {
@@ -2303,7 +2250,6 @@ async function updateSerialStats() {
       }
     }
     
-    // ✅ বর্তমান সপ্তাহের একটিভ বুকিং গণনা
     let activeBookings = 0;
     if (allAppointmentsSnapshot) {
       allAppointmentsSnapshot.forEach(doc => {
@@ -2315,11 +2261,9 @@ async function updateSerialStats() {
         } else if (data.timestamp && data.timestamp.toDate) {
           appointmentDate = data.timestamp.toDate();
         }
-        
-        // বর্তমান সপ্তাহের ডাটা এবং দিন মিললে কাউন্ট হবে
+
         if (appointmentDate && typeof isDateInCurrentWeek === 'function' && isDateInCurrentWeek(appointmentDate)) {
           if (selectedDay === 'all' || data.day === selectedDay) {
-            // টাইপ ফিল্টার চেক
             const type = data.patientType || data.type;
             if (selectedType === 'all' || type === selectedType) {
               activeBookings++;
@@ -2328,21 +2272,15 @@ async function updateSerialStats() {
         }
       });
     }
-    
-    // ✅ পেন্ডিং কাউন্ট - সঠিকভাবে ফিল্টার সহ
+
     let pendingCount = 0;
     if (pendingSelections) {
       for (const key in pendingSelections) {
         if (Object.prototype.hasOwnProperty.call(pendingSelections, key) && pendingSelections[key]) {
           const pending = pendingSelections[key];
-          
-          // পেন্ডিং ডেটা থেকে দিন বের করা
           const pendingDay = pending.day || pending.daySlot || '';
           const pendingType = pending.patientType || '';
-          
-          // দিন ফিল্টার
           const dayMatches = (selectedDay === 'all' || pendingDay === selectedDay);
-          // টাইপ ফিল্টার
           const typeMatches = (selectedType === 'all' || pendingType === selectedType);
           
           if (dayMatches && typeMatches) {
@@ -2357,11 +2295,8 @@ async function updateSerialStats() {
         }
       }
     }
-    
-    // এভেইলেবল = মোট স্লট - এক্টিভ বুকিং - পেন্ডিং
+
     const availableSerials = Math.max(0, totalSerialCount - activeBookings - pendingCount);
-    
-    // বাংলা নাম্বার কনভার্ট সহ টেক্সট আপডেট
     const showBengali = typeof toBengaliNumber === 'function';
     if (elements) {
       if (elements.totalSerials) elements.totalSerials.textContent = showBengali ? toBengaliNumber(totalSerialCount) : totalSerialCount;
@@ -2385,29 +2320,25 @@ function updateTimeOptions() {
   const timesWithBookings = new Set();
   
   console.log("🕒 updateTimeOptions called - Day:", selectedDay, "Type:", selectedType);
-  
-  // চেক করুন appointments ডাটা আছে কিনা
+
   if (!allAppointmentsSnapshot) {
     console.log("⏳ No appointments data yet");
     
-    // ডেস্কটপ টাইম ফিল্টার খালি রাখুন
     if (elements.timeFilter) {
       elements.timeFilter.innerHTML = '<option value="all">সকল সময়</option>';
     }
-    // মোবাইল টাইম ফিল্টার খালি রাখুন
+
     if (elements.timeFilterMobile) {
       elements.timeFilterMobile.innerHTML = '<option value="all">সকল সময়</option>';
     }
     return;
   }
   
-  // ✅ বর্তমান সপ্তাহের বুকিং থেকে সময় বের করুন
   const weekRange = getWeekDateRange();
   
   allAppointmentsSnapshot.forEach(doc => {
     const data = doc.data();
-    
-    // বর্তমান সপ্তাহের ডাটা চেক করুন
+
     let appointmentDate = null;
     if (data.appointmentDate) {
       appointmentDate = new Date(data.appointmentDate);
@@ -2416,12 +2347,9 @@ function updateTimeOptions() {
     }
     
     if (appointmentDate && isDateInCurrentWeek(appointmentDate)) {
-      // দিন ফিল্টার
       const dayMatch = selectedDay === 'all' || data.day === selectedDay;
-      // টাইপ ফিল্টার
       const typeMatch = selectedType === 'all' || (data.patientType || data.type) === selectedType;
-      
-      // শুধু বুকিং আছে এমন সময় যোগ করুন
+
       if (dayMatch && typeMatch && data.time) {
         timesWithBookings.add(data.time);
         console.log(`✅ বুকিং আছে: ${data.time} (${data.day}, ${data.patientType || data.type})`);
@@ -2429,13 +2357,11 @@ function updateTimeOptions() {
     }
   });
   
-  // সময় সাজানো
   const sortedTimes = sortTimes(Array.from(timesWithBookings));
   console.log("🎯 সময় ফিল্টারে দেখানো হবে (যেখানে বুকিং আছে):", sortedTimes);
   
   const currentTime = currentFilters.time;
-  
-  // ✅ ডেস্কটপ টাইম ফিল্টার আপডেট
+
   if (elements.timeFilter) {
     elements.timeFilter.innerHTML = '<option value="all">সকল সময়</option>';
     
@@ -2447,15 +2373,13 @@ function updateTimeOptions() {
       elements.timeFilter.appendChild(option);
     });
     
-    // কোনো বুকিং না থাকলে ড্রপডাউন ডিজেবল করুন
     if (sortedTimes.length === 0) {
       elements.timeFilter.disabled = true;
     } else {
       elements.timeFilter.disabled = false;
     }
   }
-  
-  // ✅ মোবাইল টাইম ফিল্টার আপডেট
+
   if (elements.timeFilterMobile) {
     elements.timeFilterMobile.innerHTML = '<option value="all">সকল সময়</option>';
     
@@ -2466,8 +2390,7 @@ function updateTimeOptions() {
       if (time === currentTime) option.selected = true;
       elements.timeFilterMobile.appendChild(option);
     });
-    
-    // কোনো বুকিং না থাকলে ড্রপডাউন ডিজেবল করুন
+
     if (sortedTimes.length === 0) {
       elements.timeFilterMobile.disabled = true;
     } else {
@@ -2486,20 +2409,16 @@ function renderAppointments() {
   elements.appointmentsBody.innerHTML = '';
   elements.loadingMessage.style.display = 'none';
   elements.appointmentsTable.style.display = 'table';
-  
-  // ✅ নতুন: শনিবার থেকে শুক্রবার পর্যন্ত সপ্তাহের জন্য তারিখ রেঞ্জ বের করা
+
   const dateRange = getWeekDateRange();
   
   let filteredDocs = [];
   let filteredCount = 0;
   let displayedCount = 0;
   
-  // ফিল্টার প্রয়োগ
   allAppointmentsSnapshot.forEach(doc => {
     const data = doc.data();
     let isMatch = true;
-    
-    // ✅ ১. তারিখ ফিল্টার: শনিবার থেকে শুক্রবার পর্যন্ত
     let appointmentDate = null;
     
     if (data.appointmentDate) {
@@ -2514,23 +2433,19 @@ function renderAppointments() {
       }
     }
     
-    // ✅ ২. দিন ফিল্টার
     if (isMatch && currentFilters.day !== 'all' && data.day !== currentFilters.day) {
       isMatch = false;
     }
     
-    // ✅ ৩. টাইপ ফিল্টার
     if (isMatch && currentFilters.type !== 'all') {
       const type = data.patientType || data.type;
       if (type !== currentFilters.type) isMatch = false;
     }
     
-    // ✅ ৪. সময় ফিল্টার
     if (isMatch && currentFilters.time !== 'all' && data.time !== currentFilters.time) {
       isMatch = false;
     }
     
-    // ✅ ৫. কল স্ট্যাটাস ফিল্টার
     if (isMatch && currentFilters.callStatus !== 'all') {
       const isCalled = data.called === true;
       if ((currentFilters.callStatus === 'called' && !isCalled) ||
@@ -2539,7 +2454,6 @@ function renderAppointments() {
       }
     }
     
-    // ✅ ৬. টোকেন স্ট্যাটাস ফিল্টার
     if (isMatch && currentFilters.tokenStatus !== 'all') {
       const isTokenGiven = data.tokenGiven === true;
       if ((currentFilters.tokenStatus === 'given' && !isTokenGiven) ||
@@ -2548,7 +2462,6 @@ function renderAppointments() {
       }
     }
     
-    // ✅ ৭. সার্চ ফিল্টার
     if (isMatch && currentFilters.search) {
       const name = (data.name || '').toLowerCase();
       const phone = String(data.phone || '');
@@ -2563,17 +2476,13 @@ function renderAppointments() {
     
     if (isMatch) {
       filteredCount++;
-      // ✅ doc.ref.path পাস করা হচ্ছে যাতে পরবর্তীতে সঠিক ডকুমেন্টে আপডেট করা যায়
       filteredDocs.push({ id: doc.id, data: data, path: doc.ref.path });
       displayedCount++;
     }
   });
-  
-  // স্ট্যাটাস বার্তা আপডেট
+
   elements.filteredCount.textContent = toBengaliNumber(filteredCount);
   elements.displayedCount.textContent = toBengaliNumber(displayedCount);
-  
-  // ✅ তারিখ রেঞ্জ মেসেজ দেখানো
   updateDateRangeMessage(dateRange);
   
   if (filteredDocs.length === 0) {
@@ -2586,30 +2495,22 @@ function renderAppointments() {
     `;
     return;
   }
-  
-  // সিরিয়াল অনুসারে সাজানো
+
   filteredDocs.sort((a, b) => (a.data.serial || 0) - (b.data.serial || 0));
-  
-  // টেবিল রো রেন্ডার
   filteredDocs.forEach(item => {
     const { id, data, path } = item;
     const row = elements.appointmentsBody.insertRow();
-    
-    // স্ট্যাটাস
     const isCalled = data.called === true;
     const callStatusClass = isCalled ? 'status-called' : 'status-not-called';
     const callStatusText = isCalled ? 'কল করা হয়েছে' : 'কল করা হয়নি';
     const callButtonClass = isCalled ? 'btn-call-undo' : 'btn-call';
     const callButtonText = isCalled ? 'কল বাতিল' : data.name || 'কল করুন';
-    
     const isTokenGiven = data.tokenGiven === true;
     const tokenStatusClass = isTokenGiven ? 'status-token-given' : 'status-token-not-given';
     const tokenStatusText = isTokenGiven ? 'টোকেন দেওয়া' : 'টোকেন বাকি';
-    
     const ageDisplay = getAgeDisplay(data);
     const typeText = (data.patientType || data.type) === 'old' ? 'পুরাতন' : 'নতুন';
     
-    // তারিখ ফর্ম্যাট
     let dateDisplay = data.appointmentDateDisplay || '—';
     if (!dateDisplay && data.timestamp && data.timestamp.toDate) {
       const date = data.timestamp.toDate();
@@ -2621,7 +2522,6 @@ function renderAppointments() {
       });
     }
 
-// ✅ সঠিকভাবে ডেটা-পাথ এবং ক্লাস অপরিবর্তিত রেখে বাটন জেনারেট করুন
     row.innerHTML = `
       <td>${toBengaliNumber(data.serial || 'N/A')}</td>
       <td><span class="status-badge ${callStatusClass}">${callStatusText}</span></td>
@@ -2649,13 +2549,10 @@ function renderAppointments() {
       </td>
     `;
         
-    // ১. কল বাটনের লিসেনার
     const callBtn = row.querySelector(`button[data-field="called"]`);
     if (callBtn) {
       callBtn.addEventListener('click', () => updateCallStatus(callBtn));
     }
-
-    // ২. টোকেন বা বিস্তারিত বাটনের লিসেনার (ফিক্সড)
     const tokenBtn = row.querySelector(`button[data-field="token"]`);
     if (tokenBtn) {
       tokenBtn.addEventListener('click', () => showTokenDetailsModal(tokenBtn));
@@ -2668,8 +2565,6 @@ function renderAppointments() {
 // =======================================================
 async function updateCallStatus(button) {
   if (!db) return;
-  
-  // ✅ docId এর বদলে সুনির্দিষ্ট ডেটাবেজ পাথ (docPath) নেওয়া হচ্ছে
   const docPath = button.getAttribute('data-path');
   const currentStatus = button.getAttribute('data-status') === 'true';
   const newStatus = !currentStatus;
@@ -2683,7 +2578,6 @@ async function updateCallStatus(button) {
   button.disabled = true;
   
   try {
-    // ✅ নতুন ডাইনামিক পাথ অনুযায়ী ফায়ারবেস আপডেট
     await db.doc(docPath).update({
       called: newStatus,
       calledTimestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -2714,7 +2608,6 @@ async function updateCallStatus(button) {
 // টোকেন ডিটেইলস মোডাল - SUBCOLLECTION SUPPORTED
 // =======================================================
 async function showTokenDetailsModal(button) {
-  // ✅ ১. আইডি এবং সম্পূর্ণ ফায়ারবেস পাথ বাটন থেকে নেওয়া হচ্ছে
   const docId = button.getAttribute('data-id');
   const docPath = button.getAttribute('data-path'); 
   
@@ -2723,8 +2616,6 @@ async function showTokenDetailsModal(button) {
     showAlert("ত্রুটি: অ্যাপয়েন্টমেন্টের সঠিক পাথ পাওয়া যায়নি", "error");
     return;
   }
-
-  // ✅ ২. নির্দিষ্ট সাবকালেকশন পাথ ব্যবহার করে ডেটা গেট করা হচ্ছে
   const docSnap = await db.doc(docPath).get();
   if (!docSnap.exists) {
     showAlert("দুঃখিত, অ্যাপয়েন্টমেন্ট ডেটা পাওয়া যায়নি!", "error");
@@ -2733,14 +2624,12 @@ async function showTokenDetailsModal(button) {
   const data = docSnap.data();
   
   currentTokenId = docId;
-  // ✅ ভবিষ্যৎ আপডেটের সুবিধার্থে গ্লোবাল ভেরিয়েবলে পাথটি সেভ করে রাখা হচ্ছে
   currentTokenPath = docPath; 
   
   let existingToken = null;
   let paymentHistory = [];
-  
-  // paymentHistories কালেকশনে খোঁজা (আগের মতোই থাকবে)
-const existingTokenQuery = await db.collection('paymentHistories')
+
+const existingTokenQuery = await db.collectionGroup('paymentHistories')
     .where('appointmentId', '==', docId)
     .limit(1)
     .get();
@@ -2800,7 +2689,6 @@ const existingTokenQuery = await db.collection('paymentHistories')
     paymentHistoryHtml = '<div class="payment-history"><p style="color:#9ca3af; padding: 20px; text-align: center;">📭 কোনো পেমেন্ট ইতিহাস নেই</p></div>';
   }
   
-  // ✅ বাটন এবং টাইটেল নির্ধারণ (এখানে বাটনে id যোগ করা হয়েছে)
   let modalTitle = 'নতুন টোকেন প্রদান';
   let actionButtonHtml = `
     <button class="btn-save-print" id="savePrintTokenBtn" onclick="saveAndPrintToken(true)"><i class="fas fa-print"></i> সংরক্ষণ ও প্রিন্ট</button>`;
@@ -2878,18 +2766,15 @@ function updateFeeByPatientType(type) {
   const feeInput = document.getElementById('tokenFee');
   
   if (feeInput) {
-    // নতুন রোগী হলে ৮০০ টাকা, পুরাতন রোগী হলে ৬০০ টাকা অটোমেটিক সেট হবে
     if (type === 'new') {
       feeInput.value = 800;
     } else if (type === 'old') {
       feeInput.value = 600;
     }
     
-    // 🛠️ পাথ ডাইনামিকালি আপডেট করার লজিক (সাব-কালেকশন সাপোর্ট)
     if (typeof currentTokenPath !== 'undefined' && currentTokenPath) {
       console.log("Old Path:", currentTokenPath);
       
-      // পাথের মধ্যকার /new/ বা /old/ অংশটি ড্রপডাউন অনুযায়ী রিপ্লেস করা হচ্ছে
       if (type === 'old' && currentTokenPath.includes('/new/')) {
         currentTokenPath = currentTokenPath.replace('/new/', '/old/');
       } else if (type === 'new' && currentTokenPath.includes('/old/')) {
@@ -2899,7 +2784,6 @@ function updateFeeByPatientType(type) {
       console.log("New Dynamic Path:", currentTokenPath);
     }
     
-    // ফি পরিবর্তন হওয়ার পর "বাকি থাকবে কত টাকা" সেটার হিসাবও যেন সাথে সাথে আপডেট হয়
     if (typeof updateDueAmount === 'function') {
       updateDueAmount();
     }
@@ -2907,26 +2791,22 @@ function updateFeeByPatientType(type) {
 }
     
 
-// গ্লোবাল ফ্ল্যাগ – একই সময়ে একাধিক সেভ প্রতিরোধ
 let isTokenSaving = false;
 
 // =======================================================
 // টোকেন সংরক্ষণ ও প্রিন্ট - SUBCOLLECTION SUPPORTED
 // =======================================================
 async function saveAndPrintToken(shouldPrint) {
-  // ✅ যদি ইতিমধ্যেই সেভ চলতে থাকে, তবে আরেকটি ক্লিক ব্লক করুন
   if (isTokenSaving) {
     showAlert('দয়া করে অপেক্ষা করুন, টোকেন সংরক্ষণ করা হচ্ছে...', 'warning');
     return;
   }
 
-  // ✅ নতুন ডাইনামিক পাথ এবং আইডি ভ্যালিডেশন
   if (!currentTokenId || !currentTokenPath) {
     showAlert('টোকেন বা অ্যাপয়েন্টমেন্টের সঠিক পাথ পাওয়া যায়নি', 'error');
     return;
   }
 
-  // ✅ বাটন ডিজেবল করা ও স্পিনার দেখানো
   const saveBtn = document.getElementById('savePrintTokenBtn');
   const originalBtnHtml = saveBtn ? saveBtn.innerHTML : '';
   if (saveBtn) {
@@ -2934,7 +2814,7 @@ async function saveAndPrintToken(shouldPrint) {
     saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> সংরক্ষণ হচ্ছে...';
   }
 
-  isTokenSaving = true; // লক অ্যাক্টিভেট
+  isTokenSaving = true; 
 
   try {
     const name = document.getElementById('tokenName')?.value || '';
@@ -2944,27 +2824,31 @@ async function saveAndPrintToken(shouldPrint) {
     const paid = parseInt(document.getElementById('tokenPaid')?.value) || 0;
     const givenBy = document.getElementById('tokenGivenBy')?.value || '';
     
-    // ✅ পরিবর্তন ১: সঠিক সাবকালেকশন পাথ (currentTokenPath) ব্যবহার করে ডেটা রিড
     const appointmentDoc = await db.doc(currentTokenPath).get();
     if (!appointmentDoc.exists) {
-      throw new Error("অ্যাপয়েন্টমেন্ট ডকুমেন্টটি ডেটাবেজে খুঁজে পাওয়া যায়নি।");
+      throw new Error("অ্যাপয়েন্টমেন্ট ডকুমেন্টটি ডেটাবেজে খুঁজে পাওয়া যায়নি।");
     }
     const appointmentData = appointmentDoc.data();
     const originalSerial = appointmentData.serial;
     
     const now = new Date();
     const yymmdd = now.toISOString().slice(2, 10).replace(/-/g, '');
-    
-    // পেমেন্ট ইতিহাস ট্র্যাক করা (যা আলাদা কালেকশনে আছে, এটি একই থাকবে)
-    const existingTokenQuery = await db.collection('paymentHistories')
-      .where('appointmentId', '==', currentTokenId)
-      .limit(1)
-      .get();
-    
+    const targetPatientType = patientType || 'new';
+    const subCollectionName = `payment_${targetPatientType}`;
+    const newPaymentDocRef = db.collection('paymentHistories')
+                               .doc(yymmdd)
+                               .collection(subCollectionName);
+
+    const [existingNew, existingOld] = await Promise.all([
+      db.collection('paymentHistories').doc(yymmdd).collection('payment_new').where('appointmentId', '==', currentTokenId).limit(1).get(),
+      db.collection('paymentHistories').doc(yymmdd).collection('payment_old').where('appointmentId', '==', currentTokenId).limit(1).get()
+    ]);
+
+    const existingDoc = !existingNew.empty ? existingNew.docs[0] : (!existingOld.empty ? existingOld.docs[0] : null);
+
     let tokenNumber;
     
-    if (!existingTokenQuery.empty) {
-      const existingDoc = existingTokenQuery.docs[0];
+    if (existingDoc) {
       tokenNumber = existingDoc.data().tokenNumber;
       const existingData = existingDoc.data();
       let paymentHistory = existingData.paymentHistory || [];
@@ -2986,7 +2870,7 @@ async function saveAndPrintToken(shouldPrint) {
         });
       }
       
-      await db.collection('paymentHistories').doc(existingDoc.id).update({
+      await existingDoc.ref.update({
         patientName: name,
         patientAge: age,
         patientType: patientType,
@@ -3003,13 +2887,20 @@ async function saveAndPrintToken(shouldPrint) {
       showAlert(`✅ টোকেন ${tokenNumber} সফলভাবে আপডেট করা হয়েছে!`, 'success');
       
     } else {
-      // নতুন টোকেন সিরিয়াল জেনারেট করা
-      const allTokensQuery = await db.collection('paymentHistories')
-        .where('tokenDatePrefix', '==', yymmdd)
-        .get();
+      const [newTokensQuery, oldTokensQuery] = await Promise.all([
+        db.collection('paymentHistories').doc(yymmdd).collection('payment_new').get(),
+        db.collection('paymentHistories').doc(yymmdd).collection('payment_old').get()
+      ]);
       
       let maxCounter = 0;
-      allTokensQuery.forEach(doc => {
+
+      newTokensQuery.forEach(doc => {
+        const data = doc.data();
+        const counter = data.tokenCounter || 0;
+        if (counter > maxCounter) maxCounter = counter;
+      });
+      
+      oldTokensQuery.forEach(doc => {
         const data = doc.data();
         const counter = data.tokenCounter || 0;
         if (counter > maxCounter) maxCounter = counter;
@@ -3030,7 +2921,9 @@ async function saveAndPrintToken(shouldPrint) {
         source: 'dashboard'
       }];
       
-      await db.collection('paymentHistories').doc(tokenDocId).set({
+      const finalDocRef = newPaymentDocRef.doc(tokenDocId);
+  
+      await finalDocRef.set({
         tokenNumber: tokenNumber,
         tokenCounter: newTokenSerial,
         tokenDatePrefix: yymmdd,
@@ -3061,7 +2954,6 @@ async function saveAndPrintToken(shouldPrint) {
       showAlert(`✅ টোকেন ${tokenNumber} তৈরি করা হয়েছে! (সিরিয়াল: ${originalSerial})`, 'success');
     }
     
-    // ✅ পরিবর্তন ২: সঠিক সাবকালেকশন পাথে (currentTokenPath) অ্যাপয়েন্টমেন্ট ডাটা আপডেট করা
     await db.doc(currentTokenPath).update({
       tokenGiven: true,
       tokenNumber: tokenNumber,
@@ -3079,7 +2971,6 @@ async function saveAndPrintToken(shouldPrint) {
       printTokenReceipt(tokenNumber, name, age, patientType, fee, paid);
     }
     
-    // রিয়েল-টাইম ড্যাশবোর্ড রি-রেন্ডার করা
     if (typeof allAppointmentsSnapshot !== 'undefined' && allAppointmentsSnapshot) {
       renderAppointments();
       updateDashboardCards(allAppointmentsSnapshot);
@@ -3089,21 +2980,19 @@ async function saveAndPrintToken(shouldPrint) {
     console.error("❌ Error saving token:", error);
     showAlert("সংরক্ষণ করতে সমস্যা হয়েছে: " + error.message, "error");
   } finally {
-    isTokenSaving = false; // লক রিলিজ
+    isTokenSaving = false; 
     if (saveBtn) {
       saveBtn.disabled = false;
-      saveBtn.innerHTML = originalBtnHtml; // বাটনের পূর্বের অবস্থায় ফিরিয়ে নেওয়া
+      saveBtn.innerHTML = originalBtnHtml;
     }
   }
 }
+
 async function printTokenReceipt(tokenNumber, name, age, patientType, fee) {
   const adminName = sessionStorage.getItem('adminName') || 'অ্যাডমিন';
-
-  // ডিভাইস শনাক্ত করা: মোবাইল কি না চেক করা
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   if (!isMobile) {
-    // --- পিসির জন্য ডাইরেক্ট প্রিন্ট সিস্টেম ---
 const win = window.open('', '_blank');
  win.document.write(`
  <!DOCTYPE html>
@@ -3132,20 +3021,16 @@ const win = window.open('', '_blank');
  <div class="info-row"><span>ফি:</span><span>${fee} টাকা</span></div>
  <div class="footer"><p>Printed by: ${adminName}</p><p>${new Date().toLocaleString('bn-BD')}</p></div>
  </div>
-<div class="no-print" style="text-align:center;margin-top:20px;">
- <button onclick="window.print()" style="padding:10px 20px;background:#2563eb;color:white;border:none;border-radius:8px;">🖨️ প্রিন্ট করুন</button>
- </div>
  <script>window.onload = function() { setTimeout(() => window.print(), 500); }<\/script>
  </body>
  </html>
  `);
  win.document.close();
-    return; // পিসির কাজ শেষ, মোবাইল কোড চলবে না
+    return; 
   }
 
-  // ১. একটি অস্থায়ী কন্টেইনার তৈরি করা যাতে স্টাইল ঠিক থাকে
   const container = document.createElement('div');
-  container.style.width = '2.10in'; // ২.১০ ইঞ্চি প্রস্থ
+  container.style.width = '2.10in'; 
   container.style.backgroundColor = 'white';
   container.style.padding = '10px';
   container.innerHTML = `
@@ -3174,16 +3059,13 @@ const win = window.open('', '_blank');
   `;
   document.body.appendChild(container);
 
-  // ২. html2canvas দিয়ে ছবি তৈরি করা
   const canvas = await html2canvas(container, { scale: 3 });
   const imgData = canvas.toDataURL('image/png');
 
-  // ৩. jsPDF দিয়ে PDF তৈরি করা
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: [53.34, 76.2] });
   doc.addImage(imgData, 'PNG', 0, 0, 53.34, 76.2);
   
-  // ৪. ফাইল হিসেবে সেভ বা শেয়ার করা
   const pdfBlob = doc.output('blob');
   const file = new File([pdfBlob], `${tokenNumber}.pdf`, { type: 'application/pdf' });
 
@@ -3193,7 +3075,6 @@ const win = window.open('', '_blank');
     doc.save(`${tokenNumber}.pdf`);
   }
 
-  // পরিষ্কার করা
   document.body.removeChild(container);
 }
     
@@ -3217,7 +3098,6 @@ async function loadSerialRanges() {
       console.log("✅ Serial ranges loaded successfully:");
       console.log("📋 Available days:", Object.keys(serialRanges));
       
-      // প্রতিটি দিনের সময় দেখান
       for (const day in serialRanges) {
         console.log(`📅 ${day}:`);
         for (const type in serialRanges[day]) {
@@ -3226,7 +3106,6 @@ async function loadSerialRanges() {
         }
       }
       
-      // ✅ serialRanges লোড হওয়ার পর টাইম ফিল্টার আপডেট করুন
       if (typeof updateTimeOptions === 'function') {
         console.log("🔄 Updating time options after loading serialRanges");
         updateTimeOptions();
@@ -3251,14 +3130,14 @@ async function loadSerialRanges() {
     function initializeQuickSerialModal() {
       console.log("🟢 initializeQuickSerialModal কল হয়েছে");
       
-      // মোডাল কন্ট্রোল - ডেস্কটপ
+
       elements.openAddSerialModalBtn.addEventListener('click', async () => {
         console.log("🟢 মোডাল ওপেন বাটনে ক্লিক করা হয়েছে");
         
         elements.quickSerialModal.style.display = 'flex';
         console.log("🟢 মোডাল display: flex সেট করা হয়েছে");
         
-        // ✅ প্রথমে serialRanges লোড করুন
+
         console.log("🔄 Loading serial ranges before grid initialization");
         await loadSerialRanges();
         
@@ -3271,7 +3150,6 @@ async function loadSerialRanges() {
         }
       });
       
-      // মোডাল কন্ট্রোল - মোবাইল
       if (elements.openAddSerialModalBtnMobile) {
         elements.openAddSerialModalBtnMobile.addEventListener('click', async () => {
           console.log("🟢 মোবাইল মোডাল ওপেন বাটনে ক্লিক করা হয়েছে");
@@ -3279,7 +3157,6 @@ async function loadSerialRanges() {
           elements.quickSerialModal.style.display = 'flex';
           console.log("🟢 মোডাল display: flex সেট করা হয়েছে");
           
-          // ✅ প্রথমে serialRanges লোড করুন
           console.log("🔄 Loading serial ranges before grid initialization");
           await loadSerialRanges();
           
@@ -3298,7 +3175,6 @@ async function loadSerialRanges() {
         elements.quickSerialModal.style.display = 'none';
         resetQuickSerialForm();
         
-        // Grid System ক্লিনআপ
         if (gridSystem) {
           try {
             gridSystem.cleanup();
@@ -3314,7 +3190,6 @@ async function loadSerialRanges() {
         elements.quickSerialModal.style.display = 'none';
         resetQuickSerialForm();
         
-        // Grid System ক্লিনআপ
         if (gridSystem) {
           try {
             gridSystem.cleanup();
@@ -3325,17 +3200,14 @@ async function loadSerialRanges() {
         }
       });
       
-      // দিন পরিবর্তনে সময় অপশন আপডেট
       elements.quickDay.addEventListener('change', () => {
         console.log("📅 Quick day changed:", elements.quickDay.value);
         updateQuickTimeOptions();
       });
       
-      // সময় পরিবর্তনে গ্রিড আপডেট
       elements.quickTime.addEventListener('change', () => {
         console.log("🕒 Quick time changed:", elements.quickTime.value);
         
-        // Grid System আপডেট
         if (gridSystem) {
           setTimeout(() => {
             gridSystem.updateGrid();
@@ -3343,7 +3215,6 @@ async function loadSerialRanges() {
         }
       });
       
-      // রোগীর ধরন সিলেকশন
       document.querySelectorAll('.serial-type-card').forEach(card => {
         card.addEventListener('click', function() {
           console.log("👥 Patient type clicked:", this.getAttribute('data-type'));
@@ -3356,7 +3227,6 @@ async function loadSerialRanges() {
           
           updateQuickTimeOptions();
           
-          // Grid System আপডেট
           if (gridSystem) {
             setTimeout(() => {
               gridSystem.updateGrid();
@@ -3364,8 +3234,7 @@ async function loadSerialRanges() {
           }
         });
       });
-      
-      // ফর্ম সাবমিট
+
       elements.quickSerialForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         console.log("📤 Quick serial form submitted");
@@ -3402,8 +3271,7 @@ async function loadSerialRanges() {
     if (Object.keys(serialRanges).length === 0) {
       await loadSerialRanges();
     }
-    
-    // ✅ মাল্টি সিলেক্ট সক্ষম করে Grid System তৈরি
+
     gridSystem = new RealTimeGridSystem({
       db: db,
       gridContainerId: 'serialGrid',
@@ -3463,7 +3331,6 @@ async function loadSerialRanges() {
   }
 }
 
-// সক্রিয় রোগীর ইন্ডেক্স বের করুন
 function getActivePatientIndex() {
   const activePatient = document.querySelector('.patient-card.active');
   if (activePatient) {
@@ -3487,7 +3354,6 @@ function getActivePatientIndex() {
     return;
   }
   
-  // ✅ সিরিয়াল রেঞ্জ থেকে সময় অপশন গুলো নেওয়া
   const times = [];
   
   if (serialRanges && serialRanges[day] && serialRanges[day][type]) {
@@ -3503,7 +3369,6 @@ function getActivePatientIndex() {
     console.log("Available types for", day, ":", serialRanges[day] ? Object.keys(serialRanges[day]) : "none");
   }
   
-  // সময় সাজানো
   const sortedTimes = sortTimes(times);
   
   const currentSelectedTime = elements.quickTime.value;
@@ -3517,7 +3382,6 @@ function getActivePatientIndex() {
       gridSystem.updateGrid();
     }
     
-    // গ্রিডে মেসেজ দেখান
     if (elements.serialGrid) {
       elements.serialGrid.innerHTML = '<div class="grid-no-selection">এই দিন/ধরনের জন্য কোনো সময় স্লট নেই</div>';
     }
@@ -3529,7 +3393,6 @@ function getActivePatientIndex() {
     option.value = time;
     option.textContent = time;
     
-    // আগে সিলেক্ট করা থাকলে সেটি রাখা
     if (time === currentSelectedTime) {
       option.selected = true;
     }
@@ -3539,7 +3402,6 @@ function getActivePatientIndex() {
   
   console.log("✅ Time options updated:", sortedTimes.length, "options");
   
-  // ✅ Grid System আপডেট
   if (gridSystem) {
     console.log("🔄 Updating grid with new time selection");
     setTimeout(() => {
@@ -3591,7 +3453,6 @@ function getNextDateByDay(targetDay) {
   };
 }
 
-// ✅ DUPLICATE SERIAL CHECK - ডাটাবেসে আগে থেকে বুক করা সিরিয়াল চেক করুন
 async function checkDuplicateSerials(day, time, type, serialsToBook) {
   try {
     const appointmentDateInfo = getNextDateByDay(day);
@@ -3612,7 +3473,6 @@ async function checkDuplicateSerials(day, time, type, serialsToBook) {
       }
     });
 
-    // যে সিরিয়ালগুলো ইতিমধ্যে বুক করা
     const duplicates = serialsToBook.filter(serial => bookedSerials.includes(serial));
 
     if (duplicates.length > 0) {
@@ -3621,10 +3481,10 @@ async function checkDuplicateSerials(day, time, type, serialsToBook) {
         `পরবর্তী উপলব্ধ সিরিয়াল: ${bookedSerials.length + 1}`,
         'error'
       );
-      return false; // বুকিং ব্লক করুন
+      return false; 
     }
 
-    return true; // সবুজ সিগন্যাল - বুকিং চালিয়ে যান
+    return true;
   } catch (error) {
     console.error('❌ Duplicate check error:', error);
     showAlert('সিরিয়াল চেক করতে সমস্যা হয়েছে', 'error');
@@ -3632,11 +3492,10 @@ async function checkDuplicateSerials(day, time, type, serialsToBook) {
   }
 }
     
-// ✅ MAIN BOOKING FUNCTION (সংশোধিত)
 async function addQuickSerial() {
   const day = elements.quickDay.value;
   const time = elements.quickTime.value;
-  const type = elements.selectedPatientType.value;  // "new" অথবা "old"
+  const type = elements.selectedPatientType.value;  
   
   if (!day || !time) {
     showAlert('দিন এবং সময় নির্বাচন করুন', 'error');
@@ -3645,8 +3504,6 @@ async function addQuickSerial() {
   
   const allPatients = getAllPatientsData();
   const phone = getCommonPhoneNumber();
-  
-  // ফোন চেক
   const skipPhoneCheckbox = document.getElementById('skipPhoneCheckbox');
   const skipPhone = skipPhoneCheckbox ? skipPhoneCheckbox.checked : false;
   
@@ -3655,7 +3512,6 @@ async function addQuickSerial() {
     return;
   }
   
-  // ভ্যালিডেশন
   let hasError = false;
   const selectedSerials = [];
   
@@ -3687,14 +3543,12 @@ async function addQuickSerial() {
   
   if (hasError) return;
   
-  // ডুপ্লিকেট সিরিয়াল চেক (একই ফর্মে)
   const uniqueSerials = [...new Set(selectedSerials)];
   if (uniqueSerials.length !== selectedSerials.length) {
     showAlert('একই সিরিয়াল একাধিক রোগীর জন্য সিলেক্ট করা যাবে না!', 'error');
     return;
   }
   
-  // UI আপডেট
   const submitBtn = document.getElementById('submitQuickBtn');
   const originalText = submitBtn.innerHTML;
   submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> যুক্ত করা হচ্ছে...';
@@ -3703,7 +3557,6 @@ async function addQuickSerial() {
   const startTime = Date.now();
   
   try {
-    // ✅ ডাটাবেসে ডুপ্লিকেট চেক
     const canBook = await checkDuplicateSerials(day, time, type, selectedSerials);
     if (!canBook) {
       submitBtn.innerHTML = originalText;
@@ -3712,17 +3565,9 @@ async function addQuickSerial() {
     }
 
     const appointmentDateInfo = getNextDateByDay(day);
-    
-    // ✅ BATCH WRITE
     const batch = db.batch();
-    
-    // 📅 yymmdd ফরম্যাট (যেমন: 250714)
     const yymmdd = appointmentDateInfo.dateString.replace(/-/g, '').slice(2);
-    
-    // 🆕 রোগীর ধরন অনুযায়ী সাবকলেকশন
     const patientTypeSubcollection = type === 'new' ? 'new' : 'old';
-    
-    // 🆕 তারিখের মূল ডকুমেন্ট তৈরি (যদি না থাকে)
     const mainDateDocRef = db.collection('appointments').doc(yymmdd);
     const mainDateDoc = await mainDateDocRef.get();
     if (!mainDateDoc.exists) {
@@ -3734,12 +3579,9 @@ async function addQuickSerial() {
       });
     }
     
-    // প্রতিটি রোগীর জন্য ডকুমেন্ট তৈরি করুন
     for (let i = 0; i < allPatients.length; i++) {
       const patient = allPatients[i];
       const serial = selectedSerials[i];
-      
-      // বয়স নরমালাইজ
       const normalized = normalizeAge(patient.ageYears, patient.ageMonths, patient.ageDays);
       let ageParts = [];
       if (normalized.years > 0) ageParts.push(`${normalized.years} বছর`);
@@ -3749,8 +3591,6 @@ async function addQuickSerial() {
       
       const formattedSerial = String(serial).padStart(2, '0');
       const docId = `${yymmdd}-${formattedSerial}`;
-      
-      // 🆕 নতুন ডকুমেন্ট রেফারেন্স (সাবকলেকশন সহ)
       const newDocRef = db
         .collection('appointments')
         .doc(yymmdd)
@@ -3787,30 +3627,25 @@ async function addQuickSerial() {
 
 // ==================== SMS Integration ====================
 try {
-  // ১. ডাইনামিক লোকাল ভ্যারিয়েবল থেকে ডেটা সংগ্রহ (লুপের বাইরে সাধারণ ডেটা)
-  const selectedPhone = phone; // উপরের ফাংশনে থাকা আসল ফোন নম্বর
-  const appointmentTime = time || "07:00 PM"; // উপরে থাকা সিলেক্টেড টাইম
-  const englishDateStr = appointmentDateInfo ? appointmentDateInfo.dateString : ""; // জেনারেট হওয়া ইংরেজি তারিখ
+  const selectedPhone = phone; 
+  const appointmentTime = time || "07:00 PM"; 
+  const englishDateStr = appointmentDateInfo ? appointmentDateInfo.dateString : "";
 
   const apiKey = '74a82f2a949057f0e67fa4b672f75275';
   const sender = '8809617635159';
 
-  // ২. ফোন নম্বর থাকলে এবং "ফোন ছাড়া বুকিং" চেক না করা থাকলেই কেবল এসএমএস যাবে
   if (selectedPhone && !skipPhone) {
     console.log(`🚀 Total serials to notify: ${allPatients.length}. Sending individual SMS...`);
 
-    // অলরেডি ফর্ম ভ্যালিডেশন করা 'allPatients' এবং 'selectedSerials' অ্যারে থেকে লুপ চালানো
     allPatients.forEach((patient, i) => {
       const patientName = patient.name || "Patient";
-      const singleSerial = selectedSerials[i]; // ঠিক এই রোগীর জন্য বরাদ্দকৃত সিরিয়াল
+      const singleSerial = selectedSerials[i]; 
 
       if (singleSerial) {
-        // প্রতিটি রোগীর জন্য আলাদা ডাইনামিক ইংরেজি মেসেজ টেমপ্লেট
         const smsMessage = `Dear ${patientName}, your Serial No: ${singleSerial}, Date: ${englishDateStr}, Estimated Time: ${appointmentTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
 
         const automasUrl = `https://api.automas.com.bd/smsapiv3?apikey=${apiKey}&sender=${sender}&msisdn=${selectedPhone}&smstext=${encodeURIComponent(smsMessage)}`;
 
-        // no-cors মোডে সাইলেন্ট ব্যাকগ্রাউন্ড রিকোয়েস্ট
         fetch(automasUrl, {
           method: 'POST',
           mode: 'no-cors',
@@ -3856,7 +3691,6 @@ try {
 }
   
 function resetQuickSerialForm() {
-  // ১. মেইন ফর্ম রিসেট
   if (elements && elements.quickSerialForm) {
     elements.quickSerialForm.reset();
   } else {
@@ -3864,7 +3698,6 @@ function resetQuickSerialForm() {
     if (form) form.reset();
   }
 
-  // ২. সিলেক্টেড সিরিয়াল ইনপুট খালি করা
   if (elements && elements.serialInput) {
     elements.serialInput.value = '';
   } else {
@@ -3872,7 +3705,6 @@ function resetQuickSerialForm() {
     if (serialInput) serialInput.value = '';
   }
   
-  // ✅ ফোন চেকবক্স রিসেট করুন
   const skipPhoneCheckbox = document.getElementById('skipPhoneCheckbox');
   const phoneFieldContainer = document.getElementById('phoneFieldContainer');
   const quickPhoneInput = document.getElementById('quickPhone');
@@ -3887,15 +3719,13 @@ function resetQuickSerialForm() {
     quickPhoneInput.setAttribute('required', 'required');
     quickPhoneInput.value = '';
   }
-  
-  // ✅ বয়স ফিল্ড রিসেট (যদি আপনার elements অবজেক্টে সরাসরি ম্যাপ করা থাকে)
+
   if (elements) {
     if (elements.quickAgeYears) elements.quickAgeYears.value = '';
     if (elements.quickAgeMonths) elements.quickAgeMonths.value = '';
     if (elements.quickAgeDays) elements.quickAgeDays.value = '';
   }
   
-  // রোগীর ধরন রিসেট
   document.querySelectorAll('.serial-type-card').forEach(card => {
     card.classList.remove('selected');
   });
@@ -3918,7 +3748,6 @@ function resetQuickSerialForm() {
     
     patientCards.forEach((card, index) => {
       if (index === 0) {
-        // প্রথম (Default) কার্ডটি থাকবে, এটিকে সক্রিয় (Active) করে এর ভেতরের ইনপুট পরিষ্কার করা হচ্ছে
         card.className = 'patient-card active';
         card.style.cssText = 'background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 2px solid #3b82f6;';
         
@@ -3934,20 +3763,16 @@ function resetQuickSerialForm() {
         if (ageYears) ageYears.value = '';
         if (ageMonths) ageMonths.value = '';
         if (ageDays) ageDays.value = '';
-        
-        // আগের কোনো সিরিয়াল সিলেক্ট করা থাকলে তা হাইড করা
         if (serialDisplay) serialDisplay.style.display = 'none';
         if (serialNumbers) serialNumbers.textContent = '—';
-        if (removeBtn) removeBtn.style.display = 'none'; // ১ম কার্ডের ডিলিট বাটন হাইড থাকবে
+        if (removeBtn) removeBtn.style.display = 'none'; 
         
       } else {
-        // বাকি ২য় বা ৩য় যত অতিরিক্ত রোগীর ফর্ম তৈরি হয়েছিল, ডম (DOM) থেকে রিমুভ করে দেওয়া হলো
         card.remove();
       }
     });
   }
 
-  // ইনডেক্স ঠিক করার গ্লোবাল ফাংশন থাকলে তা কল করা (ইনডেক্স আবার ০ থেকে শুরু হবে)
   if (typeof updatePatientIndices === 'function') {
     updatePatientIndices();
   }
@@ -3957,22 +3782,18 @@ function resetQuickSerialForm() {
     // ১০. ফিল্টার লিসেনার সেটআপ (ডেস্কটপ এবং মোবাইল উভয়ের জন্য)
     // =======================================================
     function setupFilterListeners() {
-      // সার্চ ফাংশন
       const handleSearch = (value) => {
         currentFilters.search = value.toLowerCase().trim();
         renderAppointments();
         updateDashboardCards(allAppointmentsSnapshot);
       };
-      
-      // সার্চ টাইমআউট
       let searchTimeout;
-      
-      // ডেস্কটপ ফিল্টার ইভেন্ট
+
 elements.dayFilter.addEventListener('change', (e) => {
   const value = e.target.value;
   currentFilters.day = value;
   if (elements.dayFilterMobile) elements.dayFilterMobile.value = value;
-  updateTimeOptions();  // ✅ এই লাইনটি থাকতে হবে
+  updateTimeOptions();  
   renderAppointments();
   updateDashboardCards(allAppointmentsSnapshot);
   updateSerialStats();
@@ -3982,7 +3803,7 @@ elements.typeFilter.addEventListener('change', (e) => {
   const value = e.target.value;
   currentFilters.type = value;
   if (elements.typeFilterMobile) elements.typeFilterMobile.value = value;
-  updateTimeOptions();  // ✅ এই লাইনটি থাকতে হবে
+  updateTimeOptions();
   renderAppointments();
   updateDashboardCards(allAppointmentsSnapshot);
 });
@@ -4018,7 +3839,6 @@ elements.typeFilter.addEventListener('change', (e) => {
         searchTimeout = setTimeout(() => handleSearch(value), 300);
       });
       
-      // মোবাইল ফিল্টার ইভেন্ট
       if (elements.dayFilterMobile) {
         elements.dayFilterMobile.addEventListener('change', (e) => {
           const value = e.target.value;
@@ -4091,7 +3911,6 @@ function setupRealtimeListeners() {
   elements.loadingMessage.style.display = 'block';
   elements.appointmentsTable.style.display = 'none';
   
-  // ✅ পুরনো listeners থাকলে ক্লিনআপ করা
   if (cleanupListeners) {
     cleanupListeners();
   }
@@ -4101,23 +3920,18 @@ function setupRealtimeListeners() {
   let appointmentsData = [];
   let newSnapshotDocs = [];
   
-  // ১. নতুন রোগীদের সাবকালেকশন লিসেনার ('new')
   const unsubscribeNew = db.collectionGroup('new')
     .onSnapshot(snapshot => {
       processSubcollectionSnapshot('new', snapshot);
     }, error => {
       console.error("❌ 'new' সাবকালেকশন লোড করতে ভুল হয়েছে:", error);
     });
-
-  // ২. পুরাতন রোগীদের সাবকালেকশন লিসেনার ('old')
   const unsubscribeOld = db.collectionGroup('old')
     .onSnapshot(snapshot => {
       processSubcollectionSnapshot('old', snapshot);
     }, error => {
       console.error("❌ 'old' সাবকালেকশন লোড করতে ভুল হয়েছে:", error);
     });
-
-  // ৩. পেন্ডিং সিলেকশন ট্র্যাকিং (যা আগে থেকেই ছিল)
   const unsubscribePending = db.collection('pendingSelections')
     .onSnapshot(snapshot => {
       pendingSelections = {};
@@ -4129,30 +3943,24 @@ function setupRealtimeListeners() {
       console.error("❌ পেন্ডিং সিলেকশন ট্র্যাকিং ভুল:", error);
     });
 
-  // ৪. সব লিসেনারের কম্বাইন্ড আনসাবস্ক্রাইব ফাংশন
   cleanupListeners = () => {
     unsubscribeNew();
     unsubscribeOld();
     unsubscribePending();
   };
 
-  // সাবকালেকশনের ডেটা প্রসেস ও মার্জ করার ইন্টারনাল ফাংশন
   let cachedDocs = { new: [], old: [] };
   
   function processSubcollectionSnapshot(type, snapshot) {
-    // এই টাইপের ডেটা আপডেট করা
     cachedDocs[type] = [];
     snapshot.forEach(doc => {
       cachedDocs[type].push(doc);
     });
-    
-    // 'new' এবং 'old' উভয় কালেকশনের ডেটা একসাথে মার্জ করা
+
     const combinedDocs = [...cachedDocs.new, ...cachedDocs.old];
-    
-    // গ্লোবাল ভেরিয়েবলে স্ন্যাপশট ও ডেটা অবজেক্ট তৈরি
+
     allAppointmentsSnapshot = combinedDocs; 
-    
-    // UI এবং ড্যাশবোর্ড আপডেট করা
+
     renderAppointments();
     updateDashboardCards(combinedDocs);
     updateTimeOptions();
@@ -4160,9 +3968,7 @@ function setupRealtimeListeners() {
   }
 }
 
-// 🚀 পেইজ লোড হওয়ার পর লিসেনার কল করা
 document.addEventListener('DOMContentLoaded', () => {
-  // আপনার অথেনটিকেশন পাস হলে এবং ফায়ারবেস রেডি হলে এটি রান করবে
   setTimeout(() => {
     setupRealtimeListeners();
   }, 1000);
@@ -4173,8 +3979,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =======================================================
 document.addEventListener('DOMContentLoaded', function() {
   console.log('DOM loaded, initializing...');
-  
-  // Firebase চেক
+
   if (!db) {
     if (elements && elements.loadingMessage) {
       elements.loadingMessage.textContent = 'Firebase সংযোগ নেই';
@@ -4183,18 +3988,13 @@ document.addEventListener('DOMContentLoaded', function() {
     return;
   }
   
-  // লোডিং শো
   if (elements && elements.loadingMessage) {
     elements.loadingMessage.style.display = 'block';
   }
-  
-  // ফিল্টার লিসেনার
+
   setupFilterListeners();
-  
-  // কুইক সিরিয়াল মোডাল
   initializeQuickSerialModal();
-  
-  // ✅ ফোন চেকবক্সের ইভেন্ট লিসেনার
+
   const skipPhoneCheckbox = document.getElementById('skipPhoneCheckbox');
   const phoneFieldContainer = document.getElementById('phoneFieldContainer');
   const quickPhoneInput = document.getElementById('quickPhone');
@@ -4216,14 +4016,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // ✅ রোগী যোগ করার বাটন
   const addPatientBtn = document.getElementById('addPatientBtn');
   if (addPatientBtn) {
     addPatientBtn.addEventListener('click', addPatientField);
     console.log("✅ + বাটন ইভেন্ট যোগ হয়েছে");
   }
   
-  // ✅ পেশেন্ট কন্টেইনার ক্লিক ইভেন্ট
   const patientsContainer = document.getElementById('patientsContainer');
   if (patientsContainer) {
     patientsContainer.addEventListener('click', function(e) {
@@ -4234,22 +4032,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
-  // ✅ প্রথম পেশেন্ট অ্যাক্টিভ করুন
   const firstPatient = document.querySelector('.patient-card');
   if (firstPatient) {
     setActivePatient(firstPatient);
   }
   
-  // ✅ সিরিয়াল রেঞ্জ লোড
   loadSerialRanges().then(() => {
     console.log("✅ Initial serial ranges loaded");
     updateTimeOptions();
   });
   
-  // সংশোধন: const কেটে গ্লোবাল ভ্যারিয়েবল সেট করা হলো
 setupRealtimeListeners();
   
-  // ✅ মোডালের বাইরে ক্লিক করলে বন্ধ
   window.addEventListener('click', (event) => {
     if (elements && event.target === elements.quickSerialModal) {
       elements.quickSerialModal.style.display = 'none';
@@ -4260,8 +4054,7 @@ setupRealtimeListeners();
       }
     }
   });
-  
-  // ✅ পেজ হাইড বা ক্লোজ হলে ফায়ারবেস কানেকশন ১০০% বন্ধ করার জন্য নতুন কোড
+
 window.addEventListener('pagehide', () => {
   if (typeof cleanupListeners === 'function') {
     cleanupListeners();
