@@ -2644,7 +2644,9 @@ const existingTokenQuery = await db.collectionGroup('paymentHistories')
   
   const defaultFee = data.patientType === 'new' ? 800 : 600;
   const currentFee = existingToken?.tokenFee || data.tokenFee || defaultFee;
-  const currentPaid = existingToken?.tokenPaid || data.tokenPaid || 0;
+  const currentPaid = (existingToken && existingToken.tokenPaid !== undefined) 
+  ? existingToken.tokenPaid 
+  : (data.tokenPaid !== undefined ? data.tokenPaid : currentFee);
   const due = currentFee - currentPaid;
   
   let paymentHistoryHtml = '';
@@ -2764,26 +2766,22 @@ const existingTokenQuery = await db.collectionGroup('paymentHistories')
 
 function updateFeeByPatientType(type) {
   const feeInput = document.getElementById('tokenFee');
+  const paidInput = document.getElementById('tokenPaid'); // পরিশোধিত টাকার ইনপুট ফিল্ড
   
   if (feeInput) {
-    if (type === 'new') {
-      feeInput.value = 800;
-    } else if (type === 'old') {
-      feeInput.value = 600;
+    const feeValue = (type === 'new') ? 800 : 600;
+    
+    // ফি বসানো
+    feeInput.value = feeValue;
+    
+    // পরিশোধিত টাকার ঘরেও একই ফি স্বয়ংক্রিয়ভাবে বসিয়ে দেওয়া
+    if (paidInput) {
+      paidInput.value = feeValue;
     }
     
-    if (typeof currentTokenPath !== 'undefined' && currentTokenPath) {
-      console.log("Old Path:", currentTokenPath);
-      
-      if (type === 'old' && currentTokenPath.includes('/new/')) {
-        currentTokenPath = currentTokenPath.replace('/new/', '/old/');
-      } else if (type === 'new' && currentTokenPath.includes('/old/')) {
-        currentTokenPath = currentTokenPath.replace('/old/', '/new/');
-      }
-      
-      console.log("New Dynamic Path:", currentTokenPath);
-    }
+    window.selectedPatientType = type;
     
+    // বাকি টাকা হিসাব আপডেট করা
     if (typeof updateDueAmount === 'function') {
       updateDueAmount();
     }
@@ -2823,22 +2821,28 @@ async function saveAndPrintToken(shouldPrint) {
     const fee = parseInt(document.getElementById('tokenFee')?.value) || (patientType === 'new' ? 800 : 600);
     const paid = parseInt(document.getElementById('tokenPaid')?.value) || 0;
     const givenBy = document.getElementById('tokenGivenBy')?.value || '';
-    
+
+    // ==========================================
+    // ১. মূল অ্যাপয়েন্টমেন্ট ডকুমেন্ট পড়া (পাথ অপরিবর্তিত থাকবে)
+    // ==========================================
     const appointmentDoc = await db.doc(currentTokenPath).get();
+    
     if (!appointmentDoc.exists) {
       throw new Error("অ্যাপয়েন্টমেন্ট ডকুমেন্টটি ডেটাবেজে খুঁজে পাওয়া যায়নি।");
     }
+
     const appointmentData = appointmentDoc.data();
     const originalSerial = appointmentData.serial;
-    
     const now = new Date();
     const yymmdd = now.toISOString().slice(2, 10).replace(/-/g, '');
-    const targetPatientType = patientType || 'new';
+    
+    // পেমেন্টের জন্য টার্গেট সাবকালেকশন (payment_new / payment_old)
+    const targetPatientType = patientType || appointmentData.patientType || 'new';
     const subCollectionName = `payment_${targetPatientType}`;
-    const newPaymentDocRef = db.collection('paymentHistories')
-                               .doc(yymmdd)
-                               .collection(subCollectionName);
 
+    // ==========================================
+    // ২. পূর্বে তৈরি পেমেন্ট টোকেন আছে কিনা তা চেক করা (Update Case)
+    // ==========================================
     const [existingNew, existingOld] = await Promise.all([
       db.collection('paymentHistories').doc(yymmdd).collection('payment_new').where('appointmentId', '==', currentTokenId).limit(1).get(),
       db.collection('paymentHistories').doc(yymmdd).collection('payment_old').where('appointmentId', '==', currentTokenId).limit(1).get()
@@ -2847,8 +2851,11 @@ async function saveAndPrintToken(shouldPrint) {
     const existingDoc = !existingNew.empty ? existingNew.docs[0] : (!existingOld.empty ? existingOld.docs[0] : null);
 
     let tokenNumber;
-    
+
     if (existingDoc) {
+      // -------------------------------------------------------------
+      // কেইস ১: টোকেন আপডেট (শুধুমাত্র payment_new / payment_old হ্যান্ডেল করবে)
+      // -------------------------------------------------------------
       tokenNumber = existingDoc.data().tokenNumber;
       const existingData = existingDoc.data();
       let paymentHistory = existingData.paymentHistory || [];
@@ -2869,11 +2876,12 @@ async function saveAndPrintToken(shouldPrint) {
           source: 'dashboard'
         });
       }
-      
-      await existingDoc.ref.update({
+
+      const updatedTokenData = {
+        ...existingData,
         patientName: name,
         patientAge: age,
-        patientType: patientType,
+        patientType: targetPatientType,
         tokenFee: fee,
         tokenPaid: paid,
         tokenDue: fee - paid,
@@ -2882,78 +2890,100 @@ async function saveAndPrintToken(shouldPrint) {
         givenBy: givenBy,
         reference: givenBy,
         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      };
+
+      const currentPaymentSubcollection = existingDoc.ref.parent.id; // payment_new অথবা payment_old
+      
+      // যদি সিলেক্ট করা টাইপ অনুযায়ী payment সাবকালেকশন বদলে যায়
+      if (currentPaymentSubcollection !== subCollectionName) {
+        // নতুন পেমেন্ট সাবকালেকশনে কপি করা
+        const newPaymentDocRef = db.collection('paymentHistories').doc(yymmdd).collection(subCollectionName).doc(existingDoc.id);
+        await newPaymentDocRef.set(updatedTokenData);
+        
+        // পুরানো পেমেন্ট সাবকালেকশন থেকে ডিলিট করা
+        await existingDoc.ref.delete();
+      } else {
+        await existingDoc.ref.update(updatedTokenData);
+      }
       
       showAlert(`✅ টোকেন ${tokenNumber} সফলভাবে আপডেট করা হয়েছে!`, 'success');
       
     } else {
-      const [newTokensQuery, oldTokensQuery] = await Promise.all([
-        db.collection('paymentHistories').doc(yymmdd).collection('payment_new').get(),
-        db.collection('paymentHistories').doc(yymmdd).collection('payment_old').get()
-      ]);
-      
-      let maxCounter = 0;
+      // -------------------------------------------------------------
+      // কেইস ২: সম্পূর্ণ নতুন টোকেন তৈরি (payment_new / payment_old এ সেভ হবে)
+      // -------------------------------------------------------------
+      const counterDocRef = db.collection('paymentHistories').doc(yymmdd);
 
-      newTokensQuery.forEach(doc => {
-        const data = doc.data();
-        const counter = data.tokenCounter || 0;
-        if (counter > maxCounter) maxCounter = counter;
-      });
-      
-      oldTokensQuery.forEach(doc => {
-        const data = doc.data();
-        const counter = data.tokenCounter || 0;
-        if (counter > maxCounter) maxCounter = counter;
-      });
-      
-      const newTokenSerial = maxCounter + 1;
-      tokenNumber = `T-${yymmdd}-${String(newTokenSerial).padStart(2, '0')}`;
-      const tokenDocId = `${yymmdd}-${String(newTokenSerial).padStart(2, '0')}`;
-      
-      const initialPaymentHistory = [{
-        id: Date.now().toString(),
-        amount: paid,
-        type: 'payment',
-        method: 'নগদ',
-        note: `টোকেন প্রদান - ${tokenNumber}`,
-        timestamp: new Date().toISOString(),
-        createdBy: sessionStorage.getItem('adminEmail') || 'admin',
-        source: 'dashboard'
-      }];
-      
-      const finalDocRef = newPaymentDocRef.doc(tokenDocId);
-  
-      await finalDocRef.set({
-        tokenNumber: tokenNumber,
-        tokenCounter: newTokenSerial,
-        tokenDatePrefix: yymmdd,
-        tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        patientName: name,
-        patientAge: age,
-        patientPhone: appointmentData.phone || '',
-        patientType: patientType,
-        tokenFee: fee,
-        tokenPaid: paid,
-        tokenDue: fee - paid,
-        amount: paid,
-        method: 'নগদ',
-        type: 'payment',
-        note: `টোকেন প্রদান - ${tokenNumber}`,
-        status: (fee - paid) === 0 ? 'paid' : 'due',
-        paymentHistory: initialPaymentHistory,
-        source: 'dashboard',
-        givenBy: givenBy,
-        reference: givenBy,
-        appointmentId: currentTokenId,
-        serial: originalSerial,
-        appointmentSerial: originalSerial,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        createdBy: sessionStorage.getItem('adminEmail') || 'admin'
+      await db.runTransaction(async (transaction) => {
+        const counterDoc = await transaction.get(counterDocRef);
+
+        let lastCounter = 0;
+        if (counterDoc.exists && counterDoc.data().dailyLastCounter) {
+          lastCounter = counterDoc.data().dailyLastCounter;
+        }
+
+        const newTokenSerial = lastCounter + 1;
+        const serialStr = String(newTokenSerial).padStart(2, '0');
+        const tokenDocId = `${yymmdd}-${serialStr}`;
+        tokenNumber = `T-${tokenDocId}`;
+
+        const finalDocRef = counterDocRef.collection(subCollectionName).doc(tokenDocId);
+        const checkDuplicateDoc = await transaction.get(finalDocRef);
+
+        if (checkDuplicateDoc.exists) {
+          throw new Error(`টোকেন ${tokenNumber} ইতিমধ্যে বিদ্যমান! দয়া করে আবার চেষ্টা করুন।`);
+        }
+
+        const initialPaymentHistory = [{
+          id: Date.now().toString(),
+          amount: paid,
+          type: 'payment',
+          method: 'নগদ',
+          note: `টোকেন প্রদান - ${tokenNumber}`,
+          timestamp: new Date().toISOString(),
+          createdBy: sessionStorage.getItem('adminEmail') || 'admin',
+          source: 'dashboard'
+        }];
+
+        // প্যারেন্ট ডকুমেন্টে লেটেস্ট কাউন্টার আপডেট
+        transaction.set(counterDocRef, { dailyLastCounter: newTokenSerial }, { merge: true });
+
+        // নির্বাচিত payment সাব-কালেকশনে ডাটা সেভ
+        transaction.set(finalDocRef, {
+          tokenNumber: tokenNumber,
+          tokenCounter: newTokenSerial,
+          tokenDatePrefix: yymmdd,
+          tokenTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          patientName: name,
+          patientAge: age,
+          patientPhone: appointmentData.phone || '',
+          patientType: targetPatientType,
+          tokenFee: fee,
+          tokenPaid: paid,
+          tokenDue: fee - paid,
+          amount: paid,
+          method: 'নগদ',
+          type: 'payment',
+          note: `টোকেন প্রদান - ${tokenNumber}`,
+          status: (fee - paid) === 0 ? 'paid' : 'due',
+          paymentHistory: initialPaymentHistory,
+          source: 'dashboard',
+          givenBy: givenBy,
+          reference: givenBy,
+          appointmentId: currentTokenId,
+          serial: originalSerial,
+          appointmentSerial: originalSerial,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdBy: sessionStorage.getItem('adminEmail') || 'admin'
+        });
       });
       
       showAlert(`✅ টোকেন ${tokenNumber} তৈরি করা হয়েছে! (সিরিয়াল: ${originalSerial})`, 'success');
     }
     
+    // ==========================================
+    // ৩. মূল অ্যাপয়েন্টমেন্ট ডকুমেন্টে পেমেন্ট স্ট্যাটাস আপডেট (পাথ অপরিবর্তিত)
+    // ==========================================
     await db.doc(currentTokenPath).update({
       tokenGiven: true,
       tokenNumber: tokenNumber,
@@ -2968,7 +2998,7 @@ async function saveAndPrintToken(shouldPrint) {
     closeTokenModal();
     
     if (shouldPrint === true) {
-      printTokenReceipt(tokenNumber, name, age, patientType, fee, paid);
+      printTokenReceipt(tokenNumber, name, age, targetPatientType, fee, paid);
     }
     
     if (typeof allAppointmentsSnapshot !== 'undefined' && allAppointmentsSnapshot) {

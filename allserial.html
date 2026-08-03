@@ -653,6 +653,40 @@
   input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background-color: #e5e7eb;
   }
+
+  .date-range-container {
+  display: flex;
+  flex-direction: row; /* বাম ও ডানে রাখার জন্য */
+  gap: 12px;           /* দুটি ফিল্ডের মাঝের ফাঁকা জায়গা */
+  width: 100%;
+}
+
+/* প্রতিটি তারিখ বক্স (লেবেল উপরে, ইনপুট নিচে) */
+.date-box {
+  display: flex;
+  flex-direction: column; /* লেবেল উপরে এবং ইনপুট নিচে রাখার জন্য */
+  flex: 1;                /* বাম ও ডানের বক্স দুটি সমান চওড়া হবে */
+}
+
+/* লেবেলের স্টাইল */
+.date-box label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+/* ডেট পিকার ইনপুট ফিল্ডের স্টাইল */
+.date-box input[type="date"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+  background-color: #ffffff;
+}
     
     /* Mobile Responsive */
     @media (max-width: 768px) {
@@ -734,7 +768,24 @@
       .appointments-management td {
         padding: 10px 12px;
         font-size: 14px;
-      }
+     
+     }
+
+     .date-range-container {
+    display: flex !important;
+    flex-direction: row !important; /* মোবাইলেও বাম-ডানেই থাকবে */
+    gap: 8px;
+  }
+
+  .date-box label {
+    font-size: 12px;
+  }
+
+  .date-box input[type="date"] {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
     }
     
     @media (max-width: 480px) {
@@ -842,9 +893,21 @@
           <div class="admin-table-header">
             <h2>সকল অ্যাপয়েন্টমেন্টসমূহ</h2>
             <div class="header-actions">
-              <div class="filter-group">
-                <input type="date" id="dateFilter" class="date-filter-appointments">
+ <div class="filter-group">
+<div class="date-range-container">
+    
+    <!-- বাম পাশের ফিল্ড: তারিখ থেকে -->
+    <div class="date-box">
+      <label for="dateFrom">তারিখ থেকে</label>
+      <input type="date" id="dateFrom" class="date-filter-appointments">
+    </div>
 
+    <!-- ডান পাশের ফিল্ড: তারিখ পর্যন্ত -->
+    <div class="date-box">
+      <label for="dateTo">তারিখ পর্যন্ত</label>
+      <input type="date" id="dateTo" class="date-filter-appointments">
+    </div>
+  </div>
                 <select class="type-filter-appointments">
                   <option value="all">সকল ধরন</option>
                   <option value="new">নতুন রোগী</option>
@@ -1065,23 +1128,27 @@ async function runAutoArchiving() {
     const currentWeek = getCurrentWeekDateRange();
     const currentWeekStart = currentWeek.startDate;
     currentWeekStart.setHours(0, 0, 0, 0);
-    
-    console.log("⌛ পুরনো ডেটা চেকিং এবং ডিলিট করার প্রক্রিয়া শুরু হয়েছে...");
+
+    console.log("⌛ পুরনো ডেটা চেকিং এবং আর্কাইভ/ডিলিট প্রক্রিয়া শুরু...");
     console.log("📅 বর্তমান সপ্তাহের শুরু (শনিবার):", currentWeekStart);
+
+    // ✅ new এবং old নামের সকল সাব-কালেকশন থেকে ডেটা আনতে collectionGroup ব্যবহার করা হচ্ছে
+    const [newSnapshot, oldSnapshot] = await Promise.all([
+      db.collectionGroup('new').get(),
+      db.collectionGroup('old').get()
+    ]);
+
+    // দুটি স্ন্যাপশট থেকে পাওয়া সব ডকুমেন্ট একসাথে করা
+    const allDocs = [...newSnapshot.docs, ...oldSnapshot.docs];
     
-    // ১. ১ম ডেটাবেজ থেকে সব অ্যাপয়েন্টমেন্ট আনা
-    const snapshot = await db.collection('appointments').get();
     let archiveCount = 0;
     let deleteCount = 0;
-    
-    // ২. পুরনো ডেটা সংগ্রহ করা
     const oldDocuments = [];
-    
-    for (const doc of snapshot.docs) {
+
+    for (const doc of allDocs) {
       const data = doc.data();
       let appointmentDate = null;
 
-      // তারিখ পার্স করা
       if (data.appointmentDate) {
         const [year, month, day] = data.appointmentDate.split('-');
         appointmentDate = new Date(year, month - 1, day);
@@ -1095,118 +1162,138 @@ async function runAutoArchiving() {
         appointmentDate.setHours(0, 0, 0, 0);
       }
 
-      // ৩. পুরনো ডেটা চিহ্নিত করা
       if (appointmentDate && appointmentDate < currentWeekStart) {
+        // parent.parent.id দিয়ে প্যারেন্ট ডকুমেন্ট আইডি (yymmdd) পাওয়া যাবে
+        const dateDocId = doc.ref.parent.parent ? doc.ref.parent.parent.id : 'unknown';
+        const patientType = doc.ref.parent.id; // 'new' অথবা 'old'
+
         oldDocuments.push({
           id: doc.id,
           data: data,
-          ref: doc.ref
+          ref: doc.ref,
+          dateDocId: dateDocId,
+          patientType: patientType
         });
       }
     }
-    
-    console.log(`📊 মোট ${oldDocuments.length}টি পুরনো ডকুমেন্ট পাওয়া গেছে`);
-    
+
+    console.log(`📊 মোট ${oldDocuments.length}টি পুরনো ডকুমেন্ট পাওয়া গেছে`);
     if (oldDocuments.length === 0) {
       console.log("✅ কোনো পুরনো ডেটা নেই।");
       return;
     }
-    
-    // ৪. প্রতি ৫০০টি করে ব্যাচে ভাগ করা
+
     const BATCH_SIZE = 500;
     const batches = [];
-    
     for (let i = 0; i < oldDocuments.length; i += BATCH_SIZE) {
       batches.push(oldDocuments.slice(i, i + BATCH_SIZE));
     }
-    
-    console.log(`📦 ${batches.length}টি ব্যাচ তৈরি করা হয়েছে (প্রতি ব্যাচে ${BATCH_SIZE}টি)`);
-    
-    // ৫. প্রতিটি ব্যাচ প্রসেস করা
+    console.log(`📦 ${batches.length}টি ব্যাচ তৈরি করা হয়েছে (প্রতি ব্যাচে ${BATCH_SIZE}টি)`);
+
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
       const dbBatch = db.batch();
-      
+
       console.log(`🔄 ব্যাচ ${batchIndex + 1}/${batches.length} প্রসেস করা হচ্ছে...`);
-      
-      // ক) আর্কাইভে কপি করা এবং ডিলিটের জন্য ব্যাচে যোগ করা
-      for (const doc of batch) {
+
+      for (const item of batch) {
         try {
-          // আর্কাইভে কপি
-          const archiveRef = archiveDb.collection('archived_appointments').doc(doc.id);
+          // মূল ডাটাবেজের মতোই ঠিক একই স্ট্রাকচারে আর্কাইভ ডাটাবেজে সেভ করা হচ্ছে
+          const archiveRef = archiveDb
+            .collection('archived_appointments')
+            .doc(item.dateDocId)        // প্যারেন্ট ডকুমেন্ট (yymmdd)
+            .collection(item.patientType)// সাব-কালেকশন ('new' বা 'old')
+            .doc(item.id);              // সিরিয়াল আইডি (yymmdd-serial)
+
           await archiveRef.set({
-            ...doc.data,
+            ...item.data,
             archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
             archivedBatch: batchIndex + 1,
             archivedDate: new Date().toISOString()
           });
-          
-          // ডিলিটের জন্য ব্যাচে যোগ
-          dbBatch.delete(doc.ref);
+
+          dbBatch.delete(item.ref);
           archiveCount++;
-          
+
         } catch (error) {
-          console.error(`❌ ডকুমেন্ট ${doc.id} আর্কাইভ করতে সমস্যা:`, error);
+          console.error(`❌ ডকুমেন্ট ${item.id} আর্কাইভ করতে সমস্যা:`, error);
         }
       }
-      
-      // খ) ব্যাচ কমিট করা (ডিলিট)
+
       try {
         await dbBatch.commit();
         deleteCount += batch.length;
-        console.log(`✅ ব্যাচ ${batchIndex + 1} সম্পূর্ণ: ${batch.length}টি ডকুমেন্ট ডিলিট করা হয়েছে`);
-        
-        // ছোট বিরতি (Firestore rate limit এড়ানোর জন্য)
+        console.log(`✅ ব্যাচ ${batchIndex + 1} সম্পূর্ণ: ${batch.length}টি ডকুমেন্ট ডিলিট করা হয়েছে`);
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
       } catch (error) {
         console.error(`❌ ব্যাচ ${batchIndex + 1} কমিট করতে সমস্যা:`, error);
       }
     }
-    
-    console.log(`🎉 সম্পূর্ণ! ${archiveCount}টি ডকুমেন্ট আর্কাইভ করা হয়েছে এবং ${deleteCount}টি ডকুমেন্ট ডিলিট করা হয়েছে।`);
-    
+
+    console.log(`🎉 সম্পূর্ণ! ${archiveCount}টি ডকুমেন্ট আর্কাইভ করা হয়েছে এবং ${deleteCount}টি ডকুমেন্ট ডিলিট করা হয়েছে।`);
+
   } catch (error) {
-    console.error("❌ অটো-আর্কাইভ এবং ডিলিট করার সময় সমস্যা হয়েছে:", error);
+    console.error("❌ অটো-আর্কাইভ এবং ডিলিট করার সময় সমস্যা হয়েছে:", error);
   }
 }
 
-// এই ফাংশনটি ১ম ও ২য় ডেটাবেজ থেকে ডেটা এনে একসাথে জোড়া লাগাবে
+// এই ফাংশনটি ১ম ও ২য় ডেটাবেজ থেকে ডেটা এনে একসাথে জোড়া লাগাবে
 async function loadMergedAppointments(onDataCallback) {
   try {
-    // ১. ১ম ডেটাবেজ থেকে রানিং ডেটা আনা
-    const primarySnapshot = await db.collection('appointments').get();
-    const primaryData = primarySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      isArchived: false
-    }));
+    // -------------------------------------------------------------
+    // ১. ১ম ডেটাবেজ থেকে রানিং ডেটা আনা (new ও old সাব-কালেকশন)
+    // -------------------------------------------------------------
+    const primaryNewSnap = await db.collectionGroup('new').get();
+    const primaryOldSnap = await db.collectionGroup('old').get();
 
-    // ২. ২য় ডেটাবেজ থেকে আর্কাইভ ডেটা আনা
-    const archiveSnapshot = await archiveDb.collection('archived_appointments').get();
-    const archivedData = archiveSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      isArchived: true
-    }));
+    const primaryData = [
+      ...primaryNewSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), patientType: 'new', isArchived: false })),
+      ...primaryOldSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), patientType: 'old', isArchived: false }))
+    ];
 
-    // ৩. দুটি ডেটাবেজের ডেটা একসাথে জোড়া (Merge) দেওয়া
+    // -------------------------------------------------------------
+    // ২. ২য় ডেটাবেজ থেকে আর্কাইভ ডেটা আনা (new ও old সাব-কালেকশন)
+    // -------------------------------------------------------------
+    let archivedData = [];
+    try {
+      if (typeof archiveDb !== 'undefined' && archiveDb) {
+        const archiveNewSnap = await archiveDb.collectionGroup('new').get();
+        const archiveOldSnap = await archiveDb.collectionGroup('old').get();
+
+        archivedData = [
+          ...archiveNewSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), patientType: 'new', isArchived: true })),
+          ...archiveOldSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), patientType: 'old', isArchived: true }))
+        ];
+      }
+    } catch (archErr) {
+      console.error("❌ ২য় ডেটাবেজ থেকে ডাটা লোড করতে সমস্যা হয়েছে:", archErr);
+    }
+
+    // -------------------------------------------------------------
+    // ৩. দুটি ডেটাবেজের ডেটা একসাথে জোড়া (Merge) দেওয়া
+    // -------------------------------------------------------------
     const allAppointments = [...primaryData, ...archivedData];
 
-    // ৪. তারিখ অনুযায়ী ডেটা সর্ট বা সাজানো (নতুনগুলো উপরে থাকবে)
+    // -------------------------------------------------------------
+    // ৪. তারিখ অনুযায়ী ডেটা সর্ট বা সাজানো (নতুনগুলো উপরে থাকবে)
+    // -------------------------------------------------------------
     allAppointments.sort((a, b) => {
-      return new Date(b.visitingDate || b.date) - new Date(a.visitingDate || a.date);
+      const dateA = new Date(a.appointmentDate || a.visitingDate || a.date);
+      const dateB = new Date(b.appointmentDate || b.visitingDate || b.date);
+      return dateB - dateA;
     });
 
     console.log(`📊 Total Loaded: Primary (${primaryData.length}) + Archive (${archivedData.length})`);
     
-    // ৫. ডেটা তৈরি হয়ে গেলে কলব্যাক ফাংশনে পাঠিয়ে দেওয়া
+    // -------------------------------------------------------------
+    // ৫. কলব্যাক ফাংশনে পাঠিয়ে দেওয়া
+    // -------------------------------------------------------------
     if (typeof onDataCallback === 'function') {
       onDataCallback(allAppointments);
     }
 
   } catch (error) {
-    console.error("❌ দুটি ডেটাবেজ থেকে তথ্য লোড করতে সমস্যা হয়েছে:", error);
+    console.error("❌ ডেটাবেজ থেকে তথ্য লোড করতে সমস্যা হয়েছে:", error);
   }
 }
     // ==================== UTILITY FUNCTIONS ====================
@@ -1588,74 +1675,112 @@ async function loadMergedAppointments(onDataCallback) {
     }
 
     // ==================== BULK ACTIONS FUNCTIONS ====================
-    function updateBulkActions() {
-      const count = selectedAppointments.size;
-      document.getElementById('selectedCount').textContent = `${count}টি সিলেক্টেড`;
-      
-      if (count > 0) {
-        document.getElementById('bulkActions').style.display = 'flex';
-      } else {
-        document.getElementById('bulkActions').style.display = 'none';
-      }
-    }
+function updateBulkActions() {
+  const count = selectedAppointments.size;
+  const countElem = document.getElementById('selectedCount');
+  const bulkElem = document.getElementById('bulkActions');
 
-    async function deleteSelectedAppointments() {
-      if (!db || selectedAppointments.size === 0) return;
-      
-      const count = selectedAppointments.size;
-      const appointmentsText = count === 1 ? 'এই অ্যাপয়েন্টমেন্টটি' : `${count}টি অ্যাপয়েন্টমেন্ট`;
-      
-      const result = await showConfirmation(
-        'নিশ্চিত করুন',
-        `আপনি কি ${appointmentsText} মুছতে চান?\n\nএই একশনটি রিভার্স করা যাবে না!`,
-        'হ্যাঁ, মুছুন',
-        'না, বাতিল করুন'
-      );
-      
-      if (!result.isConfirmed) {
-        return;
-      }
-      
-      try {
-        const batch = db.batch();
-        selectedAppointments.forEach(id => {
-          batch.delete(db.collection('appointments').doc(id));
-        });
-        
-        await batch.commit();
-        
-        selectedAppointments.clear();
-        document.querySelectorAll('.appointment-checkbox').forEach(cb => cb.checked = false);
-        document.getElementById('selectAllAppointments').checked = false;
-        document.getElementById('selectAll').checked = false;
-        
-        updateBulkActions();
-        
-        Swal.fire({
-          title: 'সফল!',
-          text: `${count}টি অ্যাপয়েন্টমেন্ট সফলভাবে মুছে ফেলা হয়েছে`,
-          icon: 'success',
-          timer: 2000,
-          showConfirmButton: false
-        });
-      } catch (error) {
-        console.error('❌ Error deleting appointments:', error);
-        Swal.fire({
-          title: 'সমস্যা!',
-          text: 'অ্যাপয়েন্টমেন্ট মুছতে সমস্যা হয়েছে',
-          icon: 'error'
-        });
-      }
-    }
+  if (countElem) countElem.textContent = `${count}টি সিলেক্টেড`;
+  if (bulkElem) bulkElem.style.display = count > 0 ? 'flex' : 'none';
+}
 
-    function clearSelection() {
-      selectedAppointments.clear();
-      document.querySelectorAll('.appointment-checkbox').forEach(cb => cb.checked = false);
-      document.getElementById('selectAllAppointments').checked = false;
-      document.getElementById('selectAll').checked = false;
-      updateBulkActions();
-    }
+async function deleteSelectedAppointments() {
+  if (!db || selectedAppointments.size === 0) return;
 
+  const count = selectedAppointments.size;
+  const appointmentsText = count === 1 ? 'এই অ্যাপয়েন্টমেন্টটি' : `${count}টি অ্যাপয়েন্টমেন্ট`;
+
+  const result = await showConfirmation(
+    'নিশ্চিত করুন',
+    `আপনি কি ${appointmentsText} মুছতে চান?\n\nএই একশনটি রিভার্স করা যাবে না!`,
+    'হ্যাঁ, মুছুন',
+    'না, বাতিল করুন'
+  );
+
+  if (!result.isConfirmed) {
+    return;
+  }
+
+  try {
+    const batch = db.batch();
+
+    // appointmentsManager থেকে বর্তমানের অ্যাপয়েন্টমেন্ট তালিকা সংগ্রহ
+    const currentAppointmentsList = appointmentsManager ? appointmentsManager.appointments : [];
+
+    selectedAppointments.forEach(id => {
+      // সঠিক অ্যাপয়েন্টমেন্ট অবজেক্ট খুঁজে বের করা
+      const app = currentAppointmentsList.find(a => a.id === id);
+
+      if (app) {
+        // ১. YYYY-MM-DD থেকে YYMMDD তৈরি
+        let yymmdd = app.yymmdd;
+        if (!yymmdd) {
+          const dateSource = app.appointmentDate || app.date || app.visitingDate;
+          if (dateSource) {
+            yymmdd = new Date(dateSource).toISOString().split('T')[0].replace(/-/g, '').slice(2);
+          } else if (app.timestamp && app.timestamp.seconds) {
+            yymmdd = new Date(app.timestamp.seconds * 1000).toISOString().split('T')[0].replace(/-/g, '').slice(2);
+          }
+        }
+
+        // ২. সাব-কালেকশন (new বা old) নির্ধারণ
+        const patientTypeSubcollection = (app.patientType === 'new' || app.type === 'new' || app.patientType === 'new_patients') ? 'new' : 'old';
+
+        if (yymmdd) {
+          // ৩. ফায়ারবেজের নেস্টেড পাথের রেফারেন্স
+          const docRef = db
+            .collection('appointments')
+            .doc(yymmdd)
+            .collection(patientTypeSubcollection)
+            .doc(id);
+
+          batch.delete(docRef);
+        }
+      }
+    });
+
+    // ব্যাচ এক্সিকিউট/কমিট করা
+    await batch.commit();
+
+    // সিলেক্টেড ডেটা ক্লিয়ার ও UI আপডেট
+    selectedAppointments.clear();
+    document.querySelectorAll('.appointment-checkbox').forEach(cb => cb.checked = false);
+    
+    const selectAllApp = document.getElementById('selectAllAppointments');
+    const selectAll = document.getElementById('selectAll');
+    if (selectAllApp) selectAllApp.checked = false;
+    if (selectAll) selectAll.checked = false;
+
+    updateBulkActions();
+
+    Swal.fire({
+      title: 'সফল!',
+      text: `${count}টি অ্যাপয়েন্টমেন্ট সফলভাবে মুছে ফেলা হয়েছে`,
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false
+    });
+  } catch (error) {
+    console.error('❌ Error deleting appointments:', error);
+    Swal.fire({
+      title: 'সমস্যা!',
+      text: 'অ্যাপয়েন্টমেন্ট মুছতে সমস্যা হয়েছে',
+      icon: 'error'
+    });
+  }
+}
+
+function clearSelection() {
+  selectedAppointments.clear();
+  document.querySelectorAll('.appointment-checkbox').forEach(cb => cb.checked = false);
+  
+  const selectAllApp = document.getElementById('selectAllAppointments');
+  const selectAll = document.getElementById('selectAll');
+  if (selectAllApp) selectAllApp.checked = false;
+  if (selectAll) selectAll.checked = false;
+  
+  updateBulkActions();
+}
     // ==================== APPOINTMENTS MANAGEMENT CLASS ====================
     class AppointmentsManagement {
       constructor() {
@@ -1762,68 +1887,110 @@ async function loadMergedAppointments(onDataCallback) {
         console.log('✅ Pending selections updated:', pendingSelections);
       }
       
-      async loadAppointments() {
-        try {
-          if (!this.db) return;
-          
-          // ১ম ডেটাবেজে (appointments) কোনো পরিবর্তন (নতুন সিরিয়াল, এডিট বা ডিলিট) হলে এই লিসেনারটি চালু হবে
-          const listener = this.db.collection('appointments')
-            .orderBy('timestamp', 'desc')
-            .onSnapshot(async (primarySnapshot) => {
-              console.log("⚡ ১ম ডেটাবেজে পরিবর্তন সনাক্ত হয়েছে! ২য় ডেটাবেজের সাথে মার্জ করা হচ্ছে...");
-              
-              this.appointments = [];
-              this.timeOptions.clear();
-              
-              // ক) ১ম ডেটাবেজ থেকে রানিং ডেটাগুলো নেওয়া
-              const primaryData = primarySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                isArchived: false
-              }));
+async loadAppointments() {
+  try {
+    if (!this.db || typeof archiveDb === 'undefined' || !archiveDb) {
+      console.warn("⚠️ Database Instance পাওয়া যায়নি!");
+      return;
+    }
 
-              // খ) ২য় ডেটাবেজ (অন্য জিমেইলের প্রজেক্ট) থেকে আর্কাইভ করা ডেটাগুলো নিয়ে আসা
-              let archivedData = [];
-              try {
-                const archiveSnapshot = await archiveDb.collection('archived_appointments').get();
-                archivedData = archiveSnapshot.docs.map(doc => ({
-                  id: doc.id,
-                  ...doc.data(),
-                  isArchived: true
-                }));
-              } catch (archError) {
-                console.error('❌ ২য় ডেটাবেজ থেকে ডাটা টানতে সমস্যা হয়েছে:', archError);
-              }
+    this.appointments = [];
+    this.timeOptions.clear();
 
-              // গ) দুটি ডেটাবেজের ডেটা একসাথে এক তালিকায় যোগ করা (Merge)
-              const mergedAppointments = [...primaryData, ...archivedData];
+    const allAppointmentsMap = {};
 
-              // ঘ) পুরো ডাটাকে আপনার অ্যাপের রুলস অনুযায়ী প্রসেস এবং টাইম ফিল্টার সেট করা
-              mergedAppointments.forEach(data => {
-                this.appointments.push(data);
-                if (data.time) {
-                  this.timeOptions.add(data.time);
-                }
-              });
-              
-              // ঙ) টেবিল রেন্ডার এবং পরিসংখ্যান আপডেট করা (আপনার আগের মেথডগুলো)
-              this.populateTimeFilter();
-              this.loadAppointmentsTable();
-              this.updateStats();
-              
-              console.log(`📊 টোটাল লোড হয়েছে: রানিং (${primaryData.length}) + আর্কাইভ (${archivedData.length})`);
-            }, error => {
-              console.error('❌ Error loading appointments:', error);
-              showAlert('অ্যাপয়েন্টমেন্ট লোড করতে সমস্যা হয়েছে', 'error');
-            });
-          
-          this.realtimeListeners.push(listener);
-          
-        } catch (error) {
-          console.error('❌ Error loading appointments:', error);
-          showAlert('অ্যাপয়েন্টমেন্ট লোড করতে সমস্যা হয়েছে', 'error');
+    // 🔄 UI আপডেটের ফাংশন
+    const processAndUpdateUI = () => {
+      this.appointments = [];
+      this.timeOptions.clear();
+
+      Object.values(allAppointmentsMap).forEach(item => {
+        this.appointments.push(item);
+        if (item.time) {
+          this.timeOptions.add(item.time);
         }
-      }
+      });
+
+      this.populateTimeFilter();
+      this.loadAppointmentsTable();
+      this.updateStats();
+    };
+
+    // -------------------------------------------------------------
+    // ১. Primary Database (appointments) – সব ডেটা লোড
+    // -------------------------------------------------------------
+    const unsubPrimaryNew = this.db.collectionGroup('new')
+      .onSnapshot(snapshot => {
+        snapshot.forEach(doc => {
+          allAppointmentsMap[`primary_new_${doc.id}`] = {
+            id: doc.id,
+            ...doc.data(),
+            patientType: 'new',
+            type: 'new',
+            isArchived: false
+          };
+        });
+        processAndUpdateUI();
+      }, err => console.error("❌ Primary 'new' লিসেনার ত্রুটি:", err));
+
+    const unsubPrimaryOld = this.db.collectionGroup('old')
+      .onSnapshot(snapshot => {
+        snapshot.forEach(doc => {
+          allAppointmentsMap[`primary_old_${doc.id}`] = {
+            id: doc.id,
+            ...doc.data(),
+            patientType: 'old',
+            type: 'old',
+            isArchived: false
+          };
+        });
+        processAndUpdateUI();
+      }, err => console.error("❌ Primary 'old' লিসেনার ত্রুটি:", err));
+
+    // -------------------------------------------------------------
+    // ২. Archive Database – সব ডেটা লোড (কোনো date ফিল্টার নেই)
+    // -------------------------------------------------------------
+    const unsubArchiveNew = archiveDb.collectionGroup('new')
+      .onSnapshot(snapshot => {
+        console.log("📦 Archive New Docs Count:", snapshot.size);
+        snapshot.forEach(doc => {
+          allAppointmentsMap[`archive_new_${doc.id}`] = {
+            id: doc.id,
+            ...doc.data(),
+            patientType: 'new',
+            type: 'new',
+            isArchived: true
+          };
+        });
+        processAndUpdateUI();
+      }, err => console.error("❌ Archive 'new' লিসেনার ত্রুটি:", err));
+
+    const unsubArchiveOld = archiveDb.collectionGroup('old')
+      .onSnapshot(snapshot => {
+        console.log("📦 Archive Old Docs Count:", snapshot.size);
+        snapshot.forEach(doc => {
+          allAppointmentsMap[`archive_old_${doc.id}`] = {
+            id: doc.id,
+            ...doc.data(),
+            patientType: 'old',
+            type: 'old',
+            isArchived: true
+          };
+        });
+        processAndUpdateUI();
+      }, err => console.error("❌ Archive 'old' লিসেনার ত্রুটি:", err));
+
+    // লিসেনারগুলো সেভ করে রাখা
+    if (!this.realtimeListeners) this.realtimeListeners = [];
+    this.realtimeListeners.push(unsubPrimaryNew, unsubPrimaryOld, unsubArchiveNew, unsubArchiveOld);
+
+  } catch (error) {
+    console.error('❌ Error loading appointments:', error);
+    if (typeof showAlert === 'function') {
+      showAlert('অ্যাপয়েন্টমেন্ট লোড করতে সমস্যা হয়েছে', 'error');
+    }
+  }
+}
       
       populateTimeFilter() {
         const timeFilter = document.getElementById('timeFilterSerial');
@@ -1860,184 +2027,186 @@ async function loadMergedAppointments(onDataCallback) {
       }
       
       // ==================== CORRECTED LOAD APPOINTMENTS TABLE ====================
-      loadAppointmentsTable(searchTerm = '') {
-        const tableBody = document.getElementById('appointmentsTableBody');
-        if (!tableBody) return;
-        
-        const dateFilter = document.getElementById('dateFilter')?.value || '';
-        const typeFilter = document.querySelector('.type-filter-appointments')?.value || 'all';
-        const timeFilter = document.getElementById('timeFilterSerial')?.value || 'all';
-        
-        let html = '';
-        let foundAppointments = false;
-        
-        const filteredAppointments = this.appointments.filter(app => {
-          // Search term filter
-          if (searchTerm && !(
-            (app.name && app.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (app.phone && app.phone.includes(searchTerm)) ||
-            (app.serial && app.serial.toString().includes(searchTerm))
-          )) {
-            return false;
-          }
-          
-          // **CORRECTED DATE FILTER - প্রথমে appointmentDate চেক করুন**
-          if (dateFilter) {
-            if (app.appointmentDate) {
-              // সরাসরি YYYY-MM-DD ফরম্যাটে তুলনা
-              if (app.appointmentDate !== dateFilter) {
-                return false;
-              }
-            } else if (app.timestamp) {
-              // Firebase Timestamp কে JavaScript Date তে রূপান্তর
-              let appointmentDate;
-              if (app.timestamp && app.timestamp.seconds) {
-                appointmentDate = new Date(app.timestamp.seconds * 1000);
-              } else if (app.timestamp instanceof Date) {
-                appointmentDate = app.timestamp;
-              } else if (app.timestamp && app.timestamp.toDate) {
-                appointmentDate = app.timestamp.toDate();
-              } else {
-                return false;
-              }
-              
-              // তারিখ তুলনা করুন YYYY-MM-DD ফরম্যাটে
-              const appointmentDateStr = appointmentDate.toISOString().split('T')[0];
-              if (appointmentDateStr !== dateFilter) {
-                return false;
-              }
-            } else {
-              // কোনো তারিখ তথ্য নেই
-              return false;
-            }
-          }
-          
-          // Type filter
-          if (typeFilter !== 'all') {
-            const patientType = app.patientType || app.type;
-            if (patientType !== typeFilter) {
-              return false;
-            }
-          }
-          
-          // Time filter
-          if (timeFilter !== 'all' && app.time !== timeFilter) {
-            return false;
-          }
-          
-          return true;
-        });
-        
-        // সিরিয়াল নাম্বার অনুসারে সাজান
-        filteredAppointments.sort((a, b) => (a.serial || 0) - (b.serial || 0));
-        
-        // টেবিলের রো জেনারেট করুন
-        for (const app of filteredAppointments) {
-          foundAppointments = true;
-          
-          // তারিখ ডিসপ্লে - সংশোধিত
-          let dayText = 'N/A';
-          let formattedDate = 'N/A';
-          let appointmentDate = null;
-          
-          // প্রথমে appointmentDate ফিল্ড চেক করুন
-          if (app.appointmentDate) {
-            // YYYY-MM-DD থেকে JavaScript Date তৈরি করুন
-            const [year, month, day] = app.appointmentDate.split('-');
-            appointmentDate = new Date(year, month - 1, day);
-            
-            // দিনের নাম বের করুন
-            const dayNames = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
-            const dayIndex = appointmentDate.getDay();
-            dayText = dayNames[dayIndex];
-            
-            // ফরম্যাটেড তারিখ তৈরি করুন
-            formattedDate = appointmentDate.toLocaleDateString('bn-BD', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            });
-          }
-          // যদি appointmentDate না থাকে, timestamp ব্যবহার করুন
-          else if (app.timestamp) {
-            if (app.timestamp && app.timestamp.seconds) {
-              appointmentDate = new Date(app.timestamp.seconds * 1000);
-            } else if (app.timestamp instanceof Date) {
-              appointmentDate = app.timestamp;
-            } else if (app.timestamp && app.timestamp.toDate) {
-              appointmentDate = app.timestamp.toDate();
-            }
-            
-            if (appointmentDate) {
-              const dayNames = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
-              const dayIndex = appointmentDate.getDay();
-              dayText = dayNames[dayIndex];
-              
-              formattedDate = appointmentDate.toLocaleDateString('bn-BD', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-            }
-          }
-          
-          const typeText = (app.patientType || app.type) === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
-          
-          // বয়স ডিসপ্লে
-let ageDisplay = 'N/A';
+loadAppointmentsTable(searchTerm = '') {
+  const tableBody = document.getElementById('appointmentsTableBody');
+  if (!tableBody) return;
 
-if (app.ageYears !== undefined || app.ageMonths !== undefined || app.ageDays !== undefined) {
-    ageDisplay = formatAge(
-        Number(app.ageYears) || 0,
-        Number(app.ageMonths) || 0,
-        Number(app.ageDays) || 0
-    );
-} else if (app.ageString) {
-    ageDisplay = app.ageString;
-} else if (app.age && typeof app.age === 'string') {
-    ageDisplay = app.age;
-} else if (app.age && typeof app.age === 'number') {
-    ageDisplay = `${app.age} বছর`;
-}
+  // ১. নতুন HTML ID অনুযায়ী ইনপুটগুলোর মান নেওয়া
+  const dateFrom = document.getElementById('dateFrom')?.value || '';
+  const dateTo = document.getElementById('dateTo')?.value || '';
+  const typeFilter = document.querySelector('.type-filter-appointments')?.value || 'all';
+  const timeFilter = document.getElementById('timeFilterSerial')?.value || 'all';
 
-// বুকিং তারিখ বের করুন
-let bookingDate = 'N/A';
-if (app.timestamp) {
-    let bookingDateObj;
-    if (app.timestamp.seconds) {
+  // Get current week (যদি তারিখ নির্বাচন না করা থাকে)
+  const currentWeek = typeof getCurrentWeekDateRange === 'function' ? getCurrentWeekDateRange() : null;
+
+  // ২. ফিল্টারিং লজিক (Date Range, Search, Type, Time)
+  const filteredAppointments = this.appointments.filter(app => {
+    // Search term filter
+    if (searchTerm && !(
+      (app.name && app.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (app.phone && app.phone.includes(searchTerm)) ||
+      (app.serial && app.serial.toString().includes(searchTerm))
+    )) {
+      return false;
+    }
+
+    // --- Date Filtering Logic ---
+    let appDate = null;
+
+    if (app.appointmentDate) {
+      const parts = app.appointmentDate.split('-');
+      if (parts.length === 3) {
+        appDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      } else if (typeof parseDateString === 'function') {
+        appDate = parseDateString(app.appointmentDate);
+      }
+    } else if (app.timestamp) {
+      if (app.timestamp.seconds) {
+        appDate = new Date(app.timestamp.seconds * 1000);
+      } else if (app.timestamp instanceof Date) {
+        appDate = app.timestamp;
+      } else if (typeof app.timestamp.toDate === 'function') {
+        appDate = app.timestamp.toDate();
+      }
+    }
+
+    // যদি বৈধ তারিখ না পাওয়া যায়
+    if (!appDate || isNaN(appDate.getTime())) return false;
+
+    // সময় ০০:০০:০০ করে নেওয়া যেন শুধু তারিখের পার্থক্য ধরা হয়
+    appDate.setHours(0, 0, 0, 0);
+
+    // ইউজার তারিখ ফিল্টার সিলেক্ট করলে (Date Range)
+    if (dateFrom || dateTo) {
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        if (appDate < fromDate) return false;
+      }
+
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(0, 0, 0, 0);
+        if (appDate > toDate) return false;
+      }
+    } 
+    // যদি দুটি তারিখ ইনপুটই খালি থাকে, তবে বাই-ডিফল্ট চলতি সপ্তাহের ডাটা ফিল্টার হবে
+    else {
+      if (currentWeek && typeof currentWeek.isInCurrentWeek === 'function') {
+        if (!currentWeek.isInCurrentWeek(appDate)) {
+          return false;
+        }
+      }
+    }
+
+    // Type filter
+    if (typeFilter !== 'all') {
+      const patientType = app.patientType || app.type;
+      if (patientType !== typeFilter) {
+        return false;
+      }
+    }
+
+    // Time filter
+    if (timeFilter !== 'all' && app.time !== timeFilter) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // ৩. সিরিয়াল নাম্বার অনুসারে সাজানো
+  filteredAppointments.sort((a, b) => (a.serial || 0) - (b.serial || 0));
+
+  let html = '';
+  let foundAppointments = false;
+
+  // ৪. টেবিলের রো (Row) জেনারেট করা
+  for (const app of filteredAppointments) {
+    foundAppointments = true;
+
+    let dayText = 'N/A';
+    let formattedDate = 'N/A';
+    let appointmentDate = null;
+
+    if (app.appointmentDate) {
+      const [year, month, day] = app.appointmentDate.split('-');
+      appointmentDate = new Date(year, month - 1, day);
+    } else if (app.timestamp) {
+      if (app.timestamp.seconds) {
+        appointmentDate = new Date(app.timestamp.seconds * 1000);
+      } else if (app.timestamp instanceof Date) {
+        appointmentDate = app.timestamp;
+      } else if (typeof app.timestamp.toDate === 'function') {
+        appointmentDate = app.timestamp.toDate();
+      }
+    }
+
+    if (appointmentDate && !isNaN(appointmentDate.getTime())) {
+      const dayNames = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+      dayText = dayNames[appointmentDate.getDay()];
+
+      formattedDate = appointmentDate.toLocaleDateString('bn-BD', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+
+    const typeText = (app.patientType || app.type) === 'new' ? 'নতুন রোগী' : 'পুরাতন রোগী';
+
+    // বয়স ডিসপ্লে
+    let ageDisplay = 'N/A';
+    if (app.ageYears !== undefined || app.ageMonths !== undefined || app.ageDays !== undefined) {
+      if (typeof formatAge === 'function') {
+        ageDisplay = formatAge(
+          Number(app.ageYears) || 0,
+          Number(app.ageMonths) || 0,
+          Number(app.ageDays) || 0
+        );
+      }
+    } else if (app.ageString) {
+      ageDisplay = app.ageString;
+    } else if (app.age && typeof app.age === 'string') {
+      ageDisplay = app.age;
+    } else if (app.age && typeof app.age === 'number') {
+      ageDisplay = `${app.age} বছর`;
+    }
+
+    // বুকিং তারিখ বের করা
+    let bookingDate = 'N/A';
+    if (app.timestamp) {
+      let bookingDateObj;
+      if (app.timestamp.seconds) {
         bookingDateObj = new Date(app.timestamp.seconds * 1000);
-    } else if (app.timestamp instanceof Date) {
+      } else if (app.timestamp instanceof Date) {
         bookingDateObj = app.timestamp;
-    } else if (app.timestamp && app.timestamp.toDate) {
+      } else if (typeof app.timestamp.toDate === 'function') {
         bookingDateObj = app.timestamp.toDate();
-    }
-    
-    if (bookingDateObj) {
+      }
+
+      if (bookingDateObj && !isNaN(bookingDateObj.getTime())) {
         bookingDate = bookingDateObj.toLocaleDateString('bn-BD', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second:  '2-digit'
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
         });
+      }
+    } else if (app.bookingDate) {
+      bookingDate = app.bookingDate;
     }
-} else if (app.bookingDate) {
-    bookingDate = app.bookingDate;
-}
 
-const isSelected = selectedAppointments.has(app.id);
+    const isSelected = selectedAppointments.has(app.id);
 
-html += `
-    <tr data-id="${app.id}" data-attendance="${app.attendance || 'absent'}" data-date="${app.appointmentDate || ''}">
+    html += `
+      <tr data-id="${app.id}" data-attendance="${app.attendance || 'absent'}" data-date="${app.appointmentDate || ''}">
         <td>
-            <input type="checkbox" class="appointment-checkbox" value="${app.id}" 
-                   data-appointment-id="${app.id}"
-                   ${isSelected ? 'checked' : ''}>
+          <input type="checkbox" class="appointment-checkbox" value="${app.id}" 
+                 data-appointment-id="${app.id}"
+                 ${isSelected ? 'checked' : ''}>
         </td>
         <td>${app.serial || 'N/A'}</td>
         <td>${app.name || 'N/A'}</td>
@@ -2049,61 +2218,66 @@ html += `
         <td>${app.appointmentDateDisplay || formattedDate}</td>
         <td>${bookingDate}</td>
         <td>
-            <button class="action-btn edit-btn" onclick="appointmentsManager.editAppointment('${app.id}')">
-                এডিট
-            </button>
-            <button class="action-btn delete-btn" onclick="appointmentsManager.deleteAppointment('${app.id}')">
-                মুছুন
-            </button>
+          <button class="action-btn edit-btn" onclick="appointmentsManager.editAppointment('${app.id}')">
+            এডিট
+          </button>
+          <button class="action-btn delete-btn" onclick="appointmentsManager.deleteAppointment('${app.id}')">
+            মুছুন
+          </button>
         </td>
-    </tr>
-`;
-        }
-        
-        if (!foundAppointments) {
-          let message = 'কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি';
-          
-          if (dateFilter) {
-            const date = new Date(dateFilter);
-            const dateString = date.toLocaleDateString('bn-BD', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            });
-            message = `${dateString} তারিখে কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
-          } else if (searchTerm) {
-            message = `"${searchTerm}" অনুসারে কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
-          }
-          
-          html = `
-            <tr>
-              <td colspan="11" style="text-align: center; padding: 20px; color: #6b7280;">
-                ${message}
-              </td>
-            </tr>
-          `;
-        }
-        
-        tableBody.innerHTML = html;
-        
-        // চেকবক্সে ইভেন্ট লিসেনার যোগ করুন
-        document.querySelectorAll('.appointment-checkbox').forEach(checkbox => {
-          checkbox.addEventListener('change', (e) => {
-            const appointmentId = e.target.value;
-            const isChecked = e.target.checked;
-            
-            if (isChecked) {
-              selectedAppointments.add(appointmentId);
-            } else {
-              selectedAppointments.delete(appointmentId);
-              document.getElementById('selectAllAppointments').checked = false;
-              document.getElementById('selectAll').checked = false;
-            }
-            
-            updateBulkActions();
-          });
-        });
+      </tr>
+    `;
+  }
+
+  // ৫. ডাটা না থাকলে সঠিক মেসেজ তৈরি
+  if (!foundAppointments) {
+    let message = 'কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি';
+
+    if (dateFrom || dateTo) {
+      if (dateFrom && dateTo) {
+        message = `${dateFrom} থেকে ${dateTo} তারিখের মধ্যে কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
+      } else if (dateFrom) {
+        message = `${dateFrom} তারিখের পর কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
+      } else {
+        message = `${dateTo} তারিখ পর্যন্ত কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
       }
+    } else if (searchTerm) {
+      message = `"${searchTerm}" অনুসারে কোনো অ্যাপয়েন্টমেন্ট পাওয়া যায়নি`;
+    }
+
+    html = `
+      <tr>
+        <td colspan="11" style="text-align: center; padding: 20px; color: #6b7280;">
+          ${message}
+        </td>
+      </tr>
+    `;
+  }
+
+  tableBody.innerHTML = html;
+
+  // ৬. চেকবক্সে ইভেন্ট লিসেনার যোগ করা
+  document.querySelectorAll('.appointment-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', (e) => {
+      const appointmentId = e.target.value;
+      const isChecked = e.target.checked;
+
+      if (isChecked) {
+        selectedAppointments.add(appointmentId);
+      } else {
+        selectedAppointments.delete(appointmentId);
+        const selectAllApp = document.getElementById('selectAllAppointments');
+        const selectAll = document.getElementById('selectAll');
+        if (selectAllApp) selectAllApp.checked = false;
+        if (selectAll) selectAll.checked = false;
+      }
+
+      if (typeof updateBulkActions === 'function') {
+        updateBulkActions();
+      }
+    });
+  });
+}
       
       // ==================== CORRECTED CALCULATE SERIAL STATS ====================
       calculateSerialStats() {
@@ -2347,117 +2521,115 @@ html += `
         return pendingCount;
       }
       
-      // ==================== CORRECTED UPDATE STATS ====================
-      updateStats() {
-        const dateFilter = document.getElementById('dateFilter')?.value || '';
-        const typeFilter = document.querySelector('.type-filter-appointments')?.value || 'all';
-        const timeFilter = document.getElementById('timeFilterSerial')?.value || 'all';
-        const searchTerm = document.querySelector('.search-appointments')?.value || '';
-        
-        // Get current week
-        const currentWeek = getCurrentWeekDateRange();
-        
-        const filteredAppointments = this.appointments.filter(app => {
-          // Search term filter
-          if (searchTerm && !(
-            (app.name && app.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (app.phone && app.phone.includes(searchTerm)) ||
-            (app.serial && app.serial.toString().includes(searchTerm))
-          )) {
-            return false;
-          }
-          
-          // Date filter from UI
-          if (dateFilter) {
-            if (app.appointmentDate) {
-              if (app.appointmentDate !== dateFilter) return false;
-            }
-            else if (app.timestamp) {
-              let appointmentDate;
-              if (app.timestamp.seconds) {
-                appointmentDate = new Date(app.timestamp.seconds * 1000);
-              } else {
-                return false;
-              }
-              const appointmentDateStr = appointmentDate.toISOString().split('T')[0];
-              if (appointmentDateStr !== dateFilter) return false;
-            }
-            else {
-              return false;
-            }
-          }
-          // No date filter - show only current week
-          else {
-            if (app.appointmentDate) {
-              const appointmentDate = parseDateString(app.appointmentDate);
-              if (!appointmentDate || !currentWeek.isInCurrentWeek(appointmentDate)) {
-                return false;
-              }
-            }
-            else if (app.timestamp) {
-              let appointmentDate;
-              if (app.timestamp.seconds) {
-                appointmentDate = new Date(app.timestamp.seconds * 1000);
-              } else {
-                return false;
-              }
-              if (!currentWeek.isInCurrentWeek(appointmentDate)) {
-                return false;
-              }
-            }
-            else {
-              return false;
-            }
-          }
-          
-          // Type filter
-          if (typeFilter !== 'all') {
-            const patientType = app.patientType || app.type;
-            if (patientType !== typeFilter) return false;
-          }
-          
-          // Time filter
-          if (timeFilter !== 'all' && app.time !== timeFilter) return false;
-          
-          return true;
-        });
-        
-        // Calculate appointments by day
-        const thursdayApps = filteredAppointments.filter(app => {
-          if (app.appointmentDate) {
-            const [year, month, day] = app.appointmentDate.split('-');
-            const appointmentDate = new Date(year, month - 1, day);
-            return appointmentDate.getDay() === 4;
-          }
-          else if (app.timestamp && app.timestamp.seconds) {
-            const appointmentDate = new Date(app.timestamp.seconds * 1000);
-            return appointmentDate.getDay() === 4;
-          }
-          return false;
-        });
-        
-        const fridayApps = filteredAppointments.filter(app => {
-          if (app.appointmentDate) {
-            const [year, month, day] = app.appointmentDate.split('-');
-            const appointmentDate = new Date(year, month - 1, day);
-            return appointmentDate.getDay() === 5;
-          }
-          else if (app.timestamp && app.timestamp.seconds) {
-            const appointmentDate = new Date(app.timestamp.seconds * 1000);
-            return appointmentDate.getDay() === 5;
-          }
-          return false;
-        });
-        
-        const totalApps = filteredAppointments.length;
-        
-        document.getElementById('thursdayAppointments').textContent = thursdayApps.length;
-        document.getElementById('fridayAppointments').textContent = fridayApps.length;
-        document.getElementById('totalAppointments').textContent = totalApps;
-        
-        // Calculate serial stats
-        this.calculateSerialStats();
+// ==================== CORRECTED UPDATE STATS ====================
+updateStats() {
+  const dateFrom = document.getElementById('dateFrom')?.value || '';
+  const dateTo = document.getElementById('dateTo')?.value || '';
+  const typeFilter = document.querySelector('.type-filter-appointments')?.value || 'all';
+  const timeFilter = document.getElementById('timeFilterSerial')?.value || 'all';
+  const searchTerm = document.querySelector('.search-appointments')?.value || '';
+  
+  // Get current week (যদি কোনো কারণে তারিখ ক্লিয়ার করা থাকে)
+  const currentWeek = getCurrentWeekDateRange();
+  
+  const filteredAppointments = this.appointments.filter(app => {
+    // Search term filter
+    if (searchTerm && !(
+      (app.name && app.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (app.phone && app.phone.includes(searchTerm)) ||
+      (app.serial && app.serial.toString().includes(searchTerm))
+    )) {
+      return false;
+    }
+
+    // --- Date Filtering Logic (Range & Default Today) ---
+    let appDate = null;
+
+    if (app.appointmentDate) {
+      const parts = app.appointmentDate.split('-');
+      if (parts.length === 3) {
+        appDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      } else {
+        appDate = parseDateString(app.appointmentDate);
       }
+    } else if (app.timestamp && app.timestamp.seconds) {
+      appDate = new Date(app.timestamp.seconds * 1000);
+    }
+
+    if (!appDate || isNaN(appDate.getTime())) return false;
+
+    appDate.setHours(0, 0, 0, 0);
+
+    // ইউজার তারিখ থেকে/পর্যন্ত সিলেক্ট করলে বা বাই-ডিফল্ট আজকে ফিল্টার হবে
+    if (dateFrom || dateTo) {
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        if (appDate < fromDate) return false;
+      }
+
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(0, 0, 0, 0);
+        if (appDate > toDate) return false;
+      }
+    } else {
+      // যদি ইউজার দুটি ইনপুটই মুছে দেয়, তবে বাই-ডিফল্ট চলতি সপ্তাহের ডাটা দেখাবে
+      if (!currentWeek.isInCurrentWeek(appDate)) {
+        return false;
+      }
+    }
+    
+    // Type filter
+    if (typeFilter !== 'all') {
+      const patientType = app.patientType || app.type;
+      if (patientType !== typeFilter) return false;
+    }
+    
+    // Time filter
+    if (timeFilter !== 'all' && app.time !== timeFilter) return false;
+    
+    return true;
+  });
+  
+  // Calculate appointments by day
+  const thursdayApps = filteredAppointments.filter(app => {
+    let appointmentDate = null;
+    if (app.appointmentDate) {
+      const [year, month, day] = app.appointmentDate.split('-');
+      appointmentDate = new Date(year, month - 1, day);
+    } else if (app.timestamp && app.timestamp.seconds) {
+      appointmentDate = new Date(app.timestamp.seconds * 1000);
+    }
+    return appointmentDate ? appointmentDate.getDay() === 4 : false;
+  });
+  
+  const fridayApps = filteredAppointments.filter(app => {
+    let appointmentDate = null;
+    if (app.appointmentDate) {
+      const [year, month, day] = app.appointmentDate.split('-');
+      appointmentDate = new Date(year, month - 1, day);
+    } else if (app.timestamp && app.timestamp.seconds) {
+      appointmentDate = new Date(app.timestamp.seconds * 1000);
+    }
+    return appointmentDate ? appointmentDate.getDay() === 5 : false;
+  });
+  
+  const totalApps = filteredAppointments.length;
+  
+  if (document.getElementById('thursdayAppointments')) {
+    document.getElementById('thursdayAppointments').textContent = thursdayApps.length;
+  }
+  if (document.getElementById('fridayAppointments')) {
+    document.getElementById('fridayAppointments').textContent = fridayApps.length;
+  }
+  if (document.getElementById('totalAppointments')) {
+    document.getElementById('totalAppointments').textContent = totalApps;
+  }
+  
+  // Calculate serial stats
+  this.calculateSerialStats();
+}
       
       // ==================== CORRECTED EDIT APPOINTMENT ====================
       editAppointment(id) {
@@ -2608,136 +2780,147 @@ html += `
       
       // ==================== CORRECTED UPDATE APPOINTMENT ====================
       async updateAppointment(e) {
-        e.preventDefault();
-        
-        if (!db) return;
-        
-        const id = document.getElementById('editAppointmentId').value;
-        const newSerial = parseInt(document.getElementById('editSerial').value);
-        const day = document.getElementById('editDay').value;
-        const time = document.getElementById('editTime').value;
-        const type = document.getElementById('editType').value;
-        
-        const currentAppointment = this.appointments.find(app => app.id === id);
-        if (!currentAppointment) return;
-        
-        // Validation
-        if (!newSerial) {
-          Swal.fire({
-            title: 'সতর্কতা!',
-            text: 'অনুগ্রহ করে একটি সিরিয়াল নির্বাচন করুন',
-            icon: 'warning'
-          });
-          return;
-        }
-        
-        if (!day || !time || !type) {
-          Swal.fire({
-            title: 'সতর্কতা!',
-            text: 'অনুগ্রহ করে দিন, সময় এবং ধরন নির্বাচন করুন',
-            icon: 'warning'
-          });
-          return;
-        }
-        
-        // Get age data
-        const years = parseInt(document.getElementById('editAgeYears').value) || 0;
-        const months = parseInt(document.getElementById('editAgeMonths').value) || 0;
-        const days = parseInt(document.getElementById('editAgeDays').value) || 0;
-        
-        if (years === 0 && months === 0 && days === 0) {
-          Swal.fire({
-            title: 'সতর্কতা!',
-            text: 'অনুগ্রহ করে কমপক্ষে একটি বয়স ফিল্ড পূরণ করুন (বছর/মাস/দিন)',
-            icon: 'warning'
-          });
-          return;
-        }
-        
-        // Create age string
-        let ageString = '';
-        if (years > 0) ageString += `${years} বছর`;
-        if (months > 0) {
-          if (ageString) ageString += ', ';
-          ageString += `${months} মাস`;
-        }
-        if (days > 0) {
-          if (ageString) ageString += ', ';
-          ageString += `${days} দিন`;
-        }
-        
-        // Calculate appointment date
-        const nextDateInfo = getNextDateByDay(day);
-        const appointmentDate = nextDateInfo.dateString;
-        const appointmentDateDisplay = nextDateInfo.banglaDate;
-        
-        // Check if serial is available using grid system
-        if (editGridSystem) {
-          const range = editGridSystem.getSerialRange(day, type, time);
-          if (range) {
-            const [start, end] = range;
-            if (newSerial < start || newSerial > end) {
-              Swal.fire({
-                title: 'সতর্কতা!',
-                text: `সিরিয়ালটি রেঞ্জের বাইরে (${start}-${end})`,
-                icon: 'warning'
-              });
-              return;
-            }
-          }
-        }
-        
-        const updatedData = {
-          name: document.getElementById('editName').value,
-          age: ageString,
-          ageYears: years,
-          ageMonths: months,
-          ageDays: days,
-          phone: document.getElementById('editPhone').value,
-          day: day,
-          time: time,
-          patientType: type,
-          serial: newSerial,
-          appointmentDate: appointmentDate, // Add appointment date
-          appointmentDateDisplay: appointmentDateDisplay, // Add display date
-          updatedAt: new Date()
-        };
+  e.preventDefault();
 
-        try {
-          document.getElementById('submitEditBtn').innerHTML = '<div class="loading"></div>';
-          document.getElementById('submitEditBtn').disabled = true;
-          
-          await db.collection('appointments').doc(id).update(updatedData);
-          
-          this.currentEditSelection = null;
-          
-          document.getElementById('editAppointmentModal').style.display = 'none';
-          
-          // Cleanup grid system
-          if (editGridSystem) {
-            editGridSystem.cleanup();
-            editGridSystem = null;
-          }
-          
-          Swal.fire({
-            title: 'সফল!',
-            text: 'অ্যাপয়েন্টমেন্ট আপডেট করা হয়েছে',
-            icon: 'success',
-            timer: 2000,
-            showConfirmButton: false
-          });
-        } catch (error) {
-          console.error('❌ Error updating appointment:', error);
-          Swal.fire({
-            title: 'সমস্যা!',
-            text: 'অ্যাপয়েন্টমেন্ট আপডেট করতে সমস্যা হয়েছে',
-            icon: 'error'
-          });
-        } finally {
-          document.getElementById('submitEditBtn').innerHTML = 'আপডেট করুন';
-          document.getElementById('submitEditBtn').disabled = false;
-        }
+  if (!db) return;
+
+  const id = document.getElementById('editAppointmentId').value;
+  const newSerial = parseInt(document.getElementById('editSerial').value);
+  const day = document.getElementById('editDay').value;
+  const time = document.getElementById('editTime').value;
+  const type = document.getElementById('editType').value;
+
+  // ১. ভ্যালিডেশন
+  if (!newSerial) {
+    Swal.fire({
+      title: 'সতর্কতা!',
+      text: 'অনুগ্রহ করে একটি সিরিয়াল নির্বাচন করুন',
+      icon: 'warning'
+    });
+    return;
+  }
+
+  if (!day || !time || !type) {
+    Swal.fire({
+      title: 'সতর্কতা!',
+      text: 'অনুগ্রহ করে দিন, সময় এবং ধরন নির্বাচন করুন',
+      icon: 'warning'
+    });
+    return;
+  }
+
+  // ২. বয়সের তথ্য প্রসেস করা
+  const years = parseInt(document.getElementById('editAgeYears').value) || 0;
+  const months = parseInt(document.getElementById('editAgeMonths').value) || 0;
+  const days = parseInt(document.getElementById('editAgeDays').value) || 0;
+
+  if (years === 0 && months === 0 && days === 0) {
+    Swal.fire({
+      title: 'সতর্কতা!',
+      text: 'অনুগ্রহ করে কমপক্ষে একটি বয়স ফিল্ড পূরণ করুন (বছর/মাস/দিন)',
+      icon: 'warning'
+    });
+    return;
+  }
+
+  let ageString = '';
+  if (years > 0) ageString += `${years} বছর`;
+  if (months > 0) {
+    if (ageString) ageString += ', ';
+    ageString += `${months} মাস`;
+  }
+  if (days > 0) {
+    if (ageString) ageString += ', ';
+    ageString += `${days} দিন`;
+  }
+
+  // ৩. তারিখ ও yymmdd ফরম্যাট তৈরি
+  const nextDateInfo = getNextDateByDay(day);
+  const appointmentDate = nextDateInfo.dateString; // উদাহরণ: "2026-08-07"
+  const appointmentDateDisplay = nextDateInfo.banglaDate;
+
+  // YYYY-MM-DD থেকে YYMMDD তৈরি (যেমন: "260807")
+  const yymmdd = new Date(appointmentDate).toISOString().split('T')[0].replace(/-/g, '').slice(2);
+  const patientTypeSubcollection = type === 'new' ? 'new' : 'old';
+
+  // ৪. গ্রিড সিস্টেম সিরিয়াল রেঞ্জ চেক
+  if (typeof editGridSystem !== 'undefined' && editGridSystem) {
+    const range = editGridSystem.getSerialRange(day, type, time);
+    if (range) {
+      const [start, end] = range;
+      if (newSerial < start || newSerial > end) {
+        Swal.fire({
+          title: 'সতর্কতা!',
+          text: `সিরিয়ালটি রেঞ্জের বাইরে (${start}-${end})`,
+          icon: 'warning'
+        });
+        return;
       }
+    }
+  }
+
+  // ৫. আপডেটের জন্য অবজেক্ট তৈরি
+  const updatedData = {
+    name: document.getElementById('editName').value,
+    age: ageString,
+    ageYears: years,
+    ageMonths: months,
+    ageDays: days,
+    phone: document.getElementById('editPhone').value,
+    day: day,
+    time: time,
+    patientType: type,
+    serial: newSerial,
+    appointmentDate: appointmentDate,
+    appointmentDateDisplay: appointmentDateDisplay,
+    updatedAt: new Date()
+  };
+
+  try {
+    const submitBtn = document.getElementById('submitEditBtn');
+    submitBtn.innerHTML = '<div class="loading"></div>';
+    submitBtn.disabled = true;
+
+    // ৬. সঠিক নেস্টেড পাথে পয়েন্ট করা: appointments/260807/new/260807-01
+    const docRef = db
+      .collection('appointments')
+      .doc(yymmdd)
+      .collection(patientTypeSubcollection)
+      .doc(id);
+
+    // merge: true সহ সেভ করা
+    await docRef.set(updatedData, { merge: true });
+
+    this.currentEditSelection = null;
+    document.getElementById('editAppointmentModal').style.display = 'none';
+
+    if (typeof editGridSystem !== 'undefined' && editGridSystem) {
+      editGridSystem.cleanup();
+      editGridSystem = null;
+    }
+
+    Swal.fire({
+      title: 'সফল!',
+      text: 'অ্যাপয়েন্টমেন্ট আপডেট করা হয়েছে',
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false
+    });
+  } catch (error) {
+    console.error('❌ Error updating appointment:', error);
+    Swal.fire({
+      title: 'সমস্যা!',
+      text: 'অ্যাপয়েন্টমেন্ট আপডেট করতে সমস্যা হয়েছে',
+      icon: 'error'
+    });
+  } finally {
+    const submitBtn = document.getElementById('submitEditBtn');
+    if (submitBtn) {
+      submitBtn.innerHTML = 'আপডেট করুন';
+      submitBtn.disabled = false;
+    }
+  }
+}
       
       async checkEditSerialAvailability(currentId, newSerial, day, time, type) {
         const otherBookings = this.appointments.filter(app => 
@@ -2752,96 +2935,107 @@ html += `
       }
       
       async deleteAppointment(appointmentId) {
-        const appointment = this.appointments.find(app => app.id === appointmentId);
-        if (!appointment) return;
-        
-        const result = await showConfirmation(
-          'নিশ্চিত করুন',
-          `আপনি কি "${appointment.name}" এর অ্যাপয়েন্টমেন্টটি মুছতে চান?\n\nসিরিয়াল: ${appointment.serial}\nদিন: ${appointment.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার'}\nসময়: ${appointment.time}\n\nএই একশনটি রিভার্স করা যাবে না!`,
-          'হ্যাঁ, মুছুন',
-          'না, বাতিল করুন'
-        );
-        
-        if (!result.isConfirmed) {
-          return;
-        }
-        
-        try {
-          await this.db.collection('appointments').doc(appointmentId).delete();
-          
-          if (selectedAppointments.has(appointmentId)) {
-            selectedAppointments.delete(appointmentId);
-            updateBulkActions();
-          }
-          
-          Swal.fire({
-            title: 'সফল!',
-            text: 'অ্যাপয়েন্টমেন্ট মুছে ফেলা হয়েছে',
-            icon: 'success',
-            timer: 2000,
-            showConfirmButton: false
-          });
-        } catch (error) {
-          console.error('Error deleting appointment:', error);
-          Swal.fire({
-            title: 'সমস্যা!',
-            text: 'অ্যাপয়েন্টমেন্ট মুছতে সমস্যা হয়েছে',
-            icon: 'error'
-          });
-        }
-      }
-      
-      // ==================== CORRECTED SETUP EVENT LISTENERS ====================
-      setupEventListeners() {
-        // তারিখ ফিল্টার ইভেন্ট
-        document.getElementById('dateFilter')?.addEventListener('change', (e) => {
-          const dateValue = e.target.value;
-          
-          if (dateValue) {
-            // তারিখ সিলেক্ট করলে সপ্তাহের ইনফো হাইড করুন
-            const weekInfo = document.getElementById('currentWeekInfo');
-            if (weekInfo) {
-              weekInfo.style.display = 'none';
-            }
-            
-            // ফিল্টার করা তারিখের ইনফো দেখান
-            showFilteredDateInfo(dateValue);
-          } else {
-            // তারিখ ফিল্টার ক্লিয়ার করলে সপ্তাহের ইনফো দেখান
-            const weekInfo = document.getElementById('currentWeekInfo');
-            if (weekInfo) {
-              weekInfo.style.display = 'block';
-            }
-          }
-          
-          const searchTerm = document.querySelector('.search-appointments').value || '';
-          this.loadAppointmentsTable(searchTerm);
+  const appointment = this.appointments.find(app => app.id === appointmentId);
+  if (!appointment) return;
+  
+  const result = await showConfirmation(
+    'নিশ্চিত করুন',
+    `আপনি কি "${appointment.name}" এর অ্যাপয়েন্টমেন্টটি মুছতে চান?\n\nসিরিয়াল: ${appointment.serial}\nদিন: ${appointment.day === 'Thursday' ? 'বৃহস্পতিবার' : 'শুক্রবার'}\nসময়: ${appointment.time}\n\nএই একশনটি রিভার্স করা যাবে না!`,
+    'হ্যাঁ, মুছুন',
+    'না, বাতিল করুন'
+  );
+  
+  if (!result.isConfirmed) {
+    return;
+  }
+  
+  try {
+    // ১. অ্যাপয়েন্টমেন্টের তারিখ (appointmentDate) থেকে YYMMDD বের করা
+    const dateSource = appointment.appointmentDate || appointment.date;
+    const yymmdd = appointment.yymmdd || new Date(dateSource).toISOString().split('T')[0].replace(/-/g, '').slice(2);
+    
+    // ২. সাব-কালেকশন নাম নির্ধারণ করা (new অথবা old)
+    const patientTypeSubcollection = (appointment.patientType === 'new' || appointment.patientType === 'new_patients') ? 'new' : 'old';
+    
+    // ৩. সঠিক নেস্টেড পাথে ডিলিট কল করা (appointments/260807/new/260807-01)
+    await this.db
+      .collection('appointments')
+      .doc(yymmdd)
+      .collection(patientTypeSubcollection)
+      .doc(appointmentId)
+      .delete();
+    
+    if (selectedAppointments.has(appointmentId)) {
+      selectedAppointments.delete(appointmentId);
+      updateBulkActions();
+    }
+    
+    Swal.fire({
+      title: 'সফল!',
+      text: 'অ্যাপয়েন্টমেন্ট মুছে ফেলা হয়েছে',
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false
+    });
+  } catch (error) {
+    console.error('Error deleting appointment:', error);
+    Swal.fire({
+      title: 'সমস্যা!',
+      text: 'অ্যাপয়েন্টমেন্ট মুছতে সমস্যা হয়েছে',
+      icon: 'error'
+    });
+  }
+}
+
+  // ==================== CORRECTED SETUP EVENT LISTENERS ====================
+  setupEventListeners() {
+    // টেবিল এবং স্ট্যাটস আপডেট করার হেলপার ফাংশন
+    const triggerReload = () => {
+      const searchTerm = document.querySelector('.search-appointments')?.value || '';
+      this.loadAppointmentsTable(searchTerm);
+      this.updateStats();
+    };
+
+const handleDateChange = () => {
+  const dateFromVal = document.getElementById('dateFrom')?.value; // তারিখ পাবে: "YYYY-MM-DD"
+  const typeVal = document.querySelector('.type-filter-appointments')?.value || 'all';
+
+  if (dateFromVal) {
+    // তারিখ থেকে বারের নাম বের করা (যেমন: Saturday / Sunday)
+    // 'en-US' সময় এলাকার ঝামেলার জন্য 'T00:00:00' যোগ করা নিরাপদ
+    const dateObj = new Date(dateFromVal + 'T00:00:00'); 
+    const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' }); // e.g. "Saturday"
+
+    // নির্দিষ্ট দিন এবং টাইপ পাঠানো হচ্ছে
+    this.updateTimeFilterOptions(dayName, typeVal);
+  } else {
+    // তারিখ ক্লিয়ার করলে সময় রিসেট হবে
+    this.updateTimeFilterOptions('all', typeVal);
+  }
+
+  triggerReload();
+};
+
+    document.getElementById('dateFrom')?.addEventListener('change', handleDateChange);
+    document.getElementById('dateTo')?.addEventListener('change', handleDateChange);
+
+    // Type filter event
+    document.querySelector('.type-filter-appointments')?.addEventListener('change', triggerReload);
+
+    // Time filter event
+    document.getElementById('timeFilterSerial')?.addEventListener('change', triggerReload);
+
+    // Search input event
+    const searchInput = document.querySelector('.search-appointments');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(this.searchTimer);
+        this.searchTimer = setTimeout(() => {
+          this.loadAppointmentsTable(e.target.value);
           this.updateStats();
-        });
-        
-        document.querySelector('.type-filter-appointments')?.addEventListener('change', (e) => {
-          const searchTerm = document.querySelector('.search-appointments').value || '';
-          this.loadAppointmentsTable(searchTerm);
-          this.updateStats();
-        });
-        
-        document.getElementById('timeFilterSerial')?.addEventListener('change', () => {
-          const searchTerm = document.querySelector('.search-appointments').value || '';
-          this.loadAppointmentsTable(searchTerm);
-          this.updateStats();
-        });
-        
-        // Search input event
-        const searchInput = document.querySelector('.search-appointments');
-        if (searchInput) {
-          searchInput.addEventListener('input', (e) => {
-            clearTimeout(this.searchTimer);
-            this.searchTimer = setTimeout(() => {
-              this.loadAppointmentsTable(e.target.value);
-              this.updateStats();
-            }, 300);
-          });
-        }
+        }, 300);
+      });
+    }
         
         // Add appointment button
         document.getElementById('addAppointmentBtn')?.addEventListener('click', () => {
@@ -2987,43 +3181,60 @@ html += `
           }
         });
       }
+
       
-      updateTimeFilterOptions(day, type) {
-        const timeFilter = document.getElementById('timeFilterSerial');
-        timeFilter.innerHTML = '<option value="all">সকল সময়</option>';
-        
-        if (day === 'all' || type === 'all') {
-          const allTimes = new Set();
-          
-          for (const d in serialRanges) {
-            if (day !== 'all' && d !== day) continue;
-            
-            for (const t in serialRanges[d]) {
-              if (type !== 'all' && t !== type) continue;
-              
-              for (const time in serialRanges[d][t]) {
-                allTimes.add(time);
-              }
-            }
-          }
-          
-          const sortedTimes = sortTimes(Array.from(allTimes));
-          sortedTimes.forEach(time => {
-            const option = document.createElement('option');
-            option.value = time;
-            option.textContent = time;
-            timeFilter.appendChild(option);
-          });
-        } else {
-          const times = this.getFilteredTimes(day, type);
-          times.forEach(time => {
-            const option = document.createElement('option');
-            option.value = time;
-            option.textContent = time;
-            timeFilter.appendChild(option);
-          });
+updateTimeFilterOptions(day, type) {
+  const timeFilter = document.getElementById('timeFilterSerial');
+  if (!timeFilter) return;
+  
+  // ১. ড্রপডাউন রিসেট করা
+  timeFilter.innerHTML = '<option value="all">সকল সময়</option>';
+  
+  // যদি দিন সিলেক্ট করা না থাকে বা 'all' হয়, তবে শুধু 'সকল সময়' থাকবে
+  if (!day || day === 'all') {
+    return; 
+  }
+
+  const availableTimes = new Set();
+  const targetDay = day.toLowerCase().trim(); // সব ছোট হাতের অক্ষরে রূপান্তর
+
+  // ২. serialRanges অবজেক্ট চেক করা (case-insensitive উপায়ে)
+  if (typeof serialRanges !== 'undefined' && serialRanges) {
+    // serialRanges-এর সব Key ছোট হাতের করে মেলানো
+    const matchingKey = Object.keys(serialRanges).find(
+      key => key.toLowerCase().trim() === targetDay
+    );
+
+    if (matchingKey && serialRanges[matchingKey]) {
+      const dayData = serialRanges[matchingKey];
+
+      for (const t in dayData) {
+        // যদি টাইপ 'all' না হয় এবং মিল না থাকে, তবে স্কিপ
+        if (type && type !== 'all' && t.toLowerCase() !== type.toLowerCase()) {
+          continue;
+        }
+
+        for (const time in dayData[t]) {
+          availableTimes.add(time);
         }
       }
+    }
+  }
+
+  // ৩. সর্ট করে ড্রপডাউনে বসানো
+  const timesArray = Array.from(availableTimes);
+  
+  if (timesArray.length > 0) {
+    const sortedTimes = (typeof sortTimes === 'function') ? sortTimes(timesArray) : timesArray;
+    
+    sortedTimes.forEach(time => {
+      const option = document.createElement('option');
+      option.value = time;
+      option.textContent = time;
+      timeFilter.appendChild(option);
+    });
+  }
+}
       
       exportData(format) {
         const dateFilter = document.getElementById('dateFilter')?.value || '';
@@ -3535,42 +3746,62 @@ html += `
       }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-      if (!checkAuthentication()) {
+   document.addEventListener('DOMContentLoaded', function() {
+      // ১. সিকিউরিটি চেক
+      if (typeof checkAuthentication === 'function' && !checkAuthentication()) {
         return;
       }
-      
-      if (initializeFirebase()) {
+
+      // ২. লোকাল টাইম অনুযায়ী আজকে (Today)-এর তারিখ বের করা (YYYY-MM-DD)
+      // toISOString() ব্যবহার করলে মাঝরাতে টাইমজোনের কারণে আগের দিনের তারিখ দেখাতো, যা সমাধান করা হয়েছে।
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
+
+      // ৩. DOM Elements সিলেক্ট করা
+      const dateFromEl = document.getElementById('dateFrom');
+      const dateToEl = document.getElementById('dateTo');
+
+      // বাই-ডিফল্ট আজকে ফিল্টার সেট করা
+      if (dateFromEl) dateFromEl.value = todayStr;
+      if (dateToEl) dateToEl.value = todayStr;
+
+      // ৪. ফায়ারবেস এবং অ্যাপয়েন্টমেন্ট ম্যানেজার ইনিশিয়ালাইজেশন
+      if (typeof initializeFirebase === 'function' && initializeFirebase()) {
         setTimeout(() => {
-          appointmentsManager = new AppointmentsManagement();
-          console.log('✅ Appointments Management initialized');
-          
-          // বর্তমান সপ্তাহের তথ্য দেখান
-          setTimeout(() => {
-            displayCurrentWeekInfo();
-          }, 500);
-          
-          // setTimeout(() => {
-          //   Swal.fire({
-          //     title: 'স্বাগতম!',
-          //     text: 'অ্যাপয়েন্টমেন্ট ম্যানেজমেন্ট সিস্টেমে স্বাগতম',
-          //     icon: 'success',
-          //     timer: 2000,
-          //     showConfirmButton: false
-          //   });
-          // }, 1000);
+          if (typeof AppointmentsManagement === 'function') {
+            appointmentsManager = new AppointmentsManagement();
+            console.log('✅ Appointments Management initialized');
+          }
+
+          // UI Info কন্ট্রোল: যেহেতু ইনপুটে আজকের তারিখ দেওয়া আছে, তাই Filter Info দেখাবে
+          const weekInfo = document.getElementById('currentWeekInfo');
+          if (dateFromEl?.value || dateToEl?.value) {
+            if (weekInfo) weekInfo.style.display = 'none';
+            if (typeof showFilteredDateInfo === 'function') {
+              showFilteredDateInfo(todayStr, todayStr);
+            }
+          } else {
+            if (weekInfo) weekInfo.style.display = 'block';
+            if (typeof displayCurrentWeekInfo === 'function') {
+              displayCurrentWeekInfo();
+            }
+          }
         }, 100);
       }
     });
 
+    // ৫. মেমোরি লিক ও আনসাবস্ক্রাইব হ্যান্ডলিং (Page Unload)
     window.addEventListener('beforeunload', function() {
-      if (appointmentsManager) {
+      if (typeof appointmentsManager !== 'undefined' && appointmentsManager && typeof appointmentsManager.destroy === 'function') {
         appointmentsManager.destroy();
       }
-      
-      if (realtimeListeners.length > 0) {
+
+      if (typeof realtimeListeners !== 'undefined' && Array.isArray(realtimeListeners)) {
         realtimeListeners.forEach(unsubscribe => {
-          if (unsubscribe && typeof unsubscribe === 'function') {
+          if (typeof unsubscribe === 'function') {
             unsubscribe();
           }
         });
