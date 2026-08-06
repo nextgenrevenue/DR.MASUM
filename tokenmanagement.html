@@ -960,6 +960,26 @@ async function loadTokenData() {
     }).join('');
   }
 
+function getFormattedAge(y, m, d) {
+  let years = parseInt(y) || 0;
+  let months = parseInt(m) || 0;
+  let days = parseInt(d) || 0;
+
+  // ৩০ দিনে ১ মাস এবং ১২ মাসে ১ বছর হিসেবে রূপান্তর
+  months += Math.floor(days / 30);
+  days = days % 30;
+
+  years += Math.floor(months / 12);
+  months = months % 12;
+
+  let parts = [];
+  if (years > 0) parts.push(`${toBengaliNumber(years)} বছর`);
+  if (months > 0) parts.push(`${toBengaliNumber(months)} মাস`);
+  if (days > 0) parts.push(`${toBengaliNumber(days)} দিন`);
+
+  return parts.length > 0 ? parts.join(' ') : '—';
+}
+
   // ==================== টোকেন দিন (শুধু paymentHistories এ সেভ) ====================
   async function openTokenGiveForAllModal() {
     const modalHtml = `
@@ -979,10 +999,15 @@ async function loadTokenData() {
            onblur="this.value = this.value.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')">
   </span>
 </div>
-            <div class="token-detail-row">
-              <span class="token-detail-label">বয়স:</span>
-              <span class="token-detail-value"><input type="text" id="newTokenAge" placeholder="বয়স" style="width:100%;"></span>
-            </div>
+<div class="token-detail-row">
+  <span class="token-detail-label">বয়স:</span>
+  <span class="token-detail-value" style="display: flex; justify-content: flex-end; gap: 7px;">
+    <input type="number" id="newTokenAgeYears" placeholder="বছর" min="0" style="width: 22%; text-align: center;">
+    <input type="number" id="newTokenAgeMonths" placeholder="মাস" min="0" style="width: 21%; text-align: center;">
+    <input type="number" id="newTokenAgeDays" placeholder="দিন" min="0" style="width: 21%; text-align: center;">
+  </span>
+</div>
+
             <div class="token-detail-row">
               <span class="token-detail-label">ফোন:</span>
               <span class="token-detail-value"><input type="text" id="newTokenPhone" placeholder="ফোন নম্বর" style="width:100%;"></span>
@@ -1050,12 +1075,24 @@ async function loadTokenData() {
   }
 
 async function saveAndPrintNewToken() {
-  const name = document.getElementById('newTokenName')?.value;
+  const name = document.getElementById('newTokenName')?.value.trim();
   if (!name) {
     showAlert('রোগীর নাম লিখুন', 'error');
     return;
   }
-  
+
+  // বয়স ভ্যালিডেশন
+  const years = document.getElementById('newTokenAgeYears')?.value.trim();
+  const months = document.getElementById('newTokenAgeMonths')?.value.trim();
+  const days = document.getElementById('newTokenAgeDays')?.value.trim();
+
+  if (!years && !months && !days) {
+    showAlert('রোগীর বয়স (বছর, মাস বা দিন) লিখুন', 'error');
+    document.getElementById('newTokenAgeYears')?.focus();
+    return;
+  }
+
+  const age = getFormattedAge(years, months, days);
   const saveBtn = document.querySelector('#tokenGiveBlankModal .btn-save');
   const originalText = saveBtn?.innerHTML;
   if (saveBtn) {
@@ -1076,7 +1113,10 @@ async function saveAndPrintNewToken() {
     const fee = (feeInput && feeInput > 0) ? feeInput : (patientType === 'new' ? 800 : 600);
     const paidInput = parseInt(document.getElementById('newTokenPaid').value);
     const paid = (!isNaN(paidInput) && paidInput >= 0) ? paidInput : (patientType === 'new' ? 800 : 600);
-    const age = document.getElementById('newTokenAge').value;
+    const ageYears = document.getElementById('newTokenAgeYears')?.value;
+    const ageMonths = document.getElementById('newTokenAgeMonths')?.value;
+    const ageDays = document.getElementById('newTokenAgeDays')?.value;
+    const age = getFormattedAge(ageYears, ageMonths, ageDays);
     const phone = document.getElementById('newTokenPhone').value;
     const givenBy = document.getElementById('newTokenGivenBy')?.value || '';
     const due = fee - paid;
@@ -1757,27 +1797,33 @@ return; // পিসির কাজ শেষ, মোবাইল কোড চ
   `;
   document.body.appendChild(container);
 
-  // ২. html2canvas দিয়ে ছবি তৈরি করা
-  const canvas = await html2canvas(container, { scale: 3 });
-  const imgData = canvas.toDataURL('image/png');
+const canvas = await html2canvas(container, { 
+  scale: 3,
+  useCORS: true,
+  logging: false
+});
 
-  // ৩. jsPDF দিয়ে PDF তৈরি করা
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: [53.34, 76.2] });
-  doc.addImage(imgData, 'PNG', 0, 0, 53.34, 76.2);
-  
-  // ৪. ফাইল হিসেবে সেভ বা শেয়ার করা
-  const pdfBlob = doc.output('blob');
-  const file = new File([pdfBlob], `${tokenNumber}.pdf`, { type: 'application/pdf' });
+const imgData = canvas.toDataURL('image/jpeg', 0.75);
 
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    await navigator.share({ files: [file] });
-  } else {
-    doc.save(`${tokenNumber}.pdf`);
-  }
+const { jsPDF } = window.jspdf;
+const doc = new jsPDF({ 
+  unit: 'mm', 
+  format: [53.34, 76.2],
+  compress: true 
+});
 
-  // পরিষ্কার করা
-  document.body.removeChild(container);
+doc.addImage(imgData, 'JPEG', 0, 0, 53.34, 76.2, undefined, 'FAST');
+
+const pdfBlob = doc.output('blob');
+const file = new File([pdfBlob], `${tokenNumber}.pdf`, { type: 'application/pdf' });
+
+if (navigator.canShare && navigator.canShare({ files: [file] })) {
+  await navigator.share({ files: [file] });
+} else {
+  doc.save(`${tokenNumber}.pdf`);
+}
+
+document.body.removeChild(container);
 }
 
   function closeTokenModal() {
@@ -2432,7 +2478,7 @@ async function generateTokenPrint() {
 
     setTimeout(async () => {
       const canvas = await html2canvas(container, { 
-        scale: 3, // স্কেল ১ রেখেছি যাতে ২৭২px এর বিন্দুমাত্র নড়চড় না হয়
+        scale: 3, 
         useCORS: true,
         allowTaint: true,
         logging: false,
