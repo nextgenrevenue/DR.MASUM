@@ -1,37 +1,32 @@
-const CACHE_NAME = 'drmasum-pwa-v1';
+const CACHE_NAME = 'drmasum-cache-v3';
 
-// যেসব ফাইল অফলাইনে চালানোর জন্য সেভ রাখতে হবে
+// যেসব লোকাল ফাইল ক্যাশে সেভ রাখতে হবে
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/dashboard.html',
   '/pwa.js',
-  '/manifest.json',
-  // এক্সটার্নাল সিডিএন ফাইলসমূহ
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js',
-  'https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js'
+  '/manifest.json'
 ];
 
-// ১. সার্ভিস ওয়ার্কার ইন্সটল ও ফাইল ক্যাশ করা
+// ১. সার্ভিস ওয়ার্কার ইনস্টল ও ক্যাশিং
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('✅ [Service Worker] Caching App Shell & Assets');
+      console.log('✅ [Service Worker] App Shell Cached');
       return cache.addAll(ASSETS_TO_CACHE);
     }).then(() => self.skipWaiting())
   );
 });
 
-// ২. পুরোনো ক্যাশ ক্লিয়ার করা
+// ২. পুরোনো ক্যাশ মুছে ফেলা
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('🧹 [Service Worker] Removing old cache', key);
+            console.log('🧹 [Service Worker] Deleting old cache:', key);
             return caches.delete(key);
           }
         })
@@ -40,30 +35,42 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// ৩. নেটওয়ার্ক রিকোয়েস্ট হ্যান্ডেল করা (অফলাইনে ক্যাশ থেকে ফাইল দেওয়া)
+// ৩. ফেচ ইন্টারসেপ্ট ও অফলাইন ফলব্যাক হ্যান্ডলার
 self.addEventListener('fetch', (event) => {
-  // শুধুমাত্র GET রিকোয়েস্ট ও আমাদের ওয়েবসাইটের রিকোয়েস্ট ক্যাশ করা হবে
-  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+
+  // ফায়ারবেস API বা অন্য থার্ড-পার্টি ব্যাকএন্ড সার্ভিস ওয়ার্কার ইন্টারসেপ্ট করবে না
+  if (
+    event.request.method !== 'GET' ||
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('google.com')
+  ) {
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // অফলাইনে থাকলে ক্যাশ থেকে ফাইল দেখাবে
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
-          }
-        }).catch(() => {/* অফলাইন থাকলে নেটওয়ার্ক এরর ইগনোর করবে */});
-
         return cachedResponse;
       }
 
-      // ক্যাশে না থাকলে নেটওয়ার্ক থেকে আনবে
-      return fetch(event.request).catch(() => {
-        // নেভিগেশন এরর হলে অফলাইনে ড্যাশবোর্ড বা ইনডেক্স দেখাবে
+      // ক্যাশে না থাকলে নেটওয়ার্ক থেকে ডাটা আনার চেষ্টা করবে
+      return fetch(event.request).catch(async () => {
+        // অফলাইনে পেজ নেভিগেশন/রিফ্রেশ দিলে ক্যাশ থেকে ড্যাশবোর্ড ফেরত দেবে
         if (event.request.mode === 'navigate') {
-          return caches.match('/dashboard.html') || caches.match('/index.html');
+          const dashboardPage = await caches.match('/dashboard.html');
+          if (dashboardPage) return dashboardPage;
+
+          const indexPage = await caches.match('/index.html');
+          if (indexPage) return indexPage;
         }
+
+        // ক্যাশে ফাইল না থাকলে ব্রাউজার ক্র্যাশ না করিয়ে ভ্যালিড অফলাইন এরর রেসপন্স দেবে
+        return new Response('Resource offline unavailable', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: new Headers({ 'Content-Type': 'text/plain' })
+        });
       });
     })
   );
