@@ -1614,35 +1614,48 @@ const firebaseConfig = {
     };
 
     let db;
-    let analytics;
-    let allAppointmentsSnapshot = null;
-    let serialRanges = {};
-    let appointments = [];
-    let pendingSelections = {};
-    let adminSessionId = 'admin_' + Date.now();
-    let currentFilters = {
-      day: 'all',
-      type: 'all',
-      time: 'all',
-      callStatus: 'all',
-      tokenStatus: 'all',
-      search: ''
-    };
-    
-    let gridSystem = null;
-    let currentTokenId = null;      
-    let currentTokenDoc = null;     
-    let cleanupListeners = null; 
-    
-    try {
-      const app = firebase.initializeApp(firebaseConfig);
-      db = firebase.firestore(app);
-      analytics = firebase.analytics();
-      console.log("✅ Firebase initialized");
-    } catch (e) {
-      console.error("❌ Firebase initialization error:", e);
-    }
+let analytics;
+let allAppointmentsSnapshot = null;
+let serialRanges = {};
+let appointments = [];
+let pendingSelections = {};
+let adminSessionId = 'admin_' + Date.now();
+let currentFilters = {
+  day: 'all',
+  type: 'all',
+  time: 'all',
+  callStatus: 'all',
+  tokenStatus: 'all',
+  search: ''
+};
 
+let gridSystem = null;
+let currentTokenId = null;      
+let currentTokenDoc = null;     
+let cleanupListeners = null; 
+
+try {
+  const app = firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore(app);
+  analytics = firebase.analytics();
+
+  // 🔹 Firestore Offline Persistence চালুর অংশ
+  db.enablePersistence({ synchronizeTabs: true })
+    .then(() => {
+      console.log("✅ Firestore offline persistence enabled!");
+    })
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.warn("⚠️ একাধিক ট্যাবে অ্যাপ খোলা আছে। পারসিস্টেন্স প্রথম ট্যাবে কার্যকর থাকবে।");
+      } else if (err.code === 'unimplemented') {
+        console.warn("⚠️ বর্তমান ব্রাউজারটি পারসিস্টেন্স সাপোর্ট করে না।");
+      }
+    });
+
+  console.log("✅ Firebase initialized");
+} catch (e) {
+  console.error("❌ Firebase initialization error:", e);
+}
     // =======================================================
     // ২. DOM উপাদান
     // =======================================================
@@ -1713,6 +1726,13 @@ const firebaseConfig = {
       const bengaliMap = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
       return numStr.replace(/\d/g, digit => bengaliMap[digit]);
     };
+
+    const toEnglishNumber = (num) => {
+  if (num === null || num === undefined || num === '—') return '';
+  const numStr = String(num);
+  const englishMap = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
+  return numStr.replace(/[০-৯]/g, digit => englishMap[digit]);
+};
 
     const formatTimestamp = (timestamp) => {
       if (!timestamp || !timestamp.toDate) return '—';
@@ -2060,6 +2080,10 @@ function updateDashboardCards(snapshot) {
   let tokenNotGiven = 0;
   let newPatientLastCallSerial = 0;
   let oldPatientLastCallSerial = 0;
+
+  // সার্চ কুয়েরিকে ইংরেজি সংখ্যায় রূপান্তর (যেমন: '০১৭' -> '017')
+  const rawSearch = currentFilters.search || '';
+  const englishSearch = toEnglishNumber(rawSearch);
   
   const weekDateRange = getWeekDateRange();
   snapshot.forEach(doc => {
@@ -2088,10 +2112,16 @@ function updateDashboardCards(snapshot) {
     const tokenStatusMatch = currentFilters.tokenStatus === 'all' || 
       (currentFilters.tokenStatus === 'given' && data.tokenGiven === true) ||
       (currentFilters.tokenStatus === 'not_given' && data.tokenGiven !== true);
-    const searchMatch = !currentFilters.search || 
-      (data.name && data.name.toLowerCase().includes(currentFilters.search)) ||
-      (data.phone && data.phone.includes(currentFilters.search)) ||
-      (data.serial && data.serial.toString().includes(currentFilters.search));
+
+    // 🔹 বাংলা ও ইংরেজি উভয় সংখ্যা সাপোর্টের জন্য সার্চ লজিক আপডেট
+    const dataPhone = toEnglishNumber(data.phone || '');
+    const dataSerial = toEnglishNumber(data.serial || '');
+    const dataName = (data.name || '').toLowerCase();
+
+    const searchMatch = !rawSearch || 
+      dataName.includes(rawSearch) ||
+      dataPhone.includes(englishSearch) ||
+      dataSerial.includes(englishSearch);
     
     if (dayMatch && typeMatch && timeMatch && callStatusMatch && tokenStatusMatch && searchMatch) {
       total++;
@@ -2318,24 +2348,17 @@ function updateTimeOptions() {
   const selectedDay = currentFilters.day;
   const selectedType = currentFilters.type;
   const timesWithBookings = new Set();
-  
-  console.log("🕒 updateTimeOptions called - Day:", selectedDay, "Type:", selectedType);
 
+  // ১. ডেটা না থাকলে উভয় ড্রপডাউন রিসেট করুন
   if (!allAppointmentsSnapshot) {
-    console.log("⏳ No appointments data yet");
-    
-    if (elements.timeFilter) {
-      elements.timeFilter.innerHTML = '<option value="all">সকল সময়</option>';
-    }
-
-    if (elements.timeFilterMobile) {
-      elements.timeFilterMobile.innerHTML = '<option value="all">সকল সময়</option>';
-    }
+    const defaultOption = '<option value="all">সকল সময়</option>';
+    [elements.timeFilter, elements.timeFilterMobile].forEach(el => {
+      if (el) el.innerHTML = defaultOption;
+    });
     return;
   }
-  
-  const weekRange = getWeekDateRange();
-  
+
+  // ২. লুপের মাধ্যমে বুকিংয়ের সময় সংগ্রহ (লুপের ভেতর থেকে console.log সরিয়ে দেওয়া হয়েছে)
   allAppointmentsSnapshot.forEach(doc => {
     const data = doc.data();
 
@@ -2345,60 +2368,50 @@ function updateTimeOptions() {
     } else if (data.timestamp && data.timestamp.toDate) {
       appointmentDate = data.timestamp.toDate();
     }
-    
+
     if (appointmentDate && isDateInCurrentWeek(appointmentDate)) {
       const dayMatch = selectedDay === 'all' || data.day === selectedDay;
       const typeMatch = selectedType === 'all' || (data.patientType || data.type) === selectedType;
 
       if (dayMatch && typeMatch && data.time) {
         timesWithBookings.add(data.time);
-        console.log(`✅ বুকিং আছে: ${data.time} (${data.day}, ${data.patientType || data.type})`);
       }
     }
   });
-  
+
   const sortedTimes = sortTimes(Array.from(timesWithBookings));
-  console.log("🎯 সময় ফিল্টারে দেখানো হবে (যেখানে বুকিং আছে):", sortedTimes);
-  
   const currentTime = currentFilters.time;
 
-  if (elements.timeFilter) {
-    elements.timeFilter.innerHTML = '<option value="all">সকল সময়</option>';
-    
+  // 🔹 ৩. DRY Pattern: অপশন যোগ করার জন্য রিইউজেবল ফাংশন (DocumentFragment সহ)
+  const populateFilter = (element) => {
+    if (!element) return;
+
+    // DocumentFragment ব্যবহার করায় DOM Rendering অনেক দ্রুত হয়
+    const fragment = document.createDocumentFragment();
+
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = 'all';
+    defaultOpt.textContent = 'সকল সময়';
+    fragment.appendChild(defaultOpt);
+
     sortedTimes.forEach(time => {
       const option = document.createElement('option');
       option.value = time;
       option.textContent = time;
       if (time === currentTime) option.selected = true;
-      elements.timeFilter.appendChild(option);
-    });
-    
-    if (sortedTimes.length === 0) {
-      elements.timeFilter.disabled = true;
-    } else {
-      elements.timeFilter.disabled = false;
-    }
-  }
-
-  if (elements.timeFilterMobile) {
-    elements.timeFilterMobile.innerHTML = '<option value="all">সকল সময়</option>';
-    
-    sortedTimes.forEach(time => {
-      const option = document.createElement('option');
-      option.value = time;
-      option.textContent = time;
-      if (time === currentTime) option.selected = true;
-      elements.timeFilterMobile.appendChild(option);
+      fragment.appendChild(option);
     });
 
-    if (sortedTimes.length === 0) {
-      elements.timeFilterMobile.disabled = true;
-    } else {
-      elements.timeFilterMobile.disabled = false;
-    }
-  }
-  
-  console.log(`✅ টাইম ফিল্টার আপডেট: ${sortedTimes.length} টি সময় (যেখানে বুকিং আছে)`);
+    element.innerHTML = '';
+    element.appendChild(fragment);
+    element.disabled = sortedTimes.length === 0;
+  };
+
+  // ৪. ডেস্কটপ ও মোবাইল উভয় ফিল্টারে অ্যাপ্লাই করুন
+  populateFilter(elements.timeFilter);
+  populateFilter(elements.timeFilterMobile);
+
+  console.log(`✅ টাইম ফিল্টার আপডেট সম্পন্ন: ${sortedTimes.length} টি সময় পাওয়া গেছে`);
 }
 // =======================================================
 // ৭. অ্যাপয়েন্টমেন্ট রেন্ডার - UPDATED FOR SUBCOLLECTIONS
@@ -2411,6 +2424,10 @@ function renderAppointments() {
   elements.appointmentsTable.style.display = 'table';
 
   const dateRange = getWeekDateRange();
+  
+  // 🔹 লুপের বাইরে সার্চ ইনপুটকে ইংরেজি সংখ্যায় কনভার্ট করে রাখা (পারফরম্যান্স বুস্টের জন্য)
+  const rawSearch = currentFilters.search || '';
+  const englishSearch = toEnglishNumber(rawSearch);
   
   let filteredDocs = [];
   let filteredCount = 0;
@@ -2462,14 +2479,15 @@ function renderAppointments() {
       }
     }
     
-    if (isMatch && currentFilters.search) {
+    // 🔹 বাংলা ও ইংরেজি উভয় ডিজিটের জন্য সার্চ লজিক
+    if (isMatch && rawSearch) {
       const name = (data.name || '').toLowerCase();
-      const phone = String(data.phone || '');
-      const serial = String(data.serial || '');
+      const phone = toEnglishNumber(data.phone || '');
+      const serial = toEnglishNumber(data.serial || '');
       
-      if (!name.includes(currentFilters.search) && 
-          !phone.includes(currentFilters.search) && 
-          !serial.includes(currentFilters.search)) {
+      if (!name.includes(rawSearch) && 
+          !phone.includes(englishSearch) && 
+          !serial.includes(englishSearch)) {
         isMatch = false;
       }
     }
@@ -2691,7 +2709,7 @@ async function showTokenDetailsModal(button) {
           try {
             const date = new Date(p.timestamp);
             const dateStr = date.toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
-            const timeStr = date.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+            const timeStr = date.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', second:"2-digit" });
             dateText = `${dateStr} এ ${timeStr}`;
           } catch(e) {
             dateText = p.timestamp;
@@ -2744,7 +2762,7 @@ async function showTokenDetailsModal(button) {
             </div>
             <div style="margin-bottom: 10px;">
               <label style="font-size: 13px; font-weight: 600;">বয়স</label>
-              <input type="text" id="tokenAge" value="${finalData.patientAge || finalData.age || ''}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+              <input type="text" id="tokenAge" value="${toBengaliNumber(finalData.patientAge || finalData.age || '')}" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
             </div>
             <div style="margin-bottom: 10px;">
               <label style="font-size: 13px; font-weight: 600;">রোগীর ধরন</label>
@@ -3853,126 +3871,127 @@ function resetQuickSerialForm() {
     // =======================================================
     // ১০. ফিল্টার লিসেনার সেটআপ (ডেস্কটপ এবং মোবাইল উভয়ের জন্য)
     // =======================================================
-    function setupFilterListeners() {
-      const handleSearch = (value) => {
-        currentFilters.search = value.toLowerCase().trim();
-        renderAppointments();
-        updateDashboardCards(allAppointmentsSnapshot);
-      };
-      let searchTimeout;
+   function setupFilterListeners() {
+  const handleSearch = (value) => {
+    // 🔹 বাংলা বা ইংরেজি যাই ইউজার ইনপুট দিক, সার্চ ফিল্টারে ট্রিম করা ভ্যালু জমা হবে
+    currentFilters.search = value.toLowerCase().trim();
+    renderAppointments();
+    updateDashboardCards(allAppointmentsSnapshot);
+  };
+  let searchTimeout;
 
-elements.dayFilter.addEventListener('change', (e) => {
-  const value = e.target.value;
-  currentFilters.day = value;
-  if (elements.dayFilterMobile) elements.dayFilterMobile.value = value;
-  updateTimeOptions();  
-  renderAppointments();
-  updateDashboardCards(allAppointmentsSnapshot);
-  updateSerialStats();
-});
+  elements.dayFilter.addEventListener('change', (e) => {
+    const value = e.target.value;
+    currentFilters.day = value;
+    if (elements.dayFilterMobile) elements.dayFilterMobile.value = value;
+    updateTimeOptions();  
+    renderAppointments();
+    updateDashboardCards(allAppointmentsSnapshot);
+    updateSerialStats();
+  });
 
-elements.typeFilter.addEventListener('change', (e) => {
-  const value = e.target.value;
-  currentFilters.type = value;
-  if (elements.typeFilterMobile) elements.typeFilterMobile.value = value;
-  updateTimeOptions();
-  renderAppointments();
-  updateDashboardCards(allAppointmentsSnapshot);
-});
-      
-      elements.timeFilter.addEventListener('change', (e) => {
-        const value = e.target.value;
-        currentFilters.time = value;
-        if (elements.timeFilterMobile) elements.timeFilterMobile.value = value;
-        renderAppointments();
-        updateDashboardCards(allAppointmentsSnapshot);
-      });
-      
-      elements.callStatusFilter.addEventListener('change', (e) => {
-        const value = e.target.value;
-        currentFilters.callStatus = value;
-        if (elements.callStatusFilterMobile) elements.callStatusFilterMobile.value = value;
-        renderAppointments();
-        updateDashboardCards(allAppointmentsSnapshot);
-      });
-      
-      elements.tokenStatusFilter.addEventListener('change', (e) => {
-        const value = e.target.value;
-        currentFilters.tokenStatus = value;
-        if (elements.tokenStatusFilterMobile) elements.tokenStatusFilterMobile.value = value;
-        renderAppointments();
-        updateDashboardCards(allAppointmentsSnapshot);
-      });
-      
-      elements.searchInput.addEventListener('input', (e) => {
-        const value = e.target.value;
-        if (elements.searchInputMobile) elements.searchInputMobile.value = value;
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => handleSearch(value), 300);
-      });
-      
-      if (elements.dayFilterMobile) {
-        elements.dayFilterMobile.addEventListener('change', (e) => {
-          const value = e.target.value;
-          currentFilters.day = value;
-          elements.dayFilter.value = value;
-          updateTimeOptions();
-          renderAppointments();
-          updateDashboardCards(allAppointmentsSnapshot);
-          updateSerialStats();
-        });
-      }
-      
-      if (elements.typeFilterMobile) {
-        elements.typeFilterMobile.addEventListener('change', (e) => {
-          const value = e.target.value;
-          currentFilters.type = value;
-          elements.typeFilter.value = value;
-          updateTimeOptions();
-          renderAppointments();
-          updateDashboardCards(allAppointmentsSnapshot);
-        });
-      }
-      
-      if (elements.timeFilterMobile) {
-        elements.timeFilterMobile.addEventListener('change', (e) => {
-          const value = e.target.value;
-          currentFilters.time = value;
-          elements.timeFilter.value = value;
-          renderAppointments();
-          updateDashboardCards(allAppointmentsSnapshot);
-        });
-      }
-      
-      if (elements.callStatusFilterMobile) {
-        elements.callStatusFilterMobile.addEventListener('change', (e) => {
-          const value = e.target.value;
-          currentFilters.callStatus = value;
-          elements.callStatusFilter.value = value;
-          renderAppointments();
-          updateDashboardCards(allAppointmentsSnapshot);
-        });
-      }
-      
-      if (elements.tokenStatusFilterMobile) {
-        elements.tokenStatusFilterMobile.addEventListener('change', (e) => {
-          const value = e.target.value;
-          currentFilters.tokenStatus = value;
-          elements.tokenStatusFilter.value = value;
-          renderAppointments();
-          updateDashboardCards(allAppointmentsSnapshot);
-        });
-      }
-      
-      if (elements.searchInputMobile) {
-        elements.searchInputMobile.addEventListener('input', (e) => {
-          const value = e.target.value;
-          elements.searchInput.value = value;
-          clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(() => handleSearch(value), 300);
-        });
-      }
-    }
+  elements.typeFilter.addEventListener('change', (e) => {
+    const value = e.target.value;
+    currentFilters.type = value;
+    if (elements.typeFilterMobile) elements.typeFilterMobile.value = value;
+    updateTimeOptions();
+    renderAppointments();
+    updateDashboardCards(allAppointmentsSnapshot);
+  });
+        
+  elements.timeFilter.addEventListener('change', (e) => {
+    const value = e.target.value;
+    currentFilters.time = value;
+    if (elements.timeFilterMobile) elements.timeFilterMobile.value = value;
+    renderAppointments();
+    updateDashboardCards(allAppointmentsSnapshot);
+  });
+        
+  elements.callStatusFilter.addEventListener('change', (e) => {
+    const value = e.target.value;
+    currentFilters.callStatus = value;
+    if (elements.callStatusFilterMobile) elements.callStatusFilterMobile.value = value;
+    renderAppointments();
+    updateDashboardCards(allAppointmentsSnapshot);
+  });
+        
+  elements.tokenStatusFilter.addEventListener('change', (e) => {
+    const value = e.target.value;
+    currentFilters.tokenStatus = value;
+    if (elements.tokenStatusFilterMobile) elements.tokenStatusFilterMobile.value = value;
+    renderAppointments();
+    updateDashboardCards(allAppointmentsSnapshot);
+  });
+        
+  elements.searchInput.addEventListener('input', (e) => {
+    const value = e.target.value;
+    if (elements.searchInputMobile) elements.searchInputMobile.value = value;
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => handleSearch(value), 300);
+  });
+        
+  if (elements.dayFilterMobile) {
+    elements.dayFilterMobile.addEventListener('change', (e) => {
+      const value = e.target.value;
+      currentFilters.day = value;
+      elements.dayFilter.value = value;
+      updateTimeOptions();
+      renderAppointments();
+      updateDashboardCards(allAppointmentsSnapshot);
+      updateSerialStats();
+    });
+  }
+        
+  if (elements.typeFilterMobile) {
+    elements.typeFilterMobile.addEventListener('change', (e) => {
+      const value = e.target.value;
+      currentFilters.type = value;
+      elements.typeFilter.value = value;
+      updateTimeOptions();
+      renderAppointments();
+      updateDashboardCards(allAppointmentsSnapshot);
+    });
+  }
+        
+  if (elements.timeFilterMobile) {
+    elements.timeFilterMobile.addEventListener('change', (e) => {
+      const value = e.target.value;
+      currentFilters.time = value;
+      elements.timeFilter.value = value;
+      renderAppointments();
+      updateDashboardCards(allAppointmentsSnapshot);
+    });
+  }
+        
+  if (elements.callStatusFilterMobile) {
+    elements.callStatusFilterMobile.addEventListener('change', (e) => {
+      const value = e.target.value;
+      currentFilters.callStatus = value;
+      elements.callStatusFilter.value = value;
+      renderAppointments();
+      updateDashboardCards(allAppointmentsSnapshot);
+    });
+  }
+        
+  if (elements.tokenStatusFilterMobile) {
+    elements.tokenStatusFilterMobile.addEventListener('change', (e) => {
+      const value = e.target.value;
+      currentFilters.tokenStatus = value;
+      elements.tokenStatusFilter.value = value;
+      renderAppointments();
+      updateDashboardCards(allAppointmentsSnapshot);
+    });
+  }
+        
+  if (elements.searchInputMobile) {
+    elements.searchInputMobile.addEventListener('input', (e) => {
+      const value = e.target.value;
+      elements.searchInput.value = value;
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => handleSearch(value), 300);
+    });
+  }
+}
 
 // =======================================================
 // ৯. রিয়েল-টাইম ডেটা লিসেনার (UPDATED FOR SUBCOLLECTIONS)

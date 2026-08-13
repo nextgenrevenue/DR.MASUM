@@ -1210,27 +1210,37 @@
   let firebaseReady = false;
 
 function initializeFirebase() {
-    try {
-      if (typeof firebase === 'undefined') {
-        console.warn('Firebase SDK এখনো লোড হয়নি।');
-        return false;
-      }
-      
-      if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-      }
-      
-      db = firebase.firestore();
-      analytics = firebase.analytics();
-      
-      firebaseReady = true; // এখানে ভেরিয়েবলটি আপডেট করুন
-      console.log("✅ Firebase initialized successfully");
-      return true;
-    } catch (error) {
-      console.error("❌ Firebase initialization error:", error);
+  try {
+    if (typeof firebase === 'undefined') {
+      console.warn('Firebase SDK এখনো লোড হয়নি।');
       return false;
     }
+    
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    
+    db = firebase.firestore();
+
+    // 🟢 অফলাইন ডাটা সেভ রাখার জন্য পারসিস্টেন্স অন করুন
+    db.enablePersistence({ synchronizeTabs: true })
+      .catch((err) => {
+        if (err.code === 'failed-precondition') {
+          console.warn('মাল্টিপল ট্যাবে অফলাইন পারসিস্টেন্স একসাথে সম্ভব নয়');
+        } else if (err.code === 'unimplemented') {
+          console.warn('এই ব্রাউজারে অফলাইন সাপোর্ট নেই');
+        }
+      });
+
+    analytics = firebase.analytics();
+    firebaseReady = true;
+    console.log("✅ Firebase & Offline Persistence initialized successfully");
+    return true;
+  } catch (error) {
+    console.error("❌ Firebase initialization error:", error);
+    return false;
   }
+}
   // পেজ লোড হওয়ার সাথে সাথে ফাংশনটি কল করুন
   window.addEventListener('DOMContentLoaded', () => {
     initializeFirebase();
