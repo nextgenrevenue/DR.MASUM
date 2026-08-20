@@ -451,10 +451,29 @@ const firebaseConfig = {
   appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
 };
 
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  const db = firebase.firestore();
+
+  // 🔹 Firestore Offline Persistence চালুর অংশ
+  db.enablePersistence({ synchronizeTabs: true })
+    .then(() => {
+      console.log("✅ Firestore offline persistence enabled!");
+    })
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.warn("⚠️ একাধিক ট্যাবে অ্যাপ খোলা আছে। পারসিস্টেন্স প্রথম ট্যাবে কার্যকর থাকবে।");
+      } else if (err.code === 'unimplemented') {
+        console.warn("⚠️ বর্তমান ব্রাউজারটি পারসিস্টেন্স সাপোর্ট করে না।");
+      }
+    });
+
+  console.log("✅ Firebase initialized");
+} catch (e) {
+  console.error("❌ Firebase initialization error:", e);
 }
-const db = firebase.firestore();
 
 // ============================================================
 // SMS Gateway (CORS-Free - automas.com.bd)

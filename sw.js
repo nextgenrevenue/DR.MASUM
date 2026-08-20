@@ -1,10 +1,13 @@
-const CACHE_NAME = 'drmasum-cache-v3';
+const CACHE_NAME = 'drmasum-cache-v4';
 
 // যেসব লোকাল ফাইল ক্যাশে সেভ রাখতে হবে
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  '/login.html',
   '/dashboard.html',
+  '/tokenmanagement.html',
+  '/allserial.html',
   '/pwa.js',
   '/manifest.json'
 ];
