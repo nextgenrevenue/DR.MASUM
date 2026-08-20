@@ -2576,11 +2576,11 @@ function getFilteredTokensSync() {
   document.getElementById('patientTypeFilter').addEventListener('change', () => { syncMobileFilters(); loadTokenData(); });
   document.getElementById('searchInput').addEventListener('input', () => { syncMobileFilters(); loadTokenData(); });
   
-const today = new Date();
-const dateStr = today.toISOString().split('T')[0];
-document.getElementById('dateFrom').value = dateStr;
-document.getElementById('dateTo').value = dateStr;
+const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+if (document.getElementById('dateFrom')) document.getElementById('dateFrom').value = todayStr;
+if (document.getElementById('dateTo')) document.getElementById('dateTo').value = todayStr;
 syncMobileFilters();
+
 setTimeout(() => loadTokenData(), 500);
 
   document.addEventListener('DOMContentLoaded', function() {
