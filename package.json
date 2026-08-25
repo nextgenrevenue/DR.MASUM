@@ -1,6 +1,7 @@
 {
   "name": "DrMasum",
   "dependencies": {
+    "@netlify/functions": "^2.0.0",
     "firebase-admin": "^11.8.0"
   }
 }
