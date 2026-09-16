@@ -802,7 +802,7 @@
     <!-- ===== COMPONENTS-INLINE.JS ===== -->
     <script src="components-inline.js"></script>
 
-    <!-- ============================================================ -->
+<!-- ============================================================ -->
     <!-- ===== REPORTS CUSTOM JS ===== -->
     <script>
         (function() {
@@ -848,7 +848,8 @@
                 return true;
             }
 
-            // ==================== FIREBASE CONFIG ====================
+            // ==================== FIREBASE CONFIGURATION & INITIALIZATION ====================
+            // ১ম ডেটাবেজ (বর্তমান রানিং সপ্তাহের জন্য - আপনার মূল জিমেইলের প্রজেক্ট)
             const firebaseConfig = {
                 apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
                 authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
@@ -858,15 +859,47 @@
                 appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
             };
 
-            // ==================== INIT FIREBASE & ANALYTICS ====================
-            let db, analytics;
+            // ২য় ডেটাবেজ (আর্কাইভ পুরনো ডেটার জন্য - অন্য জিমেইলের প্রজেক্ট যা আপনি দিয়েছেন)
+            const archiveFirebaseConfig = {
+                apiKey: "AIzaSyCigxjHdYfYNDizaSKDGUPCaBs39Ff-awM",
+                authDomain: "asraful-704b9.firebaseapp.com",
+                projectId: "asraful-704b9",
+                storageBucket: "asraful-704b9.firebasestorage.app",
+                messagingSenderId: "418467079550",
+                appId: "1:418467079550:web:9454a5851d477e3ad4bf2f"
+            };
+
+            // Global variables
+            let db;         // ১ম ডেটাবেজ রেফারেন্স
+            let archiveDb;  // ২য় ডেটাবেজ রেফারেন্স
+            let analytics;
 
             function initFirebase() {
                 try {
-                    if (!firebase.apps.length) {
-                        firebase.initializeApp(firebaseConfig);
-                    }
-                    db = firebase.firestore();
+                    // Firebase Apps Initialize করা
+                    const primaryApp = !firebase.apps.length ? firebase.initializeApp(firebaseConfig) : firebase.app();
+                    
+                    // ২য় প্রজেক্ট আলাদা ইনস্ট্যান্সের জন্য 'archiveApp' নাম ব্যবহার করা হয়েছে
+                    const archiveApp = !firebase.apps.some(app => app.name === 'archiveApp') 
+                        ? firebase.initializeApp(archiveFirebaseConfig, "archiveApp") 
+                        : firebase.app('archiveApp');
+
+                    // Firestore Instances অ্যাসাইন করা
+                    db = primaryApp.firestore();
+                    archiveDb = archiveApp.firestore();
+
+                    // 🔹 Firestore Offline Persistence চালু করা (db তৈরি হওয়ার পর)
+                    db.enablePersistence({ synchronizeTabs: true })
+                        .then(() => {
+                            console.log("✅ Firestore offline persistence enabled!");
+                        })
+                        .catch((err) => {
+                            if (err.code === 'failed-precondition') {
+                                console.warn("⚠️ একাধিক ট্যাবে অ্যাপ খোলা আছে। পারসিস্টেন্স প্রথম ট্যাবে কার্যকর থাকবে।");
+                            } else if (err.code === 'unimplemented') {
+                                console.warn("⚠️ বর্তমান ব্রাউজারটি পারসিস্টেন্স সাপোর্ট করে না।");
+                            }
+                        });
 
                     if (firebase.analytics) {
                         analytics = firebase.analytics();
@@ -874,26 +907,41 @@
                     }
 
                     window.db = db;
-                    console.log('✅ Firebase Single Database & Analytics connected');
+                    window.archiveDb = archiveDb;
+                    console.log('✅ Firebase Dual Databases & Analytics connected successfully!');
                 } catch (e) {
-                    console.error('❌ Firebase init error:', e);
+                    console.error('❌ Firebase initialization error:', e);
                 }
             }
 
-            // ==================== LOAD APPOINTMENTS FROM NEW PATH ====================
+            // ==================== LOAD APPOINTMENTS FROM BOTH DATABASES ====================
             async function loadAppointmentsFromNewPath() {
                 try {
-                    // সাব-কালেকশন 'new' এবং 'old' থেকে collectionGroup Query এর মাধ্যমে ডাটা লোড
-                    const [newSnap, oldSnap] = await Promise.all([
+                    // ১ম ডেটাবেজের সাব-কালেকশন 'new' এবং 'old' থেকে ডাটা লোড
+                    const [primaryNewSnap, primaryOldSnap] = await Promise.all([
                         db.collectionGroup('new').get(),
                         db.collectionGroup('old').get()
                     ]);
 
-                    const newData = newSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    const oldData = oldSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    const primaryNew = primaryNewSnap.docs.map(doc => ({ id: doc.id, source: 'primary', ...doc.data() }));
+                    const primaryOld = primaryOldSnap.docs.map(doc => ({ id: doc.id, source: 'primary', ...doc.data() }));
 
-                    const all = [...newData, ...oldData];
-                    console.log(`📊 Loaded: New (${newData.length}) + Old (${oldData.length}) = Total ${all.length}`);
+                    // ২য় ডেটাবেজ (আর্কাইভ) থেকে ডাটা লোড (যদি আর্কাইভ প্রজেক্টে 'new'/'old' বা 'archived_appointments' থাকে)
+                    let archiveData = [];
+                    try {
+                        const [archiveNewSnap, archiveOldSnap] = await Promise.all([
+                            archiveDb.collectionGroup('new').get(),
+                            archiveDb.collectionGroup('old').get()
+                        ]);
+                        const archNew = archiveNewSnap.docs.map(doc => ({ id: doc.id, source: 'archive', ...doc.data() }));
+                        const archOld = archiveOldSnap.docs.map(doc => ({ id: doc.id, source: 'archive', ...doc.data() }));
+                        archiveData = [...archNew, ...archOld];
+                    } catch (archErr) {
+                        console.warn('⚠️ Archive database query warning:', archErr);
+                    }
+
+                    const all = [...primaryNew, ...primaryOld, ...archiveData];
+                    console.log(`📊 Loaded: Primary New (${primaryNew.length}) + Primary Old (${primaryOld.length}) + Archive (${archiveData.length}) = Total ${all.length}`);
 
                     if (analytics) {
                         analytics.logEvent('report_data_loaded', { count: all.length });
@@ -901,7 +949,7 @@
 
                     return all;
                 } catch (error) {
-                    console.error('❌ Load error from new path:', error);
+                    console.error('❌ Load error from databases:', error);
                     return [];
                 }
             }
@@ -949,17 +997,14 @@
             // ==================== HELPERS ====================
             function getAge(appt) {
                 if (!appt) return null;
-                // ageYears যদি অবজেক্টে থাকে সরাসরি ব্যবহার
                 if (appt.ageYears !== undefined && appt.ageYears !== null && !isNaN(appt.ageYears)) {
                     return Number(appt.ageYears);
                 }
-                // স্ট্রিং বা অন্যান্য ফিল্ড ফরম্যাট চেক
                 const val = appt.age;
                 if (val === undefined || val === null || val === '') return null;
                 const num = Number(val);
                 if (!isNaN(num) && num >= 0 && num <= 120) return num;
                 
-                // যদি স্ট্রিং আকারে থাকে (যেমন: "25 বছর")
                 const parsed = parseInt(val);
                 if (!isNaN(parsed) && parsed >= 0 && parsed <= 120) return parsed;
 
@@ -1329,16 +1374,16 @@
                 if (!checkAuthentication()) return;
                 initFirebase();
 
-                if (db) {
+                if (db && archiveDb) {
                     loadAllData();
                 } else {
                     setTimeout(() => {
-                        if (db) {
+                        if (db && archiveDb) {
                             loadAllData();
                         } else {
                             console.warn('Firebase not ready, retrying...');
                             setTimeout(() => {
-                                if (db) {
+                                if (db && archiveDb) {
                                     loadAllData();
                                 } else {
                                     loadingOverlay.innerHTML = `

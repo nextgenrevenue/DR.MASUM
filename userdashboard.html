@@ -203,8 +203,9 @@
 
 <script>
 // ============================================================
-// 1. FIREBASE CONFIG & ANALYTICS INIT
+// 1. FIREBASE CONFIGURATION & INITIALIZATION (Dual DB + Persistence)
 // ============================================================
+
 const firebaseConfig = {
   apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
   authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
@@ -214,31 +215,59 @@ const firebaseConfig = {
   appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
 };
 
-let db, analytics;
-try {
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-  db = firebase.firestore();
-  
-  if (firebase.analytics) {
-    analytics = firebase.analytics();
-    window.analytics = analytics;
-  }
-  
-  window.db = db;
-  console.log('✅ Firebase & Analytics connected');
-} catch (err) {
-  console.error('❌ Firebase init error:', err);
-}
+const archiveFirebaseConfig = {
+  apiKey: "AIzaSyCigxjHdYfYNDizaSKDGUPCaBs39Ff-awM",
+  authDomain: "asraful-704b9.firebaseapp.com",
+  projectId: "asraful-704b9",
+  storageBucket: "asraful-704b9.firebasestorage.app",
+  messagingSenderId: "418467079550",
+  appId: "1:418467079550:web:9454a5851d477e3ad4bf2f"
+};
 
-// ============================================================
-// 2. GLOBALS
-// ============================================================
+// Global variables (একবার ডিক্লেয়ার করা হয়েছে)
+let db;         
+let archiveDb;  
 let currentUser = null;
-let allAppointments = [];
-let newListener = null;
-let oldListener = null;
+let allAppointments = []; 
+let realtimeListeners = [];
+let analyticalListeners = [];
+let appointmentsManager = null;
+let selectedAppointments = new Set();
+let searchTimer;
+let serialRanges = {
+  Thursday: { new: {}, old: {} },
+  Friday: { new: {}, old: {} }
+};
+let pendingSelections = {};
+let adminSessionId = 'admin_' + Date.now();
+let editGridSystem = null;
+
+try {
+  const primaryApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+  const archiveApp = firebase.apps.some(app => app.name === "archiveApp") 
+    ? firebase.app("archiveApp") 
+    : firebase.initializeApp(archiveFirebaseConfig, "archiveApp");
+
+  db = primaryApp.firestore();
+  archiveDb = archiveApp.firestore();
+
+  // Firestore Offline Persistence
+  db.enablePersistence({ synchronizeTabs: true })
+    .then(() => {
+      console.log("✅ Primary Firestore offline persistence enabled!");
+    })
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.warn("⚠️ একাধিক ট্যাবে অ্যাপ খোলা আছে। পারসিস্টেন্স প্রথম ট্যাবে কার্যকর থাকবে।");
+      } else if (err.code === 'unimplemented') {
+        console.warn("⚠️ বর্তমান ব্রাউজারটি পারসিস্টেন্স সাপোর্ট করে না।");
+      }
+    });
+
+  console.log("✅ Both Firebase projects initialized successfully!");
+} catch (e) {
+  console.error("❌ Firebase initialization error:", e);
+}
 
 // ============================================================
 // 3. HELPER FUNCTIONS
@@ -287,40 +316,50 @@ function getStatusBadge(app) {
 }
 
 // ============================================================
-// 4. FETCH APPOINTMENTS (Collection Group - New & Old)
+// 4. FETCH & MERGE APPOINTMENTS FROM BOTH DATABASES
 // ============================================================
-async function fetchAppointments() {
+async function fetchAndMergeAppointments() {
   try {
-    console.log('🔄 Fetching appointments from subcollections for:', currentUser);
-    
-    const [newSnap, oldSnap] = await Promise.all([
+    if (!currentUser) return;
+    console.log('🔄 Fetching from both Primary and Archive databases for:', currentUser);
+
+    // ১ম এবং ২য় উভয় ডাটাবেজের সাবকালেকশন (new ও old) থেকে একসাথে কুয়েরি চালানো
+    const [primaryNewSnap, primaryOldSnap, archiveNewSnap, archiveOldSnap] = await Promise.all([
       db.collectionGroup('new').where('phone', '==', currentUser).get(),
-      db.collectionGroup('old').where('phone', '==', currentUser).get()
+      db.collectionGroup('old').where('phone', '==', currentUser).get(),
+      archiveDb.collectionGroup('new').where('phone', '==', currentUser).get(),
+      archiveDb.collectionGroup('old').where('phone', '==', currentUser).get()
     ]);
-    
-    const newData = newSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const oldData = oldSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    
-    allAppointments = [...newData, ...oldData];
-    
+
+    const pNew = primaryNewSnap.docs.map(d => ({ id: d.id, dbSource: 'primary-new', ...d.data() }));
+    const pOld = primaryOldSnap.docs.map(d => ({ id: d.id, dbSource: 'primary-old', ...d.data() }));
+    const aNew = archiveNewSnap.docs.map(d => ({ id: d.id, dbSource: 'archive-new', ...d.data() }));
+    const aOld = archiveOldSnap.docs.map(d => ({ id: d.id, dbSource: 'archive-old', ...d.data() }));
+
+    // 🔹 সব ডেটা মার্জ (Merge) করা হলো
+    allAppointments = [...pNew, ...pOld, ...aNew, ...aOld];
+
+    // তারিখ অনুযায়ী সর্টিং
     allAppointments.sort((a, b) => {
       const dateA = a.appointmentDate || a.date || '';
       const dateB = b.appointmentDate || b.date || '';
       return dateB.localeCompare(dateA);
     });
 
-    console.log(`✅ Total: ${allAppointments.length} appointments loaded`);
-    
-    if (analytics) {
-      analytics.logEvent('user_dashboard_loaded', { total_count: allAppointments.length });
-    }
+    console.log(`✅ Total Combined Appointments: ${allAppointments.length}`);
 
     renderAll();
-  } catch (e) {
-    console.error('❌ Fetch error:', e);
+
+  } catch (error) {
+    console.error('❌ Error fetching and merging appointments:', error);
     allAppointments = [];
     renderAll();
   }
+}
+
+// ব্যাকওয়ার্ড কম্পাট্যাবিলিটির জন্য নাম ঠিক রাখা হলো
+function fetchAppointments() {
+  fetchAndMergeAppointments();
 }
 
 // ============================================================
@@ -387,29 +426,32 @@ function updateSidebarStats() {
 }
 
 // ============================================================
-// 6. REAL-TIME LISTENERS (Collection Group Queries)
+// 6. REAL-TIME LISTENERS (Both Primary & Archive Databases)
 // ============================================================
 function setupListener() {
-  if (newListener) newListener();
-  if (oldListener) oldListener();
+  // আগের সকল লিসেনার ক্লিয়ার করা
+  if (realtimeListeners.length > 0) {
+    realtimeListeners.forEach(unsub => unsub());
+    realtimeListeners = [];
+  }
 
-  newListener = db.collectionGroup('new')
-    .where('phone', '==', currentUser)
-    .onSnapshot(() => { 
-      console.log('🔄 New subcollection updated');
-      fetchAppointments(); 
-    }, (error) => {
-      console.error('New listener error:', error);
-    });
+  if (!currentUser) return;
 
-  oldListener = db.collectionGroup('old')
-    .where('phone', '==', currentUser)
-    .onSnapshot(() => { 
-      console.log('🔄 Old subcollection updated');
-      fetchAppointments(); 
-    }, (error) => {
-      console.error('Old listener error:', error);
-    });
+  // প্রাইমারি ডিবি'র নতুন ও পুরনো সাবকালেকশন লিসেনার
+  const unsubPNew = db.collectionGroup('new').where('phone', '==', currentUser)
+    .onSnapshot(() => { fetchAndMergeAppointments(); }, err => console.error("P-New listener err:", err));
+  
+  const unsubPOld = db.collectionGroup('old').where('phone', '==', currentUser)
+    .onSnapshot(() => { fetchAndMergeAppointments(); }, err => console.error("P-Old listener err:", err));
+
+  // আর্কাইভ ডিবি'র নতুন ও পুরনো সাবকালেকশন লিসেনার
+  const unsubANew = archiveDb.collectionGroup('new').where('phone', '==', currentUser)
+    .onSnapshot(() => { fetchAndMergeAppointments(); }, err => console.error("A-New listener err:", err));
+  
+  const unsubAOld = archiveDb.collectionGroup('old').where('phone', '==', currentUser)
+    .onSnapshot(() => { fetchAndMergeAppointments(); }, err => console.error("A-Old listener err:", err));
+
+  realtimeListeners.push(unsubPNew, unsubPOld, unsubANew, unsubAOld);
 }
 
 // ============================================================
@@ -417,11 +459,9 @@ function setupListener() {
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
   
-  // sessionStorage থেকে ইউজার ফোন নিন
   let userPhone = sessionStorage.getItem('userPhone') || 
                   sessionStorage.getItem('loggedInUser');
   
-  // যদি ইউজার না থাকে, লগইন পেজে রিডাইরেক্ট করুন
   if (!userPhone) {
     console.warn('⚠️ No user found! Redirecting to login...');
     window.location.href = 'login.html';
@@ -431,11 +471,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const now = new Date();
   document.getElementById('headerDate').textContent = formatDate(now);
   
-  // গ্লোবাল currentUser সেট করুন
   currentUser = userPhone;
   console.log('👤 Current User:', currentUser);
   
-  // কম্পোনেন্ট লোড - components-inline.js থেকে
   if (window.ComponentLoader) {
     window.ComponentLoader.loadAllComponents('ড্যাশবোর্ড');
     
@@ -457,8 +495,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.warn('⚠️ ComponentLoader পাওয়া যায়নি');
   }
   
-  // অ্যাপয়েন্টমেন্ট লোড ও রিয়েলটাইম লিসেনার চালু
-  fetchAppointments();
+  fetchAndMergeAppointments();
   setupListener();
 });
 </script>
