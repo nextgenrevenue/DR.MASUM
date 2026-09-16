@@ -11,6 +11,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   
   <!-- ===== grid.js লোড করুন (RealTimeGridSystem) ===== -->
@@ -392,6 +393,7 @@ let db, archiveDb;
 try {
   if (!firebase.apps.length) {
     const defaultApp = firebase.initializeApp(firebaseConfig);
+    const analytics = firebase.analytics();
     db = defaultApp.firestore();
   } else {
     db = firebase.firestore();
@@ -401,10 +403,22 @@ try {
     archiveApp = firebase.initializeApp(archiveFirebaseConfig, "archiveApp");
   }
   archiveDb = archiveApp.firestore();
-  window.db = db;
-  console.log('✅ Firebase connected');
-} catch (err) {
-  console.error('❌ Firebase init error:', err);
+  // 🔹 Firestore Offline Persistence চালু করার সঠিক স্থান (db তৈরি হওয়ার পর)
+  db.enablePersistence({ synchronizeTabs: true })
+    .then(() => {
+      console.log("✅ Firestore offline persistence enabled!");
+    })
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.warn("⚠️ একাধিক ট্যাবে অ্যাপ খোলা আছে। পারসিস্টেন্স প্রথম ট্যাবে কার্যকর থাকবে।");
+      } else if (err.code === 'unimplemented') {
+        console.warn("⚠️ বর্তমান ব্রাউজারটি পারসিস্টেন্স সাপোর্ট করে না।");
+      }
+    });
+
+  console.log("✅ Firebase initialized successfully!");
+} catch (e) {
+  console.error("❌ Firebase initialization error:", e);
 }
 
 // ============================================================
@@ -573,7 +587,7 @@ async function loadRanges() {
 }
 
 // ============================================================
-// ফেচ অ্যাপয়েন্টমেন্ট (শুধুমাত্র নতুন সাব-কালেকশন স্ট্রাকচার)
+// ফেচ অ্যাপয়েন্টমেন্ট (সঠিক সাব-কালেকশন স্ট্রাকচার অনুযায়ী)
 // ============================================================
 async function fetchAppointments() {
   if (!currentUser) {
@@ -582,58 +596,57 @@ async function fetchAppointments() {
   }
   
   try {
-    // ১. new এবং old সাব-কালেকশন থেকে ডাটা ফেচ করা
-    const newSnapPromise = db.collectionGroup('new')
-      .where('phone', '==', currentUser)
-      .get();
-
-    const oldSnapPromise = db.collectionGroup('old')
-      .where('phone', '==', currentUser)
-      .get();
-
-    // দুটি ক্যোয়ারি একসাথে চালানো
-    const [newSnap, oldSnap] = await Promise.all([newSnapPromise, oldSnapPromise]);
-
     const appointmentsMap = new Map();
 
-    // 'new' সাব-কালেকশনের ডাটা সেট করা
-    newSnap.forEach(doc => {
-      appointmentsMap.set(doc.id, { 
-        id: doc.id, 
-        ...doc.data(), 
-        patientType: doc.data().patientType || 'new',
-        isArchived: false, 
-        source: 'new' 
-      });
+    // ১. মূল ডাটাবেজ থেকে কালেকশন গ্রুপ কুয়েরি (একবারে সব 'new' এবং 'old' থেকে খোঁজা)
+    const [mainNewSnap, mainOldSnap] = await Promise.all([
+      db.collectionGroup('new').where('phone', '==', currentUser).get(),
+      db.collectionGroup('old').where('phone', '==', currentUser).get()
+    ]);
+
+    mainNewSnap.forEach(doc => {
+      appointmentsMap.set(doc.id, { id: doc.id, ...doc.data(), patientType: 'new', isArchived: false, source: 'new' });
     });
 
-    // 'old' সাব-কালেকশনের ডাটা সেট করা
-    oldSnap.forEach(doc => {
-      appointmentsMap.set(doc.id, { 
-        id: doc.id, 
-        ...doc.data(), 
-        patientType: doc.data().patientType || 'old',
-        isArchived: false, 
-        source: 'old' 
-      });
+    mainOldSnap.forEach(doc => {
+      appointmentsMap.set(doc.id, { id: doc.id, ...doc.data(), patientType: 'old', isArchived: false, source: 'old' });
     });
 
-    // Map থেকে অ্যারেতে রূপান্তর
+    // ২. আর্কাইভ ডাটাবেজ থেকে কালেকশন গ্রুপ কুয়েরি
+    if (archiveDb) {
+      try {
+        const [archNewSnap, archOldSnap] = await Promise.all([
+          archiveDb.collectionGroup('new').where('phone', '==', currentUser).get(),
+          archiveDb.collectionGroup('old').where('phone', '==', currentUser).get()
+        ]);
+
+        archNewSnap.forEach(doc => {
+          appointmentsMap.set(doc.id, { id: doc.id, ...doc.data(), patientType: 'new', isArchived: true, source: 'archive_new' });
+        });
+
+        archOldSnap.forEach(doc => {
+          appointmentsMap.set(doc.id, { id: doc.id, ...doc.data(), patientType: 'old', isArchived: true, source: 'archive_old' });
+        });
+      } catch (archErr) {
+        console.warn('⚠️ আর্কাইভ ডেটা ফেচ করতে সমস্যা:', archErr);
+      }
+    }
+
     allAppointments = Array.from(appointmentsMap.values());
 
-    // ২. অ্যাপয়েন্টমেন্ট তারিখ অনুযায়ী সাজানো (Newest First)
+    // তারিখ অনুযায়ী সাজানো
     allAppointments.sort((a, b) => {
       const dateA = a.appointmentDate || a.date || '';
       const dateB = b.appointmentDate || b.date || '';
       return dateB.localeCompare(dateA);
     });
 
-    // ৩. টেবিল ও সাইডবার আপডেট
     renderTable();
     updateSidebarStats();
 
   } catch (e) {
     console.error('❌ Fetch error:', e);
+    // যদি ইনডেক্স না থাকার কারণে ফায়ারস্টোর কোনো লিংক দেয়, সেটি কনসোলে দেখতে পাবেন
     allAppointments = [];
     renderTable();
   }
