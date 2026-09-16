@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>সিরিয়াল বুকিং - সহজ সিরিয়াল</title>
-  <!-- ফন্ট, টেইলউইন্ড, ফন্ট অ্যাওসাম, ফায়ারবেস, সুইট অ্যালার্ট -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -12,181 +11,124 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   
-  <!-- ===== grid.js (RealTimeGridSystem) ===== -->
   <script src="grid.js"></script>
-  
-  <!-- ===== components-inline.js (সাইডবার, হেডার, ফুটার) ===== -->
   <script src="components-inline.js"></script>
   
   <style>
-    /* বেসিক রিসেট */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { 
       font-family: 'Inter', 'Noto Sans Bengali', sans-serif; 
       background: #f0f4f8; 
       margin: 0;
-      padding-top: 64px; /* হেডারের জন্য জায়গা */
+      padding-top: 64px;
     }
-
-    /* সিরিয়াল গ্রিড */
     .serial-grid {
-      display: grid;
-      grid-template-columns: repeat(10, 1fr);
-      gap: 6px;
-      padding: 12px;
-      border: 2px solid #e2e8f0;
-      border-radius: 10px;
-      max-height: 260px;
-      overflow-y: auto;
-      margin: 8px 0;
-      background: white;
+      display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px;
+      padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px;
+      max-height: 260px; overflow-y: auto; margin: 8px 0; background: white;
     }
-    @media (max-width: 768px) { 
-      .serial-grid { grid-template-columns: repeat(7, 1fr); } 
-    }
-    .serial-item {
-      padding: 8px;
-      text-align: center;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 13px;
-      cursor: pointer;
-      border: 2px solid transparent;
-      transition: all 0.15s;
-    }
-    .serial-item.available { 
-      background: #dcfce7; 
-      color: #16a34a; 
-      border-color: #16a34a; 
-    }
-    .serial-item.available:hover { 
-      background: #bbf7d0; 
-      transform: scale(1.05); 
-    }
-    .serial-item.booked { 
-      background: #fecaca; 
-      color: #dc2626; 
-      border-color: #dc2626; 
-      cursor: not-allowed; 
-      opacity: 0.7; 
-    }
-    .serial-item.pending { 
-      background: #dbeafe; 
-      color: #3b82f6; 
-      border-color: #3b82f6; 
-      cursor: not-allowed; 
-      opacity: 0.7; 
-    }
-    .serial-item.selected { 
-      background: #fef3c7; 
-      color: #d97706; 
-      border-color: #d97706; 
-      box-shadow: 0 0 0 3px rgba(245,158,11,0.3); 
-    }
+    .error-msg { color: #dc2626; font-size: 11px; display: none; margin-top: 4px; }
 
-    /* বুকিং কার্ড */
+    @media (max-width: 768px) { .serial-grid { grid-template-columns: repeat(7, 1fr); } }
+    .serial-item {
+      padding: 8px; text-align: center; border-radius: 6px;
+      font-weight: 600; font-size: 13px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s;
+    }
+    .serial-item.available { background: #dcfce7; color: #16a34a; border-color: #16a34a; }
+    .serial-item.available:hover { background: #bbf7d0; transform: scale(1.05); }
+    .serial-item.booked { background: #fecaca; color: #dc2626; border-color: #dc2626; cursor: not-allowed; opacity: 0.7; }
+    .serial-item.pending { background: #dbeafe; color: #3b82f6; border-color: #3b82f6; cursor: not-allowed; opacity: 0.7; }
+    .serial-item.selected { background: #fef3c7; color: #d97706; border-color: #d97706; box-shadow: 0 0 0 3px rgba(245,158,11,0.3); }
+
     .book-section { max-width: 600px; margin: 0 auto; }
     .book-section .card { 
-      background: white; 
-      border-radius: 16px; 
-      padding: 28px; 
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04); 
-      border: 1px solid #f1f5f9; 
+      background: white; border-radius: 16px; padding: 28px; 
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; 
     }
-    .book-section .card h3 { 
-      font-size: 20px; 
-      font-weight: 700; 
-      margin-bottom: 20px; 
+    .book-section .card h3 { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+    .book-section .form-group { margin-bottom: 16px; }
+    .book-section .form-group label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 14px; color: #334155; }
+    .book-section .form-group input, .book-section .form-group select {
+      width: 100%; padding: 10px 14px; border: 2px solid #e2e8f0; 
+      border-radius: 10px; font-size: 14px; outline: none; font-family: inherit;
     }
-    .book-section .form-group { 
-      margin-bottom: 16px; 
+    .book-section .form-group input:focus, .book-section .form-group select:focus {
+      border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
     }
-    .book-section .form-group label { 
-      display: block; 
-      font-weight: 600; 
-      margin-bottom: 4px; 
-      font-size: 14px; 
-      color: #334155; 
+    
+    .switch-container {
+      display: flex; background: #e2e8f0; border-radius: 10px; padding: 4px; margin-bottom: 20px;
     }
-    .book-section .form-group input, 
-    .book-section .form-group select {
-      width: 100%; 
-      padding: 10px 14px;
-      border: 2px solid #e2e8f0; 
-      border-radius: 10px;
-      font-size: 14px; 
-      outline: none; 
-      font-family: inherit;
+    .switch-btn {
+      flex: 1; text-align: center; padding: 10px; font-weight: 600; font-size: 14px;
+      cursor: pointer; border-radius: 8px; transition: all 0.2s ease; color: #64748b;
     }
-    .book-section .form-group input:focus, 
-    .book-section .form-group select:focus {
-      border-color: #3b82f6; 
-      box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    .switch-btn.active {
+      background: #ffffff; color: #2563eb; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 
     .btn-primary {
-      width: 100%; 
-      padding: 12px; 
-      border: none; 
-      border-radius: 10px;
-      background: #3b82f6; 
-      color: white; 
-      font-weight: 700; 
-      font-size: 16px;
-      cursor: pointer; 
-      transition: 0.15s;
+      width: 100%; padding: 12px; border: none; border-radius: 10px;
+      background: #3b82f6; color: white; font-weight: 700; font-size: 16px;
+      cursor: pointer; transition: 0.15s;
     }
     .btn-primary:hover { background: #2563eb; }
-    .btn-primary:active { transform: scale(0.97); }
-    .btn-primary:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .legend { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
+    .legend-item { display: flex; align-items: center; font-size: 13px; color: #475569; font-weight: 500; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; display: inline-block; }
+    .available-dot { background-color: #10b981; }
+    .pending-dot { background-color: #3b82f6; }
+    .selected-dot { background-color: #f59e0b; }
+    .booked-dot { background-color: #ef4444; }
+
+    .no-slots-message {
+      background-color: #fef3c7; color: #d97706; padding: 15px;
+      border-radius: 8px; text-align: center; margin-top: 15px; display: none; font-weight: 600; font-size: 14px;
+    }
+    .loading-message {
+      background-color: #dbeafe; color: #2563eb; padding: 15px;
+      border-radius: 8px; text-align: center; margin-top: 15px; display: none; font-size: 14px;
     }
 
-    /* কন্টেইনার লেআউট */
-    .main-wrap {
-      display: flex;
-      min-height: calc(100vh - 64px);
+    .popup-modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;
     }
-    #sidebar-container {
-      flex-shrink: 0;
-      width: 280px;
+    .popup-content {
+      background: white; padding: 25px; border-radius: 12px; text-align: center;
+      max-width: 500px; width: 90%; max-height: 85vh; overflow-y: auto;
     }
-    .content-area {
-      flex: 1;
-      padding: 16px 20px 40px;
-      background: #f0f4f8;
+    .confirmation-slip {
+      background: white; border: 2px solid #2563eb; border-radius: 10px;
+      padding: 15px; margin: 15px auto; text-align: center; max-width: 300px; display: none;
     }
+    .download-buttons { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+    .download-btn { background: #16a34a; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+    .download-btn.pdf { background: #dc2626; }
+
+    .main-wrap { display: flex; min-height: calc(100vh - 64px); }
+    #sidebar-container { flex-shrink: 0; width: 280px; }
+    .content-area { flex: 1; padding: 16px 20px 40px; background: #f0f4f8; }
     @media (max-width: 768px) {
       .main-wrap { flex-direction: column; }
       #sidebar-container { width: 100%; }
       .content-area { padding: 12px 8px 40px; }
     }
-    #header-container, #footer-container { width: 100%; }
-
-    /* মোবাইল অ্যাডজাস্ট */
-    @media (max-width: 768px) {
-      .book-section .card { padding: 16px; }
-    }
-
-    /* লোডিং স্কেলেটন */
-    .loading-skeleton { text-align: center; padding: 40px; color: #94a3b8; }
   </style>
 </head>
 <body>
 
-<!-- ===== হেডার ===== -->
 <div id="header-container"></div>
 
-<!-- ===== মেইন র‍্যাপ ===== -->
 <div class="main-wrap">
-  <!-- সাইডবার -->
   <div id="sidebar-container"></div>
 
-  <!-- কন্টেন্ট এরিয়া -->
   <div class="content-area" id="contentArea">
-    <!-- পেজ হেডার -->
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
       <div>
         <h2 style="font-size:20px; font-weight:700; color:#1e293b;">সিরিয়াল বুকিং</h2>
@@ -197,83 +139,140 @@
       </span>
     </div>
 
-    <!-- ===== বুকিং সেকশন ===== -->
     <div class="book-section">
       <div class="card">
         <h3><i class="fas fa-calendar-plus text-blue-500"></i> নতুন সিরিয়াল বুকিং</h3>
         
-        <div class="form-group">
-          <label>📅 দিন</label>
-          <select id="bookDay">
-            <option value="Thursday">বৃহস্পতিবার</option>
-            <option value="Friday">শুক্রবার</option>
-          </select>
+        <div class="switch-container">
+          <div class="switch-btn active" id="btnSelf" onclick="switchBookingMode('self')">নিজের সিরিয়াল</div>
+          <div class="switch-btn" id="btnOther" onclick="switchBookingMode('other')">অন্যের জন্য</div>
         </div>
-        
-        <div class="form-group">
-          <label>👤 রোগীর ধরন</label>
-          <select id="bookType">
-            <option value="new">নতুন রোগী</option>
-            <option value="old">পুরাতন রোগী</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label>⏰ সময়</label>
-          <select id="bookTime">
-            <option value="">প্রথমে দিন ও ধরন নির্বাচন করুন</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label>🔢 সিরিয়াল নির্বাচন করুন</label>
-          <div class="serial-grid" id="serialGrid">
-            <div style="grid-column:1/-1; text-align:center; padding:20px; color:#94a3b8;">
-              দিন, ধরন এবং সময় নির্বাচন করুন
+
+        <form id="bookingForm">
+          
+        <div id="otherPatientSection" style="display: none;">
+            <div class="form-group">
+              <label>👤 রোগীর নাম</label>
+              <input type="text" id="name" name="name" placeholder="রোগীর পুরো নাম লিখুন" required
+            pattern="[a-zA-Z\u0980-\u09FF\.\s]{3,50}" 
+            title="শুধুমাত্র বাংলা/ইংরেজি অক্ষর, ডট (.) ও স্পেস ব্যবহার করুন (3-50 অক্ষর)"
+            onblur="this.value = this.value.toLowerCase().split(/[. ]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') == '' ? '' : this.value.toLowerCase().split(/[. ]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')">
+            <small id="nameError" class="error-msg">সঠিক নাম লিখুন (বিশেষ চিহ্ন বা সংখ্যা দেওয়া যাবে না)</small>
+            </div>
+
+            <div class="form-group">
+              <label>রোগীর বয়স</label>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                <input type="number" id="ageYears" placeholder="বছর" min="0" max="120" oninput="normalizeAgeInputs()">
+                <input type="number" id="ageMonths" placeholder="মাস" min="0" oninput="normalizeAgeInputs()">
+                <input type="number" id="ageDays" placeholder="দিন" min="0" oninput="normalizeAgeInputs()">
+              </div>
+              <small style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">কমপক্ষে একটি ফিল্ড পূরণ করুন (বছর/মাস/দিন)</small>
             </div>
           </div>
-          <input type="hidden" id="selectedSerial">
-          <!-- নির্দেশনার কালার লেজেন্ড (Legend) -->
-<div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: center; margin-top: 10px; font-size: 13px; color: #475569; font-weight: 600;">
-  
-  <span style="display: inline-flex; align-items: center; gap: 5px;">
-    <span style="width: 12px; height: 12px; background-color: #10b981; border-radius: 50%; display: inline-block;"></span>
-    সবুজ = খালি
-  </span>
 
-  <span style="display: inline-flex; align-items: center; gap: 5px;">
-    <span style="width: 12px; height: 12px; background-color: #3b82f6; border-radius: 50%; display: inline-block;"></span>
-    নীল = সিলেক্টেড (অন্য ইউজার)
-  </span>
+          <div class="form-group">
+            <label>📞 যোগাযোগের ফোন নম্বর</label>
+            <input type="tel" id="patientPhone" placeholder="01XXXXXXXXX" required>
+            <small id="phoneInfoText" style="color: #64748b; font-size: 11px; display: block; margin-top: 4px;">আপনার অ্যাকাউন্ট নম্বর দিয়ে বুকিং করা হচ্ছে</small>
+          </div>
 
-  <span style="display: inline-flex; align-items: center; gap: 5px;">
-    <span style="width: 12px; height: 12px; background-color: #f59e0b; border-radius: 50%; display: inline-block;"></span>
-    হলুদ = আপনার নির্বাচিত
-  </span>
+          <div class="form-group">
+            <label>📅 দিন</label>
+            <select id="bookDay" required>
+              <option value="">-- দিন নির্বাচন করুন --</option>
+              <option value="Thursday">বৃহস্পতিবার</option>
+              <option value="Friday">শুক্রবার</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>👤 রোগীর ধরন</label>
+            <select id="bookType" required>
+              <option value="">-- ধরন নির্বাচন করুন --</option>
+              <option value="new">নতুন রোগী</option>
+              <option value="old">পুরাতন রোগী</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>⏰ সময়</label>
+            <select id="bookTime" required disabled>
+              <option value="">প্রথমে দিন ও ধরন নির্বাচন করুন</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <label style="margin: 0;">🔢 সিরিয়াল নাম্বার নির্বাচন করুন</label>
+            </div>
+            
+            <div class="legend">
+              <div class="legend-item"><span class="legend-dot available-dot"></span><span>খালি</span></div>
+              <div class="legend-item"><span class="legend-dot pending-dot"></span><span>সিলেক্টেড (অন্য ইউজার)</span></div>
+              <div class="legend-item"><span class="legend-dot selected-dot"></span><span>আপনার নির্বাচিত</span></div>
+              <div class="legend-item"><span class="legend-dot booked-dot"></span><span>বুকড</span></div>
+            </div>
 
-  <span style="display: inline-flex; align-items: center; gap: 5px;">
-    <span style="width: 12px; height: 12px; background-color: #ef4444; border-radius: 50%; display: inline-block;"></span>
-    লাল = বুকড
-  </span>
+            <div class="loading-message" id="loadingMessage">🔄 সিরিয়াল লোড হচ্ছে...</div>
 
-</div>
-        </div>
-        
-        <button class="btn-primary" id="confirmBookBtn" disabled>
-          <i class="fas fa-check-circle"></i> সিরিয়াল নিশ্চিত করুন
-        </button>
+            <div class="serial-grid" id="serialGrid">
+              <div style="grid-column:1/-1; text-align:center; padding:20px; color:#94a3b8;">
+                দিন, ধরন এবং সময় নির্বাচন করুন
+              </div>
+            </div>
+
+            <div class="no-slots-message" id="noSlotsMessage">
+              ⚠️ এই সময়ের জন্য কোনো সিরিয়াল উপলব্ধ নেই।
+            </div>
+
+            <input type="hidden" id="selectedSerial" required>
+          </div>
+          
+          <button type="submit" class="btn-primary" id="confirmBookBtn" disabled>
+            <i class="fas fa-check-circle"></i> সিরিয়াল নিশ্চিত করুন
+          </button>
+        </form>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ===== ফুটার ===== -->
 <div id="footer-container"></div>
 
+<div class="popup-modal" id="universalPopup">
+  <div class="popup-content">
+    <div id="popupIcon" style="font-size: 40px; margin-bottom: 10px;">✅</div>
+    <div id="popupTitle" style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">সফল</div>
+    <div id="popupMessage" style="font-size: 14px; color: #475569; margin-bottom: 15px;"></div>
+    
+    <div class="confirmation-slip" id="confirmationSlip">
+      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 8px;">
+        <h4 style="color: #2563eb; font-size: 13px;">ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h4>
+        <p style="font-size: 10px; color: #6b7280;">সিরিয়াল কনফার্মেশন স্লিপ</p>
+      </div>
+      <div style="font-size: 11px; text-align: left; display: grid; gap: 4px; margin-bottom: 8px;">
+        <div><strong>নাম:</strong> <span id="slipName">-</span></div>
+        <div><strong>বয়স:</strong> <span id="slipAge">-</span></div>
+        <div><strong>ফোন:</strong> <span id="slipPhone">-</span></div>
+        <div><strong>দিন:</strong> <span id="slipDay">-</span></div>
+        <div><strong>সময়:</strong> <span id="slipTime">-</span></div>
+      </div>
+      <div style="background: #2563eb; color: white; padding: 8px; border-radius: 6px; font-size: 16px; font-weight: 700;" id="slipSerial">#০</div>
+    </div>
+
+    <div class="download-buttons" id="downloadButtons" style="display: none;">
+      <button class="download-btn" onclick="downloadPNG()">📸 PNG ডাউনলোড</button>
+      <button class="download-btn pdf" onclick="downloadPDF()">📄 PDF ডাউনলোড</button>
+    </div>
+
+    <div id="popupButtons" style="margin-top: 15px;">
+      <button onclick="closePopup()" style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">বন্ধ করুন</button>
+    </div>
+  </div>
+</div>
+
 <script>
-// ============================================================
-// FIREBASE কনফিগ
-// ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
   authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
@@ -284,193 +283,295 @@ const firebaseConfig = {
 };
 
 let db, analytics;
-
 try {
-  // ১. Firebase অ্যাপ ইনিশিয়ালাইজ করা
   const app = !firebase.apps.length ? firebase.initializeApp(firebaseConfig) : firebase.app();
   db = app.firestore();
-  try {
-    if (typeof firebase.analytics === 'function') {
-      analytics = firebase.analytics();
-      console.log('📊 Firebase Analytics initialized');
-    } else {
-      console.warn('⚠️ Firebase Analytics SDK যুক্ত করা হয়নি');
-    }
-  } catch (analyticsErr) {
-    console.warn('⚠️ Analytics local environment-এ কাজ নাও করতে পারে:', analyticsErr.message);
-  }
-  window.db = db;
-  window.analytics = analytics || null;
+  analytics = firebase.analytics();
+} catch (err) { console.error('Firebase error:', err); }
 
-  console.log('✅ Firebase connected successfully');
-} catch (err) {
-  console.error('❌ Firebase init error:', err);
+let currentUserPhone = sessionStorage.getItem('userPhone') || sessionStorage.getItem('loggedInUser') || '';
+let currentUserName = '';
+let gridRanges = {};
+let firebaseDisabledSlots = {};
+let bookingGridSystem = null;
+let currentAppointmentData = null;
+let bookingMode = 'self';
+let currentUserAge = ''; // ইউজারের বয়স সংরক্ষণের জন্য
+
+async function fetchUserData() {
+  if (!currentUserPhone) return;
+  try {
+    const userDoc = await db.collection('users').doc(currentUserPhone).get();
+    if (userDoc.exists) {
+      const data = userDoc.data();
+      currentUserName = data.name || 'ইউজার';
+      currentUserAge = data.age || data.ageString || 'প্রযোজ্য নয়'; // ডাটাবেজে বয়স থাকলে তা নেবে
+    } else {
+      currentUserName = 'ইউজার';
+      currentUserAge = 'প্রযোজ্য নয়';
+    }
+  } catch(e) {
+    currentUserName = 'ইউজার';
+    currentUserAge = 'প্রযোজ্য নয়';
+  }
 }
 
-// ============================================================
-// গ্লোবাল ভেরিয়েবল
-// ============================================================
-let currentUser = sessionStorage.getItem('userPhone') || sessionStorage.getItem('loggedInUser') || null;
-let gridRanges = {};
-let bookingGridSystem = null;
-// ============================================================
-// হেল্পার ফাংশন
-// ============================================================
+function switchBookingMode(mode) {
+  bookingMode = mode;
+  const btnSelf = document.getElementById('btnSelf');
+  const btnOther = document.getElementById('btnOther');
+  const otherSection = document.getElementById('otherPatientSection');
+  const phoneInput = document.getElementById('patientPhone');
+  const phoneInfoText = document.getElementById('phoneInfoText');
+
+  if (mode === 'self') {
+    btnSelf.classList.add('active');
+    btnOther.classList.remove('active');
+    otherSection.style.display = 'none';
+    phoneInput.value = currentUserPhone;
+    phoneInput.readOnly = true;
+    phoneInput.style.backgroundColor = '#f1f5f9';
+    phoneInfoText.textContent = 'আপনার অ্যাকাউন্ট নম্বর দিয়ে বুকিং করা হচ্ছে';
+  } else {
+    btnOther.classList.add('active');
+    btnSelf.classList.remove('active');
+    otherSection.style.display = 'block';
+    phoneInput.value = '';
+    phoneInput.readOnly = false;
+    phoneInput.style.backgroundColor = '#ffffff';
+    phoneInput.placeholder = 'রোগীর বা যোগাযোগের ফোন নম্বর লিখুন';
+    phoneInfoText.textContent = 'এই নম্বরেই কনফার্মেশন এসএমএস পাঠানো হবে';
+  }
+}
+
 function formatDate(date) {
   return date.toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 function getNextDateByDay(targetDay) {
-  const daysMap = {
-    "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3,
-    "Thursday": 4, "Friday": 5, "Saturday": 6
-  };
-  
+  const daysMap = { "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6 };
   const targetDayIndex = daysMap[targetDay];
   const today = new Date();
-  const todayIndex = today.getDay();
-  let daysToAdd = targetDayIndex - todayIndex;
+  let daysToAdd = targetDayIndex - today.getDay();
   if (daysToAdd < 0) daysToAdd += 7;
   
   const nextDate = new Date(today);
   nextDate.setDate(today.getDate() + daysToAdd);
-  
   const year = nextDate.getFullYear();
   const month = String(nextDate.getMonth() + 1).padStart(2, '0');
   const day = String(nextDate.getDate()).padStart(2, '0');
   
-  const banglaMonths = ['জানুয়ারী', 'ফেব্রুয়ারী', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
-    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+  const banglaMonths = ['জানুয়ারী', 'ফেব্রুয়ারী', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
   const banglaDays = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
-  const banglaDate = `${banglaDays[nextDate.getDay()]}, ${nextDate.getDate()} ${banglaMonths[nextDate.getMonth()]} ${year}`;
   
   return {
     date: nextDate,
     dateString: `${year}-${month}-${day}`,
-    displayDate: nextDate.toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
-    banglaDate: banglaDate,
+    banglaDate: `${banglaDays[nextDate.getDay()]}, ${nextDate.getDate()} ${banglaMonths[nextDate.getMonth()]} ${year}`,
     isToday: daysToAdd === 0
   };
 }
 
-// ============================================================
-// লোড সিরিয়াল রেঞ্জ
-// ============================================================
-async function loadRanges() {
+async function loadRangesAndSlots() {
   try {
-    const doc = await db.collection('settings').doc('serialRanges').get();
-    if (doc.exists) {
-      gridRanges = doc.data();
-      if (!gridRanges.Thursday) gridRanges.Thursday = { new: {}, old: {} };
-      if (!gridRanges.Friday) gridRanges.Friday = { new: {}, old: {} };
-    } else {
-      gridRanges = { Thursday: { new: {}, old: {} }, Friday: { new: {}, old: {} } };
-    }
-    console.log('✅ সিরিয়াল রেঞ্জ লোড হয়েছে:', gridRanges);
-  } catch (e) { 
-    console.error('Ranges error:', e); 
-  }
+    const rangeDoc = await db.collection('settings').doc('serialRanges').get();
+    if (rangeDoc.exists) { gridRanges = rangeDoc.data(); }
+
+    const slotDoc = await db.collection('settings').doc('disabledSlots').get();
+    if (slotDoc.exists) { firebaseDisabledSlots = slotDoc.data(); }
+    else { firebaseDisabledSlots = {}; }
+
+    checkAvailableDays();
+  } catch (e) { console.error('Error loading settings:', e); }
 }
 
-// ============================================================
-// টাইম অপশন আপডেট - AM/PM ফরম্যাট সহ
-// ============================================================
+function checkAvailableDays() {
+  const daySelect = document.getElementById('bookDay');
+  if (!daySelect || !gridRanges) return;
+  
+  const dayOptions = daySelect.querySelectorAll('option');
+  dayOptions.forEach(option => {
+    const dayValue = option.value;
+    if (!dayValue) return;
+    
+    const hasNew = gridRanges[dayValue] && gridRanges[dayValue]['new'] && Object.keys(gridRanges[dayValue]['new']).length > 0;
+    const hasOld = gridRanges[dayValue] && gridRanges[dayValue]['old'] && Object.keys(gridRanges[dayValue]['old']).length > 0;
+
+    if (!hasNew && !hasOld) {
+      option.disabled = true;
+      if (!option.textContent.includes('(বন্ধ)')) option.textContent += ' (বন্ধ)';
+    } else {
+      option.disabled = false;
+      option.textContent = option.textContent.replace(' (বন্ধ)', '');
+    }
+  });
+}
+
+function extractTimeNumber(timeStr) {
+  if (!timeStr) return 0;
+  const time = timeStr.toUpperCase().trim();
+  let [timePart, modifier] = time.split(' ');
+  if (!modifier) {
+    modifier = time.includes('PM') ? 'PM' : time.includes('AM') ? 'AM' : '';
+    if (modifier) timePart = time.replace(modifier, '').trim();
+  }
+  const [hours, minutes] = timePart.split(':').map(Number);
+  let hour24 = hours;
+  if (modifier === 'PM' && hours !== 12) hour24 = hours + 12;
+  else if (modifier === 'AM' && hours === 12) hour24 = 0;
+  return hour24 * 100 + (minutes || 0);
+}
+
 function updateBookingTimeOptions() {
   const day = document.getElementById('bookDay').value;
   const type = document.getElementById('bookType').value;
   const timeSelect = document.getElementById('bookTime');
   
   timeSelect.innerHTML = '<option value="">-- সময় নির্বাচন করুন --</option>';
-  
-  if (!day || !type) {
-    timeSelect.innerHTML = '<option value="">প্রথমে দিন ও ধরন নির্বাচন করুন</option>';
-    return;
-  }
-  
+  timeSelect.disabled = true;
+
+  if (!day || !type) return;
+
   if (gridRanges[day] && gridRanges[day][type]) {
-    // 🔥 সময়গুলো সাজানোর জন্য Array
-    const times = Object.keys(gridRanges[day][type]);
-    
-    // ✅ সঠিকভাবে সাজান (ঘন্টা অনুযায়ী)
-    times.sort((a, b) => {
-      return convertTimeToMinutes(a) - convertTimeToMinutes(b);
-    });
-    
-    times.forEach(time => {
-      const option = document.createElement('option');
-      option.value = time;
-      // 🔥 AM/PM ফরম্যাটে দেখান
-      option.textContent = formatTimeAMPM(time);
-      timeSelect.appendChild(option);
-    });
-  }
-  
-  if (timeSelect.options.length <= 1) {
-    timeSelect.innerHTML = '<option value="">-- কোনো সময় নেই --</option>';
+    const timeSlots = Object.keys(gridRanges[day][type]);
+    if (timeSlots.length > 0) {
+      timeSelect.disabled = false;
+      
+      const sortedTimes = timeSlots.sort((a, b) => extractTimeNumber(a) - extractTimeNumber(b));
+      const now = new Date();
+      const targetDateInfo = getNextDateByDay(day);
+
+      sortedTimes.forEach(time => {
+        const option = document.createElement('option');
+        option.value = time;
+        option.textContent = time;
+
+        const slotKey = `${day}_${time}_${type}`;
+        if (firebaseDisabledSlots[slotKey] === true) {
+          option.disabled = true;
+          option.textContent += ' (বন্ধ)';
+          timeSelect.appendChild(option);
+          return;
+        }
+
+        let isExpired = false;
+        if (targetDateInfo && targetDateInfo.isToday) {
+          let [timeStr, modifier] = time.toUpperCase().split(' ');
+          if (!modifier) {
+            modifier = time.includes('PM') ? 'PM' : time.includes('AM') ? 'AM' : '';
+            if (modifier) timeStr = time.replace(modifier, '').trim();
+          }
+          let [hours, minutes] = timeStr.split(':').map(Number);
+          if (modifier === 'PM' && hours < 12) hours += 12;
+          if (modifier === 'AM' && hours === 12) hours = 0;
+          
+          const slotTimeToday = new Date();
+          slotTimeToday.setHours(hours, minutes, 0, 0);
+          if (now > slotTimeToday) isExpired = true;
+        }
+
+        if (isExpired) {
+          option.disabled = true;
+          option.textContent += ' (এক্সপায়ার্ড)';
+          timeSelect.appendChild(option);
+          return;
+        }
+
+        let startSerial = 1, endSerial = 0;
+        const rangeValue = gridRanges[day][type][time];
+        if (rangeValue) {
+          if (Array.isArray(rangeValue)) {
+            startSerial = rangeValue[0]; endSerial = rangeValue[1];
+          } else if (typeof rangeValue === 'string') {
+            const parts = rangeValue.split('-');
+            startSerial = parseInt(parts[0]) || 1;
+            endSerial = parseInt(parts[parts.length - 1]) || 0;
+          }
+        }
+
+        let totalSeatsAllowed = (endSerial >= startSerial && startSerial > 0) ? (endSerial - startSerial) + 1 : 999;
+        
+        let bookedCountInRange = 0;
+        if (bookingGridSystem && bookingGridSystem.appointments) {
+          let allApps = [];
+          Object.values(bookingGridSystem.appointments).forEach(group => {
+            if (Array.isArray(group)) allApps.push(...group);
+          });
+          const matched = allApps.filter(app => {
+            const appDate = app.appointmentDate || app.date;
+            return app.day === day && (app.patientType || app.type) === type && (app.timeSlot || app.time) === time && appDate === targetDateInfo.dateString;
+          });
+          bookedCountInRange = matched.length;
+        }
+
+        if (totalSeatsAllowed > 0 && totalSeatsAllowed < 999 && bookedCountInRange >= totalSeatsAllowed) {
+          option.disabled = true;
+          option.textContent = time + ' (খালি নেই)';
+        } else {
+          option.disabled = false;
+          const available = totalSeatsAllowed - bookedCountInRange;
+          if (available > 0 && available < totalSeatsAllowed) {
+            option.textContent = time + ` (${available}টি খালি)`;
+          }
+        }
+
+        timeSelect.appendChild(option);
+      });
+    }
   }
 }
 
-// ============================================================
-// সময়কে মিনিটে কনভার্ট করার ফাংশন (সাজানোর জন্য)
-// ============================================================
-function convertTimeToMinutes(timeStr) {
-  if (!timeStr) return 0;
-  // "10:00 AM" বা "10:00" বা "10:00 am" সব ফরম্যাট সাপোর্ট
-  let cleaned = timeStr.trim().toUpperCase();
-  let hours = 0, minutes = 0;
-  let isPM = cleaned.includes('PM');
-  
-  // শুধু সংখ্যা বের করা
-  const parts = cleaned.match(/(\d+):?(\d+)?/);
-  if (parts) {
-    hours = parseInt(parts[1]);
-    minutes = parseInt(parts[2] || 0);
+function resetGridAndSelection() {
+  document.getElementById('bookTime').value = '';
+  document.getElementById('selectedSerial').value = '';
+  document.getElementById('confirmBookBtn').disabled = true;
+  document.getElementById('noSlotsMessage').style.display = 'none';
+
+  const gridContainer = document.getElementById('serialGrid');
+  if (gridContainer) {
+    gridContainer.innerHTML = `
+      <div style="grid-column:1/-1; text-align:center; padding:20px; color:#94a3b8;">
+        সময় নির্বাচন করুন...
+      </div>
+    `;
   }
-  
-  // ১২ ঘন্টা ফরম্যাট কনভার্ট
-  if (isPM && hours < 12) hours += 12;
-  if (!isPM && hours === 12) hours = 0;
-  
-  return hours * 60 + minutes;
+  if (bookingGridSystem && typeof bookingGridSystem.updateGrid === 'function') {
+    bookingGridSystem.updateGrid();
+  }
 }
 
-// ============================================================
-// সময়কে AM/PM ফরম্যাটে দেখানোর ফাংশন
-// ============================================================
-function formatTimeAMPM(timeStr) {
-  if (!timeStr) return timeStr;
+// 🛑 মাস ও দিন বেশি লিখলে তা স্বয়ংক্রিয়ভাবে বছর/মাসে কনভার্ট করার ফাংশন
+function normalizeAgeInputs() {
+  let years = parseInt(document.getElementById('ageYears').value) || 0;
+  let months = parseInt(document.getElementById('ageMonths').value) || 0;
+  let days = parseInt(document.getElementById('ageDays').value) || 0;
   
-  let cleaned = timeStr.trim().toUpperCase();
-  // ইতিমধ্যে AM/PM থাকলে সেটাই রিটার্ন
-  if (cleaned.includes('AM') || cleaned.includes('PM')) {
-    return timeStr;
+  let dbYears = years;
+  let dbMonths = months;
+  let dbDays = days;
+  
+  // যদি দিন ৩০ বা তার বেশি হয়, তবে তা মাসে রূপান্তর হবে (১ মাস = ৩০ দিন ধরে)
+  if (dbDays >= 30) {
+    dbMonths += Math.floor(dbDays / 30);
+    dbDays = dbDays % 30;
+  }
+
+  // যদি মাস ১২ বা তার বেশি হয়, তবে তা বছরে রূপান্তর হবে
+  if (dbMonths >= 12) {
+    dbYears += Math.floor(dbMonths / 12);
+    dbMonths = dbMonths % 12;
   }
   
-  // শুধু সংখ্যা বের করা
-  const parts = cleaned.match(/(\d+):?(\d+)?/);
-  if (!parts) return timeStr;
-  
-  let hours = parseInt(parts[1]);
-  let minutes = parseInt(parts[2] || 0);
-  let ampm = hours >= 12 ? 'PM' : 'AM';
-  
-  // ১২ ঘন্টা ফরম্যাটে কনভার্ট
-  let displayHour = hours % 12;
-  if (displayHour === 0) displayHour = 12;
-  
-  const minStr = minutes.toString().padStart(2, '0');
-  return `${displayHour}:${minStr} ${ampm}`;
+  return { 
+    dbYears: dbYears, 
+    dbMonths: dbMonths, 
+    dbDays: dbDays 
+  };
 }
 
-// ============================================================
-// বুকিং গ্রিড সিস্টেম ইনিশিয়ালাইজ
-// ============================================================
 function initializeBookingGridSystem() {
-  if (bookingGridSystem) {
-    bookingGridSystem.cleanup();
-    bookingGridSystem = null;
-  }
-
+  if (bookingGridSystem) { bookingGridSystem.cleanup(); }
+  
   bookingGridSystem = new RealTimeGridSystem({
     db: db,
     gridContainerId: 'serialGrid',
@@ -482,344 +583,230 @@ function initializeBookingGridSystem() {
     userPendingExpiry: 1 * 60 * 1000,
     
     onSerialClick: function(data) {
-      console.log('✅ সিরিয়াল সিলেক্টেড:', data);
       const btn = document.getElementById('confirmBookBtn');
       if (data.status === 'selected' || data.status === 'pending') {
         document.getElementById('selectedSerial').value = data.serial;
         btn.disabled = false;
-        btn.style.opacity = '1';
-        btn.style.cursor = 'pointer';
       } else {
         btn.disabled = true;
-        btn.style.opacity = '0.5';
-        btn.style.cursor = 'not-allowed';
       }
     },
     
     onGridUpdate: function(type, data) {
-      console.log('📊 গ্রিড আপডেট হয়েছে:', type, data);
-      // গ্রিড আপডেট হলে কনফর্ম বাটন ডিসেবল করুন
-      const btn = document.getElementById('confirmBookBtn');
-      if (!document.getElementById('selectedSerial').value) {
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-        btn.style.cursor = 'not-allowed';
+      const gridContainer = document.getElementById('serialGrid');
+      const noSlotsMsg = document.getElementById('noSlotsMessage');
+      if (gridContainer && type === 'grid') {
+        const availableItems = gridContainer.querySelectorAll('.serial-item.available');
+        if (availableItems.length === 0 && document.getElementById('bookTime').value) {
+          noSlotsMsg.style.display = 'block';
+        } else {
+          noSlotsMsg.style.display = 'none';
+        }
       }
     }
   });
   
-  return bookingGridSystem.init().then(success => {
-    if (success) {
-      console.log('✅ বুকিং গ্রিড সিস্টেম রেডি');
-      return true;
-    }
-    return false;
-  });
+  bookingGridSystem.init();
 }
 
-// ============================================================
-// গ্রিড রিফ্রেশ (ডে/টাইপ/টাইম চেঞ্জ হলে)
-// ============================================================
-function refreshBookingGrid() {
+document.getElementById('bookingForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+let name = '';
+  let phone = document.getElementById('patientPhone').value.trim();
+  let ageDisplay = 'প্রযোজ্য নয়';
+  let dbYears = 0, dbMonths = 0, dbDays = 0;
+
+  if (bookingMode === 'self') {
+    name = currentUserName || 'ইউজার';
+    phone = currentUserPhone;
+    ageDisplay = currentUserAge; 
+  } else {
+    name = document.getElementById('patientName').value.trim();
+    
+    // নরমালাইজেশন ফাংশন কল করে সঠিক বছর, মাস ও দিন বের করা
+    const normalizedAge = normalizeAgeInputs();
+    dbYears = normalizedAge.dbYears;
+    dbMonths = normalizedAge.dbMonths;
+    dbDays = normalizedAge.dbDays;
+    
+    let parts = [];
+    if (dbYears > 0) parts.push(`${dbYears} বছর`);
+    if (dbMonths > 0) parts.push(`${dbMonths} মাস`);
+    if (dbDays > 0) parts.push(`${dbDays} দিন`);
+    
+    ageDisplay = parts.join(' ') || '০ দিন';
+
+    if (!name) {
+      Swal.fire('সতর্কতা', 'রোগীর নাম লিখুন', 'warning');
+      return;
+    }
+  }
+
   const day = document.getElementById('bookDay').value;
   const type = document.getElementById('bookType').value;
   const time = document.getElementById('bookTime').value;
-  
-  const gridContainer = document.getElementById('serialGrid');
-  const btn = document.getElementById('confirmBookBtn');
-  
-  // বাটন ডিসেবল করুন
-  btn.disabled = true;
-  btn.style.opacity = '0.5';
-  btn.style.cursor = 'not-allowed';
-  document.getElementById('selectedSerial').value = '';
-  
-  // গ্রিড ক্লিয়ার করুন
-  if (gridContainer) {
-    if (!day || !type || !time) {
-      let msg = 'দিন, ধরন এবং সময় নির্বাচন করুন';
-      if (day && type && !time) msg = 'সময় নির্বাচন করুন';
-      else if (day && !type) msg = 'ধরন নির্বাচন করুন';
-      else if (!day) msg = 'দিন নির্বাচন করুন';
-      
-      gridContainer.innerHTML = `
-        <div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;">
-          ${msg}
-        </div>
-      `;
-      return;
-    }
-  }
-  
-  // Grid System আপডেট
-  if (bookingGridSystem) {
-    bookingGridSystem.updateGrid();
-  }
-}
+  const serial = parseInt(document.getElementById('selectedSerial').value);
 
-// ============================================================
-// সিরিয়াল বুকিং কনফার্ম
-// ============================================================
-async function updateAppointment(e) {
-  e.preventDefault();
-  
-  const id = document.getElementById('editAppointmentId').value;
-  const newSerial = parseInt(document.getElementById('editSerial').value);
-  const day = document.getElementById('editDay').value;
-  const time = document.getElementById('editTime').value;
-  const type = document.getElementById('editType').value;
-
-  // ১. সিরিয়াল ভ্যালিডেশন
-  if (!newSerial || isNaN(newSerial)) {
-    Swal.fire({ title: 'সতর্কতা!', text: 'অনুগ্রহ করে একটি সঠিক সিরিয়াল নির্বাচন করুন', icon: 'warning' });
+  if (!phone || !day || !type || !time || !serial) {
+    Swal.fire('সতর্কতা', 'সকল তথ্য সঠিকভাবে পূরণ করুন', 'warning');
     return;
   }
 
-  // ২. বয়স ক্যালিফোর্নিয়া স্ট্রিং প্রসেসিং
-  const years = parseInt(document.getElementById('editAgeYears').value) || 0;
-  const months = parseInt(document.getElementById('editAgeMonths').value) || 0;
-  const days = parseInt(document.getElementById('editAgeDays').value) || 0;
-  let ageString = '';
-  if (years > 0) ageString += `${years} বছর`;
-  if (months > 0) ageString += `${ageString ? ', ' : ''}${months} মাস`;
-  if (days > 0) ageString += `${ageString ? ', ' : ''}${days} দিন`;
-
   const nextDateInfo = getNextDateByDay(day);
-  const appointmentDate = nextDateInfo.dateString;
-  const appointmentDateDisplay = nextDateInfo.banglaDate;
-
-  // ৩. নতুন ফরম্যাট অনুযায়ী yymmdd এবং Custom ID গঠন
-  const yymmdd = appointmentDate.replace(/-/g, '').slice(2);
-  const formattedSerial = String(newSerial).padStart(2, '0');
-  const newCustomId = `${yymmdd}-${formattedSerial}`;
-  const targetSubcollection = type === 'new' ? 'new' : 'old';
+  const yymmdd = nextDateInfo.dateString.replace(/-/g, '').slice(2);
+  const formattedSerial = String(serial).padStart(2, '0');
+  const docId = `${yymmdd}-${formattedSerial}`;
+  const subcollectionName = type === 'new' ? 'new' : 'old';
 
   try {
-    // ৪. পুরোনো ডাটা চেক (পাস্ট ডেট এডিট ব্লক করতে)
-    // new এবং old দুটি সাব-কালেকশনেই সার্চ করে আগের ডকুমেন্ট খুঁজে বের করা
-    let oldDocRef = null;
-    let oldDocData = null;
+    const docRef = db.collection('appointments').doc(yymmdd).collection(subcollectionName).doc(docId);
+    const docSnap = await docRef.get();
 
-    const checkNewSnap = await db.collectionGroup('new').where('appointmentId', '==', id).get();
-    if (!checkNewSnap.empty) {
-      oldDocRef = checkNewSnap.docs[0].ref;
-      oldDocData = checkNewSnap.docs[0].data();
-    } else {
-      const checkOldSnap = await db.collectionGroup('old').where('appointmentId', '==', id).get();
-      if (!checkOldSnap.empty) {
-        oldDocRef = checkOldSnap.docs[0].ref;
-        oldDocData = checkOldSnap.docs[0].data();
-      }
-    }
-
-    // যদি পাস্ট ডেট হয় তবে এডিট করতে দেওয়া হবে না
-    const todayStr = getTodayStr();
-    if (oldDocData && oldDocData.appointmentDate && oldDocData.appointmentDate < todayStr) {
-      Swal.fire({ title: 'অপারেশন ব্যর্থ!', text: 'অতিক্রান্ত সিরিয়াল এডিট বা আপডেট করা সম্ভব নয়।', icon: 'error' });
-      document.getElementById('editAppointmentModal').style.display = 'none';
+    if (docSnap.exists) {
+      Swal.fire('দুঃখিত', 'এই সিরিয়ালটি ইতিমধ্যে বুক হয়ে গেছে!', 'error');
+      if (bookingGridSystem) bookingGridSystem.updateGrid();
       return;
     }
 
-    // ৫. নতুন টার্গেট ডকুমেন্টের রেফারেন্স
-    const newDocRef = db
-      .collection('appointments')
-      .doc(yymmdd)
-      .collection(targetSubcollection)
-      .doc(newCustomId);
-
-    // ৬. ডুপ্লিকেট সিরিয়াল চেক (যদি সিরিয়াল/তারিখ/টাইপ পরিবর্তন করা হয়)
-    if (!oldDocRef || oldDocRef.path !== newDocRef.path) {
-      const duplicateCheck = await newDocRef.get();
-      if (duplicateCheck.exists) {
-        Swal.fire({ title: 'দুঃখিত!', text: 'এই নতুন সিরিয়ালটি ইতিমধ্যে বুকিং করা আছে। অন্য সিরিয়াল নির্বাচন করুন।', icon: 'error' });
-        return;
-      }
-    }
-
-    // ৭. প্যারেন্ট তারিখের ডকুমেন্ট নিশ্চিত করা
-    const mainDateDocRef = db.collection('appointments').doc(yymmdd);
-    const mainDateDoc = await mainDateDocRef.get();
-    if (!mainDateDoc.exists) {
-      await mainDateDocRef.set({
-        date: appointmentDate,
-        dateDisplay: appointmentDateDisplay,
+    const parentRef = db.collection('appointments').doc(yymmdd);
+    const parentSnap = await parentRef.get();
+    if (!parentSnap.exists) {
+      await parentRef.set({
+        date: nextDateInfo.dateString,
+        dateDisplay: nextDateInfo.banglaDate,
         day: day,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
 
-    // ৮. আপডেটেড ডাটা অবজেক্ট তৈরি
-    const updatedAppointmentData = {
-      appointmentId: newCustomId,
-      name: document.getElementById('editName').value,
-      phone: document.getElementById('editPhone').value,
-      age: ageString,
-      ageYears: years,
-      ageMonths: months,
-      ageDays: days,
-      day: day,
-      time: time,
-      timeSlot: time,
+    currentAppointmentData = {
+      appointmentId: docId,
+      name, phone, day, time, serial,
       patientType: type,
-      serial: newSerial,
-      status: oldDocData?.status || 'confirmed',
-      date: appointmentDate,
-      appointmentDate: appointmentDate,
-      appointmentDateDisplay: appointmentDateDisplay,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      ageYears: dbYears,
+      ageMonths: dbMonths,
+      ageDays: dbDays,
+      ageDisplay: ageDisplay,
+      age: ageDisplay,
+      date: nextDateInfo.dateString,
+      appointmentDate: nextDateInfo.dateString,
+      appointmentDateDisplay: nextDateInfo.banglaDate,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      status: 'confirmed'
     };
 
-    // ৯. যদি পাত্র/পাথ পরিবর্তিত হয়ে থাকে (যেমন: new থেকে old বা ভিন্ন সিরিয়াল/তারিখ)
-    // সেক্ষেত্রে পুরোনো ডকুমেন্ট ডিলিট করে নতুনটিতে সেভ করা হবে
-    if (oldDocRef && oldDocRef.path !== newDocRef.path) {
-      await oldDocRef.delete();
+    await docRef.set(currentAppointmentData);
+
+    try {
+      const smsMessage = `Dear ${name}, your Serial No: ${serial}, Date: ${nextDateInfo.dateString}, Time: ${time}. Thank you!`;
+      const smsUrl = `https://api.automas.com.bd/smsapiv3?apikey=74a82f2a949057f0e67fa4b672f75275&sender=8809617635159&msisdn=${phone}&smstext=${encodeURIComponent(smsMessage)}`;
+      fetch(smsUrl, { method: 'POST', mode: 'no-cors' });
+    } catch(err) { console.warn('SMS error:', err); }
+
+    document.getElementById('slipName').textContent = name;
+    document.getElementById('slipAge').textContent = ageDisplay;
+    document.getElementById('slipPhone').textContent = phone;
+    document.getElementById('slipDay').textContent = nextDateInfo.banglaDate;
+    document.getElementById('slipTime').textContent = time;
+    document.getElementById('slipSerial').textContent = `#${serial}`;
+    
+    document.getElementById('confirmationSlip').style.display = 'block';
+    document.getElementById('downloadButtons').style.display = 'flex';
+    document.getElementById('popupMessage').textContent = 'আপনার সিরিয়াল বুকিং সফল হয়েছে!';
+    document.getElementById('universalPopup').style.display = 'flex';
+
+    if(analytics) {
+      firebase.analytics().logEvent('serial_booked', { patient_type: type, day: day });
     }
-
-    // ১০. নতুন পাথে ডাটা সেভ
-    await newDocRef.set(updatedAppointmentData, { merge: true });
-
-    // ১১. ক্লিনআপ এবং সাকসেস মেসেজ
-    document.getElementById('editAppointmentModal').style.display = 'none';
-    editModeId = null;
-    if (editGridSystem) { editGridSystem.cleanup(); editGridSystem = null; }
-
-    Swal.fire({ 
-      title: '✅ সফল!', 
-      text: 'অ্যাপয়েন্টমেন্ট আপডেট করা হয়েছে', 
-      icon: 'success', 
-      timer: 2000, 
-      showConfirmButton: false 
-    });
-
-    fetchAppointments();
 
   } catch (error) {
-    console.error('Update error:', error);
-    Swal.fire({ title: 'সমস্যা!', text: 'আপডেট করতে সমস্যা হয়েছে: ' + error.message, icon: 'error' });
-  }
-}
-
-// ============================================================
-// সাইডবার স্ট্যাট আপডেট - components-inline.js এর ফাংশন ব্যবহার
-// ============================================================
-function updateSidebarStats() {
-  // components-inline.js এর window.updateSidebarStats ফাংশন কল
-  if (typeof window.updateSidebarStats === 'function') {
-    // ফাংশনটি components-inline.js এ ডিফাইন করা আছে
-    // এটি sideTotal এবং sidePending আপডেট করবে
-    window.updateSidebarStats(0, 0);
-  }
-}
-
-// ============================================================
-// কম্পোনেন্ট লোডার রেডি হওয়ার জন্য অপেক্ষা
-// ============================================================
-function waitForComponentLoader(callback, retries = 15) {
-  if (typeof ComponentLoader !== 'undefined' && ComponentLoader.loadAllComponents) {
-    callback();
-    return;
-  }
-  if (retries <= 0) {
-    console.warn('⚠️ ComponentLoader পাওয়া যায়নি, ডিফল্ট UI লোড হচ্ছে');
-    return;
-  }
-  setTimeout(() => waitForComponentLoader(callback, retries - 1), 300);
-}
-
-// ============================================================
-// DOM লোড হলে
-// ============================================================
-document.addEventListener('DOMContentLoaded', async function() {
-  // সেশন চেক
-  if (!currentUser) {
-    currentUser = sessionStorage.getItem('userPhone') || sessionStorage.getItem('loggedInUser');
-    if (!currentUser) {
-      window.location.href = 'login.html';
-      return;
-    }
-  }
-
-  // হেডার ডেট
-  const now = new Date();
-  document.getElementById('headerDate').textContent = formatDate(now);
-
-  // কম্পোনেন্ট লোড
-  waitForComponentLoader(() => {
-    ComponentLoader.loadAllComponents('সিরিয়াল বুকিং');
-    console.log('✅ কম্পোনেন্ট লোড সম্পন্ন');
-  });
-
-  // ===== ইভেন্ট লিসেনার =====
-  
-  // দিন পরিবর্তন
-  document.getElementById('bookDay').addEventListener('change', function() {
-    updateBookingTimeOptions();
-    document.getElementById('selectedSerial').value = '';
-    const gridContainer = document.getElementById('serialGrid');
-    if (gridContainer) {
-      gridContainer.innerHTML = `
-        <div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;">
-          সময় নির্বাচন করুন...
-        </div>
-      `;
-    }
-    setTimeout(refreshBookingGrid, 100);
-  });
-
-  // ধরন পরিবর্তন
-  document.getElementById('bookType').addEventListener('change', function() {
-    updateBookingTimeOptions();
-    document.getElementById('selectedSerial').value = '';
-    const gridContainer = document.getElementById('serialGrid');
-    if (gridContainer) {
-      gridContainer.innerHTML = `
-        <div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;">
-          ${document.getElementById('bookDay').value ? 'সময় নির্বাচন করুন...' : 'দিন নির্বাচন করুন...'}
-        </div>
-      `;
-    }
-    setTimeout(refreshBookingGrid, 100);
-  });
-
-  // সময় পরিবর্তন
-  document.getElementById('bookTime').addEventListener('change', function() {
-    document.getElementById('selectedSerial').value = '';
-    const btn = document.getElementById('confirmBookBtn');
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-    btn.style.cursor = 'not-allowed';
-    refreshBookingGrid();
-  });
-
-  // কনফর্ম বুকিং বাটন
-  document.getElementById('confirmBookBtn').addEventListener('click', confirmBooking);
-
-  // ===== ডাটা লোড =====
-  await loadRanges();
-  updateBookingTimeOptions();
-  
-  // গ্রিড সিস্টেম ইনিশিয়ালাইজ
-  await initializeBookingGridSystem();
-  
-  // প্রাথমিক গ্রিড অবস্থা
-  const gridContainer = document.getElementById('serialGrid');
-  if (gridContainer && !gridContainer.querySelector('.serial-item')) {
-    gridContainer.innerHTML = `
-      <div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;">
-        দিন, ধরন এবং সময় নির্বাচন করুন
-      </div>
-    `;
+    console.error('Save error:', error);
+    Swal.fire('ত্রুটি', 'ডাটা সেভ করতে সমস্যা হয়েছে', 'error');
   }
 });
 
-// ============================================================
-// ক্লিনআপ
-// ============================================================
-window.addEventListener('beforeunload', function() {
-  if (bookingGridSystem) {
-    bookingGridSystem.cleanup();
-    bookingGridSystem = null;
+function closePopup() {
+  document.getElementById('universalPopup').style.display = 'none';
+  location.reload();
+}
+
+async function downloadPNG() {
+  const slip = document.getElementById('confirmationSlip');
+  const canvas = await html2canvas(slip, { scale: 3 });
+  const link = document.createElement('a');
+  link.download = `serial-${currentAppointmentData.serial}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+async function downloadPDF() {
+  const { jsPDF } = window.jspdf;
+  const slip = document.getElementById('confirmationSlip');
+  const canvas = await html2canvas(slip, { scale: 3 });
+  const pdf = new jsPDF('portrait', 'mm', 'a6');
+  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), (canvas.height * pdf.internal.pageSize.getWidth()) / canvas.width);
+  pdf.save(`serial-${currentAppointmentData.serial}.pdf`);
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
+  document.getElementById('headerDate').textContent = formatDate(new Date());
+  
+  if (typeof ComponentLoader !== 'undefined') {
+    ComponentLoader.loadAllComponents('সিরিয়াল বুকিং');
   }
+
+  await fetchUserData();
+  
+  const phoneInput = document.getElementById('patientPhone');
+  phoneInput.value = currentUserPhone;
+  phoneInput.readOnly = true;
+  phoneInput.style.backgroundColor = '#f1f5f9';
+
+  const nameInput = document.getElementById('name');
+  const nameError = document.getElementById('nameError');
+  if (nameInput && nameError) {
+    nameInput.addEventListener('input', () => {
+      const val = nameInput.value.trim();
+      const lowerVal = val.toLowerCase();
+      const baseValid = /^[\p{L}\p{M}\. ]{3,50}$/u.test(val);
+      const hasVowelOrCar = /[aeiouAEIOU\u0985-\u0994\u09BE-\u09CC]/.test(val);
+      const hasConsecutiveConsonants = /[bcdfghjklmnpqrstvwxyz]{4,}/.test(lowerVal);
+      const hasRepeatedChars = /(.)\1\1/.test(lowerVal);
+
+      if (!baseValid || !hasVowelOrCar || hasConsecutiveConsonants || hasRepeatedChars) {
+        nameError.style.display = 'block';
+        nameError.textContent = 'অনুগ্রহ করে রোগীর সঠিক নাম লিখুন (সংখ্যা বা এলোমেলো অক্ষর গ্রহণযোগ্য নয়)।';
+        nameInput.setCustomValidity('invalid');
+      } else {
+        nameError.style.display = 'none';
+        nameInput.setCustomValidity('');
+      }
+    });
+  }
+
+  // দিন পরিবর্তন করলে সময় ড্রপডাউন ও গ্রিড সম্পূর্ণ রিসেট হবে
+  document.getElementById('bookDay').addEventListener('change', () => { 
+    updateBookingTimeOptions(); 
+    resetGridAndSelection();
+  });
+
+  // রোগীর ধরন পরিবর্তন করলে সময় ড্রপডাউন ও গ্রিড সম্পূর্ণ রিসেট হবে
+  document.getElementById('bookType').addEventListener('change', () => { 
+    updateBookingTimeOptions(); 
+    resetGridAndSelection();
+  });
+
+  // সময় পরিবর্তন করলে সিরিয়াল ইনপুট ও গ্রিড আপডেট হবে
+  document.getElementById('bookTime').addEventListener('change', () => {
+    document.getElementById('selectedSerial').value = '';
+    document.getElementById('confirmBookBtn').disabled = true;
+    document.getElementById('noSlotsMessage').style.display = 'none';
+    if (bookingGridSystem) bookingGridSystem.updateGrid();
+  });
+
+  await loadRangesAndSlots();
+  initializeBookingGridSystem();
 });
 </script>
 
