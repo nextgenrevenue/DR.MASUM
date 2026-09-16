@@ -598,7 +598,7 @@
   // ==================== MENU CONFIG ====================
   const MENU_CONFIG = {
     user: [
-      { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'ড্যাশবোর্ড', page: 'dashboard' },
+      { id: 'userdashboard', icon: 'fa-tachometer-alt', label: 'ড্যাশবোর্ড', page: 'userdashboard' },
       { id: 'my-serials', icon: 'fa-list-alt', label: 'সিরিয়াল তালিকা', page: 'my-serials' },
       { id: 'book-serial', icon: 'fa-calendar-plus', label: 'সিরিয়াল বুক', page: 'book-serial' },
       { id: 'profile', icon: 'fa-user-edit', label: 'প্রোফাইল', page: 'profile', isDropdown: true },
@@ -1071,7 +1071,7 @@ async loadNameFromFirebase(phone) {
      
      const currentPageName = path.split("/").pop();
      
-     const pages = ['dashboard', 'my-serials', 'book-serial', 'profile', 'change-password',
+     const pages = ['dashboard', 'userdashboard', 'my-serials', 'book-serial', 'profile', 'change-password',
                     'tokenmanagement', 'notice', 'allserial', 'management','admin-chat', 'admincontrol', 'reports'];
      
      if (pages.includes(currentPageName)) {
