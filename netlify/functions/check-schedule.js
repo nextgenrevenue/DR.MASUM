@@ -82,4 +82,4 @@ const myScheduleHandler = async function(event, context) {
 };
 
 // Netlify Scheduled Cron (প্রতি ১ মিনিটে চলবে)
-exports.handler = schedule('* * * * *', myScheduleHandler);
+exports.handler = myScheduleHandler;
