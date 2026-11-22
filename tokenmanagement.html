@@ -176,7 +176,7 @@
     .table-wrapper {
       overflow-x: auto;
       overflow-y: auto;
-      max-height: 500px;
+      max-height: 650px;
       min-height: 400px;
     }
     
@@ -224,6 +224,74 @@
     tr:hover {
       background: #f9fafb;
     }
+
+tr {
+  position: relative;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* পুরো রো-এর ব্যাকগ্রাউন্ড আর সবুজ হবে না */
+tr.row-seen {
+  background-color: transparent;
+}
+
+.patient-name-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  overflow: hidden;
+  transition: background-color 0.35s ease, color 0.35s ease;
+}
+
+/* প্রেস করে ধরে রাখার সময় নিচে হালকা প্রগ্রেস বার */
+.patient-name-wrap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 0%;
+  background-color: #10b981;
+  transition: width 0.6s linear;
+  pointer-events: none;
+}
+
+tr.pressing .patient-name-wrap::after {
+  width: 100%;
+}
+
+tr.row-seen .patient-name-wrap {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+tr.row-seen .patient-name-wrap::after {
+  display: none;
+}
+
+.seen-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  font-weight: 700;
+  font-size: 12px;
+  color: #065f46;
+  transform: scale(0.5);
+  transition: width 0.25s ease, opacity 0.25s ease, transform 0.25s ease;
+}
+
+tr.row-seen .seen-check {
+  width: 14px;
+  opacity: 1;
+  transform: scale(1);
+}
 
     .status-badge {
       display: inline-block;
@@ -480,7 +548,7 @@
       }
       
       .table-wrapper {
-        max-height: 400px;
+        max-height: 610px;
       }
     }
     
@@ -944,32 +1012,49 @@ async function loadTokenData() {
       const tokenNumber = token.tokenNumber || '—';
       const serialNumber = token.serial || '—';
       const givenBy = token.givenBy || token.reference || '—';
+      const isSeen = token.isCalled === true;
       
       return `
-        <tr>
-          <td>${formatDate(token.tokenTimestamp)}</td>
-          <td><strong>${tokenNumber}</strong></td>
-          <td>${toBengaliNumber(serialNumber)}</td>
-          <td><strong>${escapeHtml(token.patientName || '—')}</strong></td>
-          <td>${token.patientAge || '—'}</td>
-          <td>${token.patientPhone || '—'}</td>
-          <td>${token.patientType === 'new' ? 'নতুন' : 'পুরাতন'}</td>
-          <td>${toBengaliNumber(fee)} টাকা</td>
-          <td>${toBengaliNumber(paid)} টাকা</td>
-          <td>${toBengaliNumber(due)} টাকা</td>
-          <td><span class="status-badge ${status === 'paid' ? 'status-paid' : 'status-due'}">${status === 'paid' ? 'পরিশোধিত' : 'বাকি'}</span></td>
-          <td>${givenBy}</td>
-          <td>
-            <div class="action-buttons">
-              <button class="btn-view" onclick="viewTokenDetails('${token.id}')">
-                <i class="fas fa-eye"></i> বিস্তারিত
-              </button>
-              <button class="btn-delete" onclick="deleteToken('${token.id}', '${escapeHtml(token.patientName || 'এই টোকেন')}')">
-                <i class="fas fa-trash"></i> ডিলিট
-              </button>
-            </div>
-          </td>
-        </tr>
+        <tr
+  class="${isSeen ? 'row-seen' : ''}"
+  onmousedown="startRowLongPress(event, this, '${token.id}', ${isSeen})"
+  onmouseup="cancelRowLongPress()"
+  onmouseleave="cancelRowLongPress()"
+  ontouchstart="startRowLongPress(event, this, '${token.id}', ${isSeen})"
+  ontouchend="cancelRowLongPress()"
+  ontouchcancel="cancelRowLongPress()"
+  ontouchmove="cancelRowLongPress()"
+  ondblclick="handleRowDoubleClick(event, '${token.id}', ${isSeen})"
+  onclick="handleRowClickGuard(event)"
+>
+  <td>${formatDate(token.tokenTimestamp)}</td>
+  <td><strong>${tokenNumber}</strong></td>
+  <td>${toBengaliNumber(serialNumber)}</td>
+  <td>
+    <span class="patient-name-wrap">
+      <strong>${escapeHtml(token.patientName || '—')}</strong>
+      <span class="seen-check">✓</span>
+    </span>
+  </td>
+  <td>${token.patientAge || '—'}</td>
+  <td>${token.patientPhone || '—'}</td>
+  <td>${token.patientType === 'new' ? 'নতুন' : 'পুরাতন'}</td>
+  <td>${toBengaliNumber(fee)} টাকা</td>
+  <td>${toBengaliNumber(paid)} টাকা</td>
+  <td>${toBengaliNumber(due)} টাকা</td>
+  <td><span class="status-badge ${status === 'paid' ? 'status-paid' : 'status-due'}">${status === 'paid' ? 'পরিশোধিত' : 'বাকি'}</span></td>
+  <td>${givenBy}</td>
+  <td>
+    <div class="action-buttons">
+      <button class="btn-view" onclick="viewTokenDetails('${token.id}')">
+        <i class="fas fa-eye"></i> বিস্তারিত
+      </button>
+      <button class="btn-delete" onclick="deleteToken('${token.id}', '${escapeHtml(token.patientName || 'এই টোকেন')}')">
+        <i class="fas fa-trash"></i> ডিলিট
+      </button>
+    </div>
+  </td>
+</tr>
       `;
     }).join('');
   }
@@ -1237,6 +1322,157 @@ async function saveAndPrintNewToken() {
   }
 }
 
+const LONG_PRESS_DURATION = 600;
+let longPressTimer = null;
+let activePressRow = null;
+let longPressTriggered = false;
+
+async function toggleCalledStatus(tokenId, currentSeen) {
+  if (!db || !tokenId) return;
+
+  const nextSeen = !currentSeen;
+  const dateFolder = tokenId.split('-')[0];
+
+  try {
+    let tokenRef = db.collection('paymentHistories')
+      .doc(dateFolder)
+      .collection('payment_new')
+      .doc(tokenId);
+
+    let tokenDoc = await tokenRef.get();
+
+    if (!tokenDoc.exists) {
+      tokenRef = db.collection('paymentHistories')
+        .doc(dateFolder)
+        .collection('payment_old')
+        .doc(tokenId);
+      tokenDoc = await tokenRef.get();
+    }
+
+    if (!tokenDoc.exists) {
+      showAlert('❌ টোকেন খুঁজে পাওয়া যায়নি!', 'error');
+      return;
+    }
+
+    await tokenRef.update({
+      isCalled: nextSeen,
+      calledAt: nextSeen ? firebase.firestore.FieldValue.serverTimestamp() : null
+    });
+
+    // যুক্ত থাকা অ্যাপয়েন্টমেন্ট ডকুমেন্ট আপডেট (Token Given <-> Visited)
+    const tokenData = tokenDoc.data() || {};
+    const appointmentId = tokenData.appointmentId;
+
+    if (appointmentId) {
+      const apptDateFolder = appointmentId.split('-')[0];
+      let apptRef = db.collection('appointments')
+        .doc(apptDateFolder)
+        .collection('new')
+        .doc(appointmentId);
+
+      let apptDoc = await apptRef.get();
+      if (!apptDoc.exists) {
+        apptRef = db.collection('appointments')
+          .doc(apptDateFolder)
+          .collection('old')
+          .doc(appointmentId);
+        apptDoc = await apptRef.get();
+      }
+
+      if (apptDoc.exists) {
+        const apptUpdate = nextSeen
+          ? {
+              status: 'visited',
+              tokenGiven: false,
+              tokenStatus: 'visited',
+              visitedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }
+          : {
+              status: 'pending',
+              tokenGiven: true,
+              tokenStatus: 'given',
+              visitedAt: null
+            };
+
+        await apptRef.update(apptUpdate);
+      }
+    }
+
+    if (Array.isArray(window.cachedTokens)) {
+      window.cachedTokens = window.cachedTokens.map(t =>
+        t.id === tokenId ? { ...t, isCalled: nextSeen } : t
+      );
+      if (typeof updateStats === 'function') updateStats(window.cachedTokens);
+      if (typeof renderTokenTable === 'function') renderTokenTable(window.cachedTokens);
+    } else if (typeof loadTokenData === 'function') {
+      await loadTokenData();
+    }
+
+    showAlert(
+      nextSeen ? '✅ রোগী দেখা হয়েছে হিসেবে চিহ্নিত করা হয়েছে' : '↩️ চিহ্ন বাতিল করা হয়েছে',
+      'success'
+    );
+  } catch (err) {
+    console.error('toggleCalledStatus error:', err);
+    showAlert('❌ স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে: ' + err.message, 'error');
+  }
+}
+
+function startRowLongPress(event, rowEl, tokenId, currentSeen) {
+  if (event.type === 'mousedown' && event.button !== 0) return;
+  if (event.target.closest('button, a, input, select, .action-buttons')) return;
+
+  cancelRowLongPress();
+  longPressTriggered = false;
+  activePressRow = rowEl;
+  rowEl.classList.add('pressing');
+
+  longPressTimer = setTimeout(() => {
+    longPressTriggered = true;
+    rowEl.classList.remove('pressing');
+
+    const selectedText = window.getSelection ? window.getSelection().toString().trim() : '';
+    if (selectedText.length > 0) return;
+
+    if (navigator.vibrate) {
+      navigator.vibrate(25);
+    }
+
+    toggleCalledStatus(tokenId, currentSeen);
+  }, LONG_PRESS_DURATION);
+}
+
+function cancelRowLongPress() {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+  if (activePressRow) {
+    activePressRow.classList.remove('pressing');
+    activePressRow = null;
+  }
+}
+
+function handleRowDoubleClick(event, tokenId, currentSeen) {
+  if (event.target.closest('button, a, input, select, .action-buttons')) return;
+
+  if (window.getSelection) {
+    window.getSelection().removeAllRanges();
+  }
+
+  toggleCalledStatus(tokenId, currentSeen);
+}
+
+function handleRowClickGuard(event) {
+  if (longPressTriggered) {
+    longPressTriggered = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+}
+
+window.addEventListener('scroll', cancelRowLongPress, { passive: true });
+
 async function deleteToken(tokenId, tokenName) {
   const confirmDelete = confirm(`"${tokenName}" টোকেনটি ডিলিট করতে চান?`);
   if (!confirmDelete) return;
@@ -1300,11 +1536,14 @@ async function deleteToken(tokenId, tokenName) {
       // অ্যাপয়েন্টমেন্ট পাওয়া গেলে তার টোকেন ফ্ল্যাগগুলো রিসেট করা
       if (appointmentDoc.exists) {
         batch.update(appointmentRef, {
-          tokenGiven: false,
-          tokenNumber: null,
-          tokenTimestamp: null,
-          tokenFee: null,
-          tokenPaid: null,
+         status: 'pending',
+         tokenGiven: false,
+         tokenStatus: null,
+         tokenNumber: null,
+         tokenTimestamp: null,
+         tokenFee: null,
+         tokenPaid: null,
+         visitedAt: null,
           lastTokenUpdate: firebase.firestore.FieldValue.serverTimestamp()
         });
       } else {
@@ -1312,7 +1551,6 @@ async function deleteToken(tokenId, tokenName) {
       }
     }
     
-    // ৫. সম্পর্কিত পেমেন্ট হিস্ট্রি (যদি থাকে) ডিলিট করা
     // collectionGroup ব্যবহার করে উভয় সাব-কালেকশন থেকে সম্পর্কিত ডাটা বের করা
     const [relNewSnap, relOldSnap] = await Promise.all([
       db.collectionGroup('payment_new').where('tokenTimestamp', '==', tokenId).get(),
@@ -2250,7 +2488,7 @@ return;
 
   document.body.appendChild(container);
 
-  // ফোনের রেশিও লক হ্যাক
+ // ফোনের রেশিও লক হ্যাক
   const originalDevicePixelRatio = window.devicePixelRatio;
   Object.defineProperty(window, 'devicePixelRatio', {
     get: function() { return 1; },
@@ -2259,12 +2497,12 @@ return;
 
   setTimeout(() => {
     html2canvas(container, {
-      scale: 3, 
+      scale: 3,
       useCORS: true,
       allowTaint: true,
       logging: false,
-      width: targetWidth, 
-      windowWidth: targetWidth 
+      width: targetWidth,
+      windowWidth: targetWidth
     }).then(canvas => {
       delete window.devicePixelRatio;
       Object.defineProperty(window, 'devicePixelRatio', {
@@ -2273,18 +2511,23 @@ return;
         configurable: true
       });
 
-      const imgData = canvas.toDataURL('image/png');
-      
-      const pdfWidth = 58; 
+      const imgData = canvas.toDataURL('image/jpeg', 0.78);
+
+      const pdfWidth = 58;
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
+
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF('p', 'mm', [pdfWidth, pdfHeight]);
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight],
+        compress: true
+      });
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+
       const pdfBlob = pdf.output('blob');
       const file = new File([pdfBlob], "Report.pdf", { type: "application/pdf" });
-      
+
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         navigator.share({
           files: [file],
@@ -2483,7 +2726,7 @@ async function generateTokenPrint() {
       </html>
     `;
 
-    // 🔴 ৩. ডিভাইস পিক্সেল রেশিও ক্রাশ হ্যাক
+   // 🔴 ৩. ডিভাইস পিক্সেল রেশিও ক্রাশ হ্যাক
     const originalDevicePixelRatio = window.devicePixelRatio;
     Object.defineProperty(window, 'devicePixelRatio', {
       get: function() { return 1; },
@@ -2508,17 +2751,22 @@ async function generateTokenPrint() {
         configurable: true
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', 0.78);
 
       // ৪. PDF সাইজ জেনারেশন
       const pdfWidth = 58; 
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF('p', 'mm', [pdfWidth, pdfHeight]);
-      doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight],
+        compress: true
+      });
+      doc.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
 
-      // ৫. ফাইল শেয়ার বা ডাউনলোড
+      // ৫. ফাইল শেয়ার বা ডাউনলোড
       const pdfBlob = doc.output('blob');
       const file = new File([pdfBlob], "Token_list.pdf", { type: 'application/pdf' });
 
@@ -2535,16 +2783,15 @@ async function generateTokenPrint() {
       document.body.removeChild(container);
 
       if (startTokenId && endTokenId) {
-        showAlert(`✅ ${filteredTokens.length}টি টোকেন (${startTokenId} – ${endTokenId}) প্রিন্ট হয়েছে`, 'success');
+        showAlert(`✅ ${filteredTokens.length}টি টোকেন (${startTokenId} – ${endTokenId}) প্রিন্ট হয়েছে`, 'success');
       } else {
-        showAlert(`✅ সব ${filteredTokens.length}টি টোকেন প্রিন্ট হয়েছে`, 'success');
+        showAlert(`✅ সব ${filteredTokens.length}টি টোকেন প্রিন্ট হয়েছে`, 'success');
       }
     }, 400);
     
     return;
   }
 }
-
 
 // 🔥 print এর জন্য হেল্পার ফাংশন (খুব সিম্পল)
 async function getFilteredTokens() {
