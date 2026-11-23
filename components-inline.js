@@ -1236,6 +1236,73 @@ function updateUI(total, pending) {
   // ==================== GLOBAL ====================
   window.ComponentLoader = ComponentLoader;
   
+// ==================== PAGE PERMISSIONS ====================
+  const PAGE_PERMISSIONS = {
+    'userdashboard': ['user', 'admin', 'staff', 'owner'],
+    'my-serials': ['user', 'admin', 'staff', 'owner'],
+    'book-serial': ['user', 'admin', 'staff', 'owner'],
+    'profile': ['user', 'admin', 'staff', 'owner'],
+    'change-password': ['user', 'admin', 'staff', 'owner'],
+
+    'dashboard': ['admin', 'staff', 'owner'],
+    'tokenmanagement': ['admin', 'owner'],
+    'admin-chat': ['admin', 'owner'],
+    'notice': ['admin', 'staff', 'owner'],
+
+    'allserial': ['staff', 'owner'],
+    'management': ['staff', 'owner'],
+    'admincontrol': ['owner'],
+    'reports': ['owner']
+  };
+
+  ComponentLoader.checkPageAccess = function() {
+    const isLoggedIn = sessionStorage.getItem('adminLoggedIn') === 'true';
+    const loginTime = parseInt(sessionStorage.getItem('loginTime') || '0', 10);
+    const twoHours = 2 * 60 * 60 * 1000;
+
+    if (!isLoggedIn || !loginTime || (Date.now() - loginTime) >= twoHours) {
+      sessionStorage.clear();
+      window.location.replace('login.html');
+      return false;
+    }
+
+    const role = (sessionStorage.getItem('userRole') || 'user').toLowerCase();
+    const currentPage = this.getCurrentPage();
+    const allowedRoles = PAGE_PERMISSIONS[currentPage];
+    const fallback = (role === 'admin' || role === 'staff' || role === 'owner')
+      ? 'dashboard.html'
+      : 'userdashboard.html';
+
+    if (!allowedRoles || !allowedRoles.includes(role)) {
+      if (window.location.pathname.toLowerCase().indexOf(fallback) === -1) {
+        window.location.replace(fallback);
+      }
+      return false;
+    }
+
+    if (role === 'staff') {
+      const staffFlags = {
+        'management': sessionStorage.getItem('can_management') === 'true',
+        'notice': sessionStorage.getItem('can_notice') === 'true',
+        'allserial': sessionStorage.getItem('can_allserial') === 'true'
+      };
+
+      if (currentPage in staffFlags && !staffFlags[currentPage]) {
+        if (window.location.pathname.toLowerCase().indexOf('dashboard.html') === -1) {
+          window.location.replace('dashboard.html');
+        }
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  // ==================== IMMEDIATE ACCESS GUARD ====================
+  if (typeof ComponentLoader.checkPageAccess === 'function') {
+    ComponentLoader.checkPageAccess();
+  }
+
   // ==================== AUTO LOAD ====================
   document.addEventListener('DOMContentLoaded', function() {
     if (document.body.hasAttribute('data-auto-load-components')) {
@@ -1243,5 +1310,5 @@ function updateUI(total, pending) {
       ComponentLoader.loadAllComponents(pageTitle);
     }
   });
-  
+
 })();
