@@ -42,30 +42,30 @@ const myScheduleHandler = async function(event, context) {
   try {
     const docRef = db.collection('settings').doc('appointmentNotice');
     const doc = await docRef.get();
-    
+
     if (!doc.exists) return { statusCode: 404 };
-    
+
     const data = doc.data();
     if (data.statusType !== 'scheduled') return { statusCode: 200 };
-    
+
     // Bangladesh Timezone Convert
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" }));
     const currentDay = now.getDay();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    
+
     let shouldBeActive = false;
     if (data.slot1) {
       const s1 = data.slot1;
       shouldBeActive = isNowInSlot(
-        currentDay, 
+        currentDay,
         currentMinutes,
-        Number(s1.startDay), 
-        s1.startTime, 
-        Number(s1.endDay), 
+        Number(s1.startDay),
+        s1.startTime,
+        Number(s1.endDay),
         s1.endTime
       );
     }
-    
+
     if (data.active !== shouldBeActive) {
       await docRef.update({
         active: shouldBeActive,
@@ -73,7 +73,7 @@ const myScheduleHandler = async function(event, context) {
       });
       console.log(`✅ Status changed to: ${shouldBeActive}`);
     }
-    
+
     return { statusCode: 200, body: JSON.stringify({ active: shouldBeActive }) };
   } catch (error) {
     console.error('❌ Error:', error);
@@ -82,4 +82,4 @@ const myScheduleHandler = async function(event, context) {
 };
 
 // Netlify Scheduled Cron (প্রতি ১ মিনিটে চলবে)
-exports.handler = myScheduleHandler;
+exports.handler = schedule("* * * * *", myScheduleHandler);
