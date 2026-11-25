@@ -2561,7 +2561,7 @@ function renderAppointments() {
             <i class="fas fa-print"></i> বিস্তারিত
           </button>` :
           `<button class="action-btn btn-token" data-id="${id}" data-path="${path}" data-field="token">
-            <i class="fas fa-plus"></i> ${data.name || 'টোকেন দিন'}
+            <i class="fas fa-ticket-alt"></i> ${data.name || 'টোকেন দিন'}
           </button>`
         }
       </td>
@@ -2584,12 +2584,18 @@ function renderAppointments() {
 async function updateCallStatus(button) {
   if (!db) return;
   const docPath = button.getAttribute('data-path');
+  const docId = button.getAttribute('data-id');   // 🔹 liveQueue-এর জন্য লাগবে
   const currentStatus = button.getAttribute('data-status') === 'true';
   const newStatus = !currentStatus;
   
   const row = button.closest('tr');
   const patientNameCell = row.querySelector('td:nth-child(4)');
-  const patientName = patientNameCell ? patientNameCell.textContent : '';
+  const patientName = patientNameCell ? patientNameCell.textContent.trim() : '';
+  
+  // 🔹 সিরিয়াল নম্বর বের করা (প্রথম সেল থেকে)
+  const serialCell = row.querySelector('td:first-child');
+  const serialText = serialCell ? serialCell.textContent.trim() : '0';
+  const serialNum = parseInt(toEnglishNumber(serialText)) || 0;
   
   const originalText = button.textContent;
   button.textContent = 'আপডেট হচ্ছে...';
@@ -2600,6 +2606,28 @@ async function updateCallStatus(button) {
       called: newStatus,
       calledTimestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
+    
+    // 🔹 Live Queue sync (নতুন যোগ)
+    try {
+      if (newStatus === true) {
+        // কল করা হলে কিউতে যোগ (waiting হিসেবে)
+        await db.collection('liveQueue').doc(docId).set({
+          serial: serialNum,
+          name: patientName,
+          status: 'waiting',
+          appointmentId: docId,
+          addedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log(`✅ Live Queue: ${patientName} (${serialNum}) → waiting`);
+      } else {
+        // কল বাতিল হলে কিউ থেকে সরাও
+        await db.collection('liveQueue').doc(docId).delete();
+        console.log(`🗑️ Live Queue: ${patientName} সরানো হয়েছে`);
+      }
+    } catch (qErr) {
+      console.warn('⚠️ Live Queue sync failed:', qErr);
+      // কিউ sync ব্যর্থ হলেও main call status আপডেট থেক যাবে
+    }
     
     showAlert(newStatus ? `${patientName} - কল করা হয়েছে` : `${patientName} - কল বাতিল করা হয়েছে`, 'success');
     

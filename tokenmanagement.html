@@ -1334,11 +1334,11 @@ async function toggleCalledStatus(tokenId, currentSeen) {
   const dateFolder = tokenId.split('-')[0];
 
   try {
+    // ১. টোকেন ডকুমেন্ট খুঁজে বের করা
     let tokenRef = db.collection('paymentHistories')
       .doc(dateFolder)
       .collection('payment_new')
       .doc(tokenId);
-
     let tokenDoc = await tokenRef.get();
 
     if (!tokenDoc.exists) {
@@ -1354,50 +1354,71 @@ async function toggleCalledStatus(tokenId, currentSeen) {
       return;
     }
 
+    const tokenData = tokenDoc.data() || {};
+
+    // ২. isCalled আপডেট
     await tokenRef.update({
       isCalled: nextSeen,
       calledAt: nextSeen ? firebase.firestore.FieldValue.serverTimestamp() : null
     });
 
-    // যুক্ত থাকা অ্যাপয়েন্টমেন্ট ডকুমেন্ট আপডেট (Token Given <-> Visited)
-    const tokenData = tokenDoc.data() || {};
-    const appointmentId = tokenData.appointmentId;
+    // ৩. ✅ liveQueue আপডেট
+    try {
+      const queueDocId = tokenData.appointmentId || tokenId;
 
+      if (nextSeen === true) {
+        // আগের রানিং সবাইকে মুছে ফেলো
+        const runningSnap = await db.collection('liveQueue')
+          .where('status', '==', 'running').get();
+
+        if (!runningSnap.empty) {
+          const batch = db.batch();
+          runningSnap.forEach(doc => {
+            batch.delete(doc.ref);
+          });
+          await batch.commit();
+        }
+
+        // ✅ নতুন রোগী → running হিসেবে যোগ (টোকেন নাম্বার সহ)
+        await db.collection('liveQueue').doc(queueDocId).set({
+          serial: tokenData.serial || 0, // সিরিয়াল
+          name: tokenData.patientName || 'নাম নেই', // নাম
+          tokenNumber: tokenData.tokenNumber || '', // 👈 টোকেন নাম্বার
+          status: 'running',
+          appointmentId: tokenData.appointmentId || null,
+          tokenId: tokenId,
+          runningAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+      } else {
+        // ❌ চিহ্ন বাতিল হলে কিউ থেকে মুছে ফেলো
+        await db.collection('liveQueue').doc(queueDocId).delete();
+      }
+    } catch (qErr) {
+      console.warn('⚠️ Live Queue sync failed:', qErr);
+    }
+
+    // ৪. অ্যাপয়েন্টমেন্ট আপডেট
+    const appointmentId = tokenData.appointmentId;
     if (appointmentId) {
       const apptDateFolder = appointmentId.split('-')[0];
       let apptRef = db.collection('appointments')
-        .doc(apptDateFolder)
-        .collection('new')
-        .doc(appointmentId);
-
+        .doc(apptDateFolder).collection('new').doc(appointmentId);
       let apptDoc = await apptRef.get();
       if (!apptDoc.exists) {
         apptRef = db.collection('appointments')
-          .doc(apptDateFolder)
-          .collection('old')
-          .doc(appointmentId);
+          .doc(apptDateFolder).collection('old').doc(appointmentId);
         apptDoc = await apptRef.get();
       }
-
       if (apptDoc.exists) {
         const apptUpdate = nextSeen
-          ? {
-              status: 'visited',
-              tokenGiven: false,
-              tokenStatus: 'visited',
-              visitedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }
-          : {
-              status: 'pending',
-              tokenGiven: true,
-              tokenStatus: 'given',
-              visitedAt: null
-            };
-
+          ? { status: 'visited', tokenGiven: false, tokenStatus: 'visited', visitedAt: firebase.firestore.FieldValue.serverTimestamp() }
+          : { status: 'pending', tokenGiven: true, tokenStatus: 'given', visitedAt: null };
         await apptRef.update(apptUpdate);
       }
     }
 
+    // ৫. ক্যাশ আপডেট
     if (Array.isArray(window.cachedTokens)) {
       window.cachedTokens = window.cachedTokens.map(t =>
         t.id === tokenId ? { ...t, isCalled: nextSeen } : t
@@ -1409,12 +1430,12 @@ async function toggleCalledStatus(tokenId, currentSeen) {
     }
 
     showAlert(
-      nextSeen ? '✅ রোগী দেখা হয়েছে হিসেবে চিহ্নিত করা হয়েছে' : '↩️ চিহ্ন বাতিল করা হয়েছে',
+      nextSeen ? '🟢 রোগী এখন রানিং' : '↩️ চিহ্ন বাতিল করা হয়েছে',
       'success'
     );
   } catch (err) {
     console.error('toggleCalledStatus error:', err);
-    showAlert('❌ স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে: ' + err.message, 'error');
+    showAlert('❌ স্ট্যাটাস আপডেটে সমস্যা: ' + err.message, 'error');
   }
 }
 
