@@ -504,11 +504,11 @@ function formatBookingDate(app) {
 }
 
 function getStatusBadge(app) {
-  if (app.tokenGiven === true || app.tokenStatus === 'given') {
-    return '<span class="status-badge token-given">Token Given</span>';
-  }
   if (app.status === 'visited') {
     return '<span class="status-badge visited">Visited</span>';
+  }
+  if (app.tokenGiven === true || app.tokenStatus === 'given') {
+    return '<span class="status-badge token-given">Token Given</span>';
   }
   const appointmentDate = app.appointmentDate || app.date;
   if (appointmentDate) {
