@@ -1412,7 +1412,7 @@ async function toggleCalledStatus(tokenId, currentSeen) {
       }
       if (apptDoc.exists) {
         const apptUpdate = nextSeen
-          ? { status: 'visited', tokenGiven: false, tokenStatus: 'visited', visitedAt: firebase.firestore.FieldValue.serverTimestamp() }
+          ? { status: 'visited', tokenGiven: true, tokenStatus: 'visited', visitedAt: firebase.firestore.FieldValue.serverTimestamp() }
           : { status: 'pending', tokenGiven: true, tokenStatus: 'given', visitedAt: null };
         await apptRef.update(apptUpdate);
       }
