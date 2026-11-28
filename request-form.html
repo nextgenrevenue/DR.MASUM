@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>সিরিয়ালের জন্য তথ্য পাঠান | ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      font-family: 'Noto Sans Bengali', sans-serif;
+      background: linear-gradient(135deg, #f0fdfa, #ecfdf5);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-xl border border-teal-100 overflow-hidden">
+    <div class="bg-gradient-to-r from-teal-700 to-emerald-600 text-white p-5 text-center">
+      <h1 class="text-xl font-bold">ডাঃ মোঃ ওয়াহিদুজ্জামান মাসুম</h1>
+      <p class="text-xs text-teal-100 mt-1">সিরিয়ালের জন্য নিচের তথ্যগুলো পূরণ করে পাঠান</p>
+    </div>
+
+    <form id="patientRequestForm" class="p-5 space-y-4">
+      <div>
+        <label for="reqName" class="block text-sm font-semibold text-slate-700 mb-1">১. রোগীর নাম <span class="text-red-500">*</span></label>
+        <input type="text" id="reqName" required placeholder="রোগীর পুরো নাম লিখুন"
+          class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1">২. বয়স <span class="text-red-500">*</span></label>
+        <div class="grid grid-cols-3 gap-2">
+          <input type="number" id="reqAgeYears" min="0" max="120" placeholder="বছর"
+            class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-600" />
+          <input type="number" id="reqAgeMonths" min="0" placeholder="মাস"
+            class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-600" />
+          <input type="number" id="reqAgeDays" min="0" placeholder="দিন"
+            class="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-teal-600" />
+        </div>
+        <small id="ageNormalizedPreview" class="text-xs text-teal-700 font-medium mt-1 hidden block"></small>
+        <small class="text-xs text-slate-500 mt-1 block">কমপক্ষে একটি ঘর পূরণ করুন </small>
+      </div>
+
+      <div>
+        <label for="reqPhone" class="block text-sm font-semibold text-slate-700 mb-1">৩. মোবাইল নম্বর <span class="text-red-500">*</span></label>
+        <input type="tel" id="reqPhone" required pattern="01[0-9]{9}" maxlength="11" placeholder="01XXXXXXXXX"
+          class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100" />
+      </div>
+
+      <div>
+        <label for="reqPatientType" class="block text-sm font-semibold text-slate-700 mb-1">৪. নতুন / পুরানো রোগী <span class="text-red-500">*</span></label>
+        <select id="reqPatientType"
+          class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:border-teal-600">
+          <option value="new">নতুন রোগী</option>
+          <option value="old">পুরানো রোগী</option>
+        </select>
+      </div>
+
+      <div id="lastVisitWrapper" class="hidden">
+        <label for="reqLastVisitDate" class="block text-sm font-semibold text-slate-700 mb-1">৫. পুরানো রোগী হলে সর্বশেষ দেখানোর তারিখ <span class="text-red-500">*</span></label>
+        <input type="date" id="reqLastVisitDate"
+          class="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-teal-600" />
+        <div id="autoConvertNote" class="hidden mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+          ⚠️ সর্বশেষ দেখানোর তারিখ ৩ মাস (৯০ দিন) বা তার বেশি হওয়ায় এটি স্বয়ংক্রিয়ভাবে <strong>নতুন রোগী</strong> হিসেবে গণ্য হবে।
+        </div>
+      </div>
+
+      <button type="submit" id="reqSubmitBtn"
+        class="w-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold py-3 rounded-xl shadow-md transition">
+        তথ্য পাঠান
+      </button>
+
+      <div id="reqStatusMsg" class="text-sm text-center"></div>
+
+      <div class="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
+        <a href="/" class="text-teal-700 font-semibold hover:underline">← হোম পেজ</a>
+        <span>হেল্পলাইন: ০১৭৭৭৮৮৮৪৮৯</span>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+      authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+      projectId: "doctor-appointment-syste-23828",
+      storageBucket: "doctor-appointment-syste-23828.appspot.com",
+      messagingSenderId: "79600391014",
+      appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+
+    const nameEl = document.getElementById('reqName');
+    const ageYearsEl = document.getElementById('reqAgeYears');
+    const ageMonthsEl = document.getElementById('reqAgeMonths');
+    const ageDaysEl = document.getElementById('reqAgeDays');
+    const agePreviewEl = document.getElementById('ageNormalizedPreview');
+    const phoneEl = document.getElementById('reqPhone');
+    const typeEl = document.getElementById('reqPatientType');
+    const lastVisitWrap = document.getElementById('lastVisitWrapper');
+    const lastVisitInput = document.getElementById('reqLastVisitDate');
+    const noteEl = document.getElementById('autoConvertNote');
+    const formEl = document.getElementById('patientRequestForm');
+    const statusEl = document.getElementById('reqStatusMsg');
+
+    function formatCapitalizedName(rawName) {
+      return rawName
+        .trim()
+        .replace(/\s+/g, ' ')
+        .split(' ')
+        .map((word) => {
+          if (!word) return '';
+          return word.charAt(0).toUpperCase() + word.slice(1);
+        })
+        .join(' ');
+    }
+
+    nameEl.addEventListener('blur', () => {
+      if (nameEl.value.trim()) {
+        nameEl.value = formatCapitalizedName(nameEl.value);
+      }
+    });
+
+    function normalizeAge(updateInputs = false) {
+      const rawYears = parseInt(ageYearsEl.value, 10) || 0;
+      const rawMonths = parseInt(ageMonthsEl.value, 10) || 0;
+      const rawDays = parseInt(ageDaysEl.value, 10) || 0;
+
+      if (rawYears < 0 || rawMonths < 0 || rawDays < 0 || (rawYears === 0 && rawMonths === 0 && rawDays === 0)) {
+        agePreviewEl.classList.add('hidden');
+        agePreviewEl.textContent = '';
+        return { isValid: false };
+      }
+
+      const extraMonthsFromDays = Math.floor(rawDays / 30);
+      const remDays = rawDays % 30;
+
+      const totalMonths = rawMonths + extraMonthsFromDays;
+      const extraYearsFromMonths = Math.floor(totalMonths / 12);
+      const remMonths = totalMonths % 12;
+
+      const finalYears = rawYears + extraYearsFromMonths;
+
+      if (finalYears > 120) {
+        agePreviewEl.classList.add('hidden');
+        return { isValid: false };
+      }
+
+      if (updateInputs) {
+        ageYearsEl.value = finalYears > 0 ? finalYears : '';
+        ageMonthsEl.value = remMonths > 0 ? remMonths : '';
+        ageDaysEl.value = remDays > 0 ? remDays : '';
+      }
+
+      const parts = [];
+      if (finalYears > 0) parts.push(`${finalYears} বছর`);
+      if (remMonths > 0) parts.push(`${remMonths} মাস`);
+      if (remDays > 0) parts.push(`${remDays} দিন`);
+      const ageDisplay = parts.join(' ') || '০ দিন';
+
+      const wasNormalized = (rawMonths !== remMonths) || (rawDays !== remDays) || (rawYears !== finalYears);
+      if (wasNormalized) {
+        agePreviewEl.textContent = `হিসাবকৃত বয়স: ${ageDisplay}`;
+        agePreviewEl.classList.remove('hidden');
+      } else {
+        agePreviewEl.classList.add('hidden');
+      }
+
+      return {
+        isValid: true,
+        years: finalYears,
+        months: remMonths,
+        days: remDays,
+        ageDisplay
+      };
+    }
+
+    [ageYearsEl, ageMonthsEl, ageDaysEl].forEach((input) => {
+      input.addEventListener('change', () => {
+        normalizeAge(true);
+      });
+      input.addEventListener('input', () => {
+        normalizeAge(false);
+      });
+    });
+
+    function isOverThreeMonths(dateStr) {
+      if (!dateStr) return false;
+      const visitDate = new Date(dateStr + 'T00:00:00');
+      if (isNaN(visitDate.getTime())) return false;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.floor((today - visitDate) / (1000 * 60 * 60 * 24));
+      return diffDays >= 90;
+    }
+
+    function evaluatePatientType() {
+      if (typeEl.value === 'old') {
+        lastVisitWrap.classList.remove('hidden');
+        lastVisitInput.required = true;
+        const over90 = isOverThreeMonths(lastVisitInput.value);
+        noteEl.classList.toggle('hidden', !over90);
+        return over90
+          ? { finalType: 'new', autoConvertedFromOld: true }
+          : { finalType: 'old', autoConvertedFromOld: false };
+      } else {
+        lastVisitWrap.classList.add('hidden');
+        lastVisitInput.required = false;
+        lastVisitInput.value = '';
+        noteEl.classList.add('hidden');
+        return { finalType: 'new', autoConvertedFromOld: false };
+      }
+    }
+
+    typeEl.addEventListener('change', evaluatePatientType);
+    lastVisitInput.addEventListener('change', evaluatePatientType);
+
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusEl.innerHTML = '';
+
+      const formattedName = formatCapitalizedName(nameEl.value);
+      nameEl.value = formattedName;
+
+      const phone = phoneEl.value.trim();
+      const ageResult = normalizeAge(true);
+
+      if (!formattedName || formattedName.length < 2) {
+        statusEl.innerHTML = '<span class="text-red-600">সঠিক নাম লিখুন।</span>';
+        return;
+      }
+      if (!ageResult.isValid) {
+        statusEl.innerHTML = '<span class="text-red-600">সঠিক বয়স লিখুন (বছর/মাস/দিন)।</span>';
+        return;
+      }
+      if (!/^01[0-9]{9}$/.test(phone)) {
+        statusEl.innerHTML = '<span class="text-red-600">সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।</span>';
+        return;
+      }
+
+      const { finalType, autoConvertedFromOld } = evaluatePatientType();
+      if (typeEl.value === 'old' && !lastVisitInput.value) {
+        statusEl.innerHTML = '<span class="text-red-600">সর্বশেষ দেখানোর তারিখ দিন।</span>';
+        return;
+      }
+
+      const btn = document.getElementById('reqSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'পাঠানো হচ্ছে...';
+
+      try {
+        await db.collection('pendingRequests').add({
+          name: formattedName,
+          ageYears: ageResult.years,
+          ageMonths: ageResult.months,
+          ageDays: ageResult.days,
+          ageDisplay: ageResult.ageDisplay,
+          age: ageResult.ageDisplay,
+          phone,
+          requestedType: typeEl.value,
+          patientType: finalType,
+          autoConvertedFromOld,
+          lastVisitDate: typeEl.value === 'old' ? lastVisitInput.value : null,
+          status: 'pending',
+          serial: null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        formEl.reset();
+        agePreviewEl.classList.add('hidden');
+        agePreviewEl.textContent = '';
+        evaluatePatientType();
+        statusEl.innerHTML = `
+          <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs leading-relaxed">
+            ✅ <strong>আপনার তথ্য সফলভাবে পাঠানো হয়েছে!</strong><br>
+            রোগীর ধরন: <strong>${finalType === 'new' ? 'নতুন রোগী' : 'পুরানো রোগী'}</strong><br>
+            অ্যাডমিন সিরিয়াল নির্ধারণ করে কনফার্ম করলে আপনি SMS পাবেন।
+          </div>
+        `;
+      } catch (err) {
+        console.error(err);
+        statusEl.innerHTML = '<span class="text-red-600">তথ্য পাঠাতে সমস্যা হয়েছে। আবার চেষ্টা করুন।</span>';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'তথ্য পাঠান';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>টোকেন রিকুয়েস্ট</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-analytics-compat.js"></script>
+  <script src="components-inline.js"></script>
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --success-hover: #15803d;
+      --danger: #dc2626;
+      --warning: #f59e0b;
+      --gray: #6b7280;
+      --white: #ffffff;
+      --dark: #1f2937;
+      --background: #f5f7fa;
+      --border-color: #d1d5db;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Noto Sans Bengali', sans-serif;
+    }
+
+    body {
+      background-color: var(--background);
+      color: var(--dark);
+      overflow-x: hidden;
+    }
+
+    .admin-container {
+      display: flex;
+      min-height: 100vh;
+      padding-top: 60px;
+    }
+
+    #sidebar-container {
+      flex-shrink: 0;
+    }
+
+    .admin-main {
+      flex: 1;
+      padding: 20px;
+      background-color: var(--background);
+      min-height: calc(100vh - 60px);
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .page-header h2 {
+      font-size: 20px;
+      color: var(--dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .back-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background-color: var(--white);
+      color: var(--primary);
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .back-link-btn:hover {
+      background-color: var(--primary);
+      color: var(--white);
+    }
+
+    .request-card {
+      background-color: var(--white);
+      border-radius: 14px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+      max-width: 640px;
+      margin: 0 auto;
+      overflow: hidden;
+      border-top: 4px solid var(--primary);
+    }
+
+    .request-card-header {
+      background-color: var(--primary);
+      color: var(--white);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .request-card-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .request-card-body {
+      padding: 22px 20px;
+    }
+
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    .age-inputs-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .age-inputs-row input {
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--dark);
+      background-color: var(--white);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .due-preview {
+      margin-top: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--success);
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .btn-reset {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      background-color: #e5e7eb;
+      color: #374151;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-reset:hover {
+      background-color: #d1d5db;
+    }
+
+    .btn-submit-req {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background-color: var(--success);
+      color: var(--white);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-submit-req:hover {
+      background-color: var(--success-hover);
+    }
+
+    .btn-submit-req:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .toast-box {
+      position: fixed;
+      top: 76px;
+      right: 20px;
+      z-index: 99999;
+      padding: 12px 18px;
+      border-radius: 10px;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+      animation: fadeSlideIn 0.25s ease;
+    }
+
+    @keyframes fadeSlideIn {
+      from { transform: translateY(-8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    @media (max-width: 600px) {
+      .admin-main {
+        padding: 14px;
+      }
+      .form-grid-2 {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+      .form-actions {
+        flex-direction: column-reverse;
+      }
+      .btn-reset,
+      .btn-submit-req {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body data-auto-load-components="true">
+  <div id="header-container"></div>
+
+  <div class="admin-container">
+    <div id="sidebar-container"></div>
+
+    <main class="admin-main">
+
+      <div class="request-card">
+        <div class="request-card-header">
+          <h3><i class="fas fa-paper-plane" style="color: white;"></i>টোকেন রিকুয়েস্ট</h3>
+        </div>
+
+        <div class="request-card-body">
+          <form id="requestTokenForm">
+            <div class="form-group">
+              <label for="reqName">রোগীর নাম *</label>
+              <input type="text" id="reqName" placeholder="রোগীর পুরো নাম লিখুন" required onblur="formatPatientName(this)">
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>বয়স *</label>
+                <div class="age-inputs-row">
+                  <input type="number" id="reqAgeYears" placeholder="বছর" min="0">
+                  <input type="number" id="reqAgeMonths" placeholder="মাস" min="0">
+                  <input type="number" id="reqAgeDays" placeholder="দিন" min="0">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="reqPhone">ফোন নম্বর</label>
+                <input type="tel" id="reqPhone" placeholder="01XXXXXXXXX">
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="reqPatientType">রোগীর ধরন</label>
+                <select id="reqPatientType">
+                  <option value="new">নতুন রোগী</option>
+                  <option value="old">পুরাতন রোগী</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="reqReference">রেফারেন্স</label>
+                <input type="text" id="reqReference" placeholder="রেফারেন্স নাম লিখুন">
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="reqFee">ফি (টাকা)</label>
+                <input type="number" id="reqFee" value="800" min="0" required>
+              </div>
+
+              <div class="form-group">
+                <label for="reqPaid">পরিশোধিত টাকা</label>
+                <input type="number" id="reqPaid" value="800" min="0" required>
+                <div id="reqDueDisplay" class="due-preview">বাকি: ০ টাকা</div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn-reset" id="resetRequestBtn">রিসেট</button>
+              <button type="submit" class="btn-submit-req" id="submitRequestTokenBtn">
+                <i class="fas fa-paper-plane"></i> রিকুয়েস্ট টোকেন পাঠান
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="footer-container"></div>
+
+  <script>
+    // =======================================================
+    // ১. অথেন্টিকেশন চেক
+    // =======================================================
+    function checkAuthentication() {
+      const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
+      const loginTime = sessionStorage.getItem('loginTime');
+      const sessionDuration = 2 * 60 * 60 * 1000;
+
+      if (!isLoggedIn || isLoggedIn !== 'true') {
+        alert('Please login first!!');
+        window.location.href = '/login';
+        return false;
+      }
+
+      if (!loginTime || (new Date().getTime() - parseInt(loginTime, 10)) > sessionDuration) {
+        sessionStorage.clear();
+        alert('Session expired! Please login again.');
+        window.location.href = '/login';
+        return false;
+      }
+
+      return true;
+    }
+
+    if (!checkAuthentication()) {
+      throw new Error('Authentication failed - redirecting to login');
+    }
+
+    // =======================================================
+    // ২. Firebase কনফিগারেশন
+    // =======================================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+      authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+      projectId: "doctor-appointment-syste-23828",
+      storageBucket: "doctor-appointment-syste-23828.appspot.com",
+      messagingSenderId: "79600391014",
+      appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+    };
+
+    let db;
+    try {
+      const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore(app);
+      if (firebase.analytics) {
+        firebase.analytics(app);
+      }
+      db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    } catch (err) {
+      console.error('❌ Firebase initialization error:', err);
+    }
+
+    // =======================================================
+    // ৩. হেল্পার ফাংশন
+    // =======================================================
+    const toBn = (num) => {
+      if (num === null || num === undefined || num === '' || num === '—') return '—';
+      const map = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+      return String(num).replace(/\d/g, (d) => map[d]);
+    };
+
+    function getFormattedAge(y, m, d) {
+      let years = parseInt(y, 10) || 0;
+      let months = parseInt(m, 10) || 0;
+      let days = parseInt(d, 10) || 0;
+
+      // ৩০ দিনে ১ মাস এবং ১২ মাসে ১ বছর হিসেবে নরমালাইজেশন
+      months += Math.floor(days / 30);
+      days = days % 30;
+
+      years += Math.floor(months / 12);
+      months = months % 12;
+
+      const parts = [];
+      if (years > 0) parts.push(`${toBn(years)} বছর`);
+      if (months > 0) parts.push(`${toBn(months)} মাস`);
+      if (days > 0) parts.push(`${toBn(days)} দিন`);
+
+      return {
+        text: parts.length > 0 ? parts.join(' ') : '—',
+        years,
+        months,
+        days
+      };
+    }
+
+    function formatPatientName(input) {
+      input.value = input.value
+        .toLowerCase()
+        .replace(/\./g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 0)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    }
+
+    function getTodayDateInfo() {
+      const now = new Date();
+      const bdDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
+      const yymmdd = bdDateStr.slice(2).replace(/-/g, '');
+      const displayDate = now
+        .toLocaleDateString('bn-BD', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          timeZone: 'Asia/Dhaka'
+        })
+        .replace(/,\s*/, ',')
+        .replace(/\d/g, (d) => toBn(d));
+
+      return { dateString: bdDateStr, yymmdd, displayDate };
+    }
+
+    function showToast(message, type = 'success') {
+      if (typeof showAlert === 'function') {
+        showAlert(message, type);
+        return;
+      }
+      const toast = document.createElement('div');
+      toast.className = 'toast-box';
+      toast.textContent = message;
+      toast.style.backgroundColor =
+        type === 'error' ? '#dc2626' : type === 'warning' ? '#f59e0b' : '#16a34a';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // =======================================================
+    // ৪. ফর্ম লজিক ও রিকুয়েস্ট সাবমিট
+    // =======================================================
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('requestTokenForm');
+      const ageYearsInput = document.getElementById('reqAgeYears');
+      const ageMonthsInput = document.getElementById('reqAgeMonths');
+      const ageDaysInput = document.getElementById('reqAgeDays');
+      const typeSelect = document.getElementById('reqPatientType');
+      const feeInput = document.getElementById('reqFee');
+      const paidInput = document.getElementById('reqPaid');
+      const dueEl = document.getElementById('reqDueDisplay');
+      const resetBtn = document.getElementById('resetRequestBtn');
+      const submitBtn = document.getElementById('submitRequestTokenBtn');
+
+      const updateDue = () => {
+        const fee = parseInt(feeInput.value, 10) || 0;
+        const paid = parseInt(paidInput.value, 10) || 0;
+        const due = fee - paid;
+        dueEl.textContent = `বাকি: ${toBn(due)} টাকা`;
+        dueEl.style.color = due > 0 ? '#dc2626' : '#16a34a';
+      };
+
+      const resetFormToDefault = () => {
+        form.reset();
+        typeSelect.value = 'new';
+        feeInput.value = 800;
+        paidInput.value = 800;
+        updateDue();
+      };
+
+      typeSelect.addEventListener('change', () => {
+        const defaultFee = typeSelect.value === 'old' ? 600 : 800;
+        feeInput.value = defaultFee;
+        paidInput.value = defaultFee;
+        updateDue();
+      });
+
+      feeInput.addEventListener('input', updateDue);
+      paidInput.addEventListener('input', updateDue);
+      resetBtn.addEventListener('click', resetFormToDefault);
+      updateDue();
+
+      let isSubmitting = false;
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (isSubmitting) return;
+
+        if (!db) {
+          showToast('Firebase সংযোগ পাওয়া যায়নি!', 'error');
+          return;
+        }
+
+        const name = document.getElementById('reqName').value.trim();
+        const yearsRaw = ageYearsInput.value.trim();
+        const monthsRaw = ageMonthsInput.value.trim();
+        const daysRaw = ageDaysInput.value.trim();
+        const phone = document.getElementById('reqPhone').value.trim();
+        const patientType = typeSelect.value || 'new';
+        const fee = parseInt(feeInput.value, 10) || (patientType === 'old' ? 600 : 800);
+        const paid = parseInt(paidInput.value, 10) || 0;
+        const reference = document.getElementById('reqReference').value.trim();
+        const preparedBy =
+          sessionStorage.getItem('adminName') ||
+          sessionStorage.getItem('adminEmail') ||
+          '—';
+
+        if (!name) {
+          showToast('রোগীর নাম দিন', 'warning');
+          return;
+        }
+
+        if (!yearsRaw && !monthsRaw && !daysRaw) {
+          showToast('রোগীর বয়স (বছর, মাস বা দিন) লিখুন', 'warning');
+          ageYearsInput.focus();
+          return;
+        }
+
+        const normalizedAge = getFormattedAge(yearsRaw, monthsRaw, daysRaw);
+
+        isSubmitting = true;
+        const originalBtnHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> পাঠানো হচ্ছে...';
+
+        try {
+          const dateInfo = getTodayDateInfo();
+
+          await db.collection('tokenRequests').add({
+            requestType: 'token_request',
+            status: 'pending_request',
+            name,
+            patientName: name,
+            age: normalizedAge.text,
+            patientAge: normalizedAge.text,
+            ageYears: normalizedAge.years,
+            ageMonths: normalizedAge.months,
+            ageDays: normalizedAge.days,
+            phone: phone || null,
+            patientPhone: phone || null,
+            serial: null,
+            patientType,
+            type: patientType,
+            tokenFee: fee,
+            tokenPaid: paid,
+            tokenDue: fee - paid,
+            givenBy: reference,
+            reference,
+            preparedBy,
+            createdBy: preparedBy,
+            appointmentDate: dateInfo.dateString,
+            appointmentDateDisplay: dateInfo.displayDate,
+            yymmdd: dateInfo.yymmdd,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+
+          showToast('✅ রিকুয়েস্ট টোকেন পেন্ডিং তালিকায় যুক্ত হয়েছে!', 'success');
+          resetFormToDefault();
+        } catch (err) {
+          console.error('❌ Request token submit error:', err);
+          showToast('❌ রিকুয়েস্ট পাঠাতে সমস্যা হয়েছে: ' + err.message, 'error');
+        } finally {
+          isSubmitting = false;
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnHtml;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

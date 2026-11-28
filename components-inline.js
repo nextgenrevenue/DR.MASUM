@@ -13,7 +13,10 @@
           <span id="pageTitle">ড্যাশবোর্ড</span>
         </div>
         <div class="header-right">
-          <span class="header-role" id="headerRole">ইউজার</span>
+          <button type="button" class="header-notif-btn" id="headerNotifBellBtn" title="পেন্ডিং সিরিয়াল রিকোয়েস্ট" aria-label="পেন্ডিং সিরিয়াল রিকোয়েস্ট">
+            <i class="fas fa-bell"></i>
+            <span class="header-notif-badge" id="headerPendingBadge">0</span>
+          </button>
         </div>
       </header>
       
@@ -53,15 +56,50 @@
           align-items: center;
           gap: 16px;
         }
-        
-        .admin-header .header-role {
-          background: rgba(59,130,246,0.2);
-          padding: 4px 16px;
-          border-radius: 20px;
-          font-size: 12px;
-          font-weight: 600;
-          color: #93c5fd;
-          border: 1px solid rgba(59,130,246,0.3);
+
+        .header-notif-btn {
+          position: relative;
+          background: rgba(59,130,246,0.16);
+          border: 1px solid rgba(59,130,246,0.35);
+          color: #e2e8f0;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 17px;
+          cursor: pointer;
+          transition: all 0.25s ease;
+        }
+
+        .header-notif-btn:hover {
+          background: rgba(59,130,246,0.3);
+          color: #ffffff;
+          transform: translateY(-1px);
+        }
+
+        .header-notif-badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background: #ef4444;
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 700;
+          min-width: 19px;
+          height: 19px;
+          padding: 0 5px;
+          border-radius: 999px;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          line-height: 1;
+          box-shadow: 0 2px 6px rgba(239,68,68,0.45);
+        }
+
+        .header-notif-badge.has-items {
+          display: inline-flex;
         }
         
         .mobile-menu-btn {
@@ -84,7 +122,7 @@
           .admin-header .header-logo { font-size: 16px; }
           .admin-header .header-logo i { font-size: 20px; }
           .mobile-menu-btn { display: flex; align-items: center; }
-          .admin-header .header-role { font-size: 10px; padding: 2px 12px; }
+          .header-notif-btn { width: 36px; height: 36px; font-size: 15px; }
         }
       </style>
     `,
@@ -607,6 +645,8 @@
       { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'ড্যাশবোর্ড', page: 'dashboard' },
       { id: 'my-serials', icon: 'fa-list-alt', label: 'সিরিয়াল তালিকা', page: 'my-serials' },
       { id: 'book-serial', icon: 'fa-calendar-plus', label: 'সিরিয়াল বুক', page: 'book-serial' },
+      { id: 'request-token', icon: 'fa-paper-plane', label: 'টোকেন রিকোয়েস্ট', page: 'request-token' },
+      { id: 'pending-requests', icon: 'fa-inbox', label: 'সিরিয়াল রিকোয়েস্ট', page: 'appointment-pending' },
       { id: 'tokenmanagement', icon: 'fa-ticket-alt', label: 'টোকেন ম্যানেজমেন্ট', page: 'tokenmanagement' },
       { id: 'admin-chat', icon: 'fa-comment-dots', label: 'লাইভ চ্যাট', page: 'admin-chat' },
       { id: 'notice', icon: 'fa-bullhorn', label: 'নোটিশ', page: 'notice' },
@@ -616,6 +656,8 @@
       { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'ড্যাশবোর্ড', page: 'dashboard' },
       { id: 'my-serials', icon: 'fa-list-alt', label: 'সিরিয়াল তালিকা', page: 'my-serials' },
       { id: 'book-serial', icon: 'fa-calendar-plus', label: 'সিরিয়াল বুক', page: 'book-serial' },
+      { id: 'request-token', icon: 'fa-paper-plane', label: 'টোকেন রিকোয়েস্ট', page: 'request-token' },
+      { id: 'pending-requests', icon: 'fa-inbox', label: 'সিরিয়াল রিকোয়েস্ট', page: 'appointment-pending' },
       { id: 'tokenmanagement', icon: 'fa-ticket-alt', label: 'টোকেন ম্যানেজমেন্ট', page: 'tokenmanagement' },
       { id: 'allserial', icon: 'fa-calendar-check', label: 'অ্যাপয়েন্টমেন্ট সমুহ', page: 'allserial' },
       { id: 'management', icon: 'fa-tasks', label: 'সিরিয়াল ম্যানেজমেন্ট', page: 'management' },
@@ -683,7 +725,14 @@
       if (mobileBtn) {
         mobileBtn.addEventListener('click', () => this.toggleSidebar());
       }
+      const bellBtn = document.getElementById('headerNotifBellBtn');
+      if (bellBtn) {
+        bellBtn.addEventListener('click', () => {
+          this.navigateTo('appointment-pending');
+        });
+      }
       this.createMobileOverlay();
+      this.initPendingRequestsBadge();
     },
     
     // ===== SIDEBAR =====
@@ -730,7 +779,6 @@ initProfile() {
   
   document.getElementById('sidebarPhone').innerHTML = `<i class="fas fa-phone-alt"></i> ${phone}`;
   document.getElementById('sidebarName').textContent = name;
-  document.getElementById('headerRole').textContent = this.getRoleLabel(role);
   
   // রোল অনুযায়ী ব্যাজ
   const badge = document.getElementById('sidebarBadge');
@@ -1071,7 +1119,7 @@ async loadNameFromFirebase(phone) {
      
      const currentPageName = path.split("/").pop();
      
-     const pages = ['dashboard', 'userdashboard', 'my-serials', 'book-serial', 'profile', 'change-password',
+     const pages = ['dashboard', 'userdashboard', 'my-serials', 'book-serial', 'request-token' , 'appointment-pending', 'profile', 'change-password',
                     'tokenmanagement', 'notice', 'allserial', 'management','admin-chat', 'admincontrol', 'reports'];
      
      if (pages.includes(currentPageName)) {
@@ -1102,6 +1150,7 @@ async loadNameFromFirebase(phone) {
         this.loadUserRole();
         this.initDropdown();
         this.initLogout();
+        this.initPendingRequestsBadge();
       }, 100);
       
       // রেসপনসিভ
@@ -1232,6 +1281,30 @@ function updateUI(total, pending) {
   if (sideTotalEl) sideTotalEl.textContent = total;
   if (sidePendingEl) sidePendingEl.textContent = pending;
 }
+
+  // ==================== REALTIME HEADER BELL BADGE ====================
+  ComponentLoader.initPendingRequestsBadge = function() {
+    const role = sessionStorage.getItem('userRole') || 'user';
+    if (role !== 'admin' && role !== 'owner') return;
+    if (typeof firebase === 'undefined' || !firebase.apps || !firebase.apps.length) return;
+
+    const db = firebase.firestore();
+    if (typeof this._unsubscribePendingBell === 'function') {
+      this._unsubscribePendingBell();
+    }
+
+    this._unsubscribePendingBell = db.collection('pendingRequests')
+      .where('status', '==', 'pending')
+      .onSnapshot((snap) => {
+        const badgeEl = document.getElementById('headerPendingBadge');
+        if (!badgeEl) return;
+        const count = snap.size || 0;
+        badgeEl.textContent = count;
+        badgeEl.classList.toggle('has-items', count > 0);
+      }, (err) => {
+        console.warn('Pending bell badge listener error:', err);
+      });
+  };
   
   // ==================== GLOBAL ====================
   window.ComponentLoader = ComponentLoader;

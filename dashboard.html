@@ -2903,9 +2903,10 @@ async function saveAndPrintToken(shouldPrint) {
     const fee = parseInt(document.getElementById('tokenFee')?.value) || (patientType === 'new' ? 800 : 600);
     const paid = parseInt(document.getElementById('tokenPaid')?.value) || 0;
     const givenBy = document.getElementById('tokenGivenBy')?.value || '';
+    const preparedByName = sessionStorage.getItem('adminName') || sessionStorage.getItem('adminEmail') || '—';
 
     // ==========================================
-    // ১. মূল অ্যাপয়েন্টমেন্ট ডকুমেন্ট পড়া (পাথ অপরিবর্তিত থাকবে)
+    // ১. মূল অ্যাপয়েন্টমেন্ট ডকুমেন্ট পড়া (পাথ অপরিবর্তিত থাকবে)
     // ==========================================
     const appointmentDoc = await db.doc(currentTokenPath).get();
     
@@ -2954,7 +2955,8 @@ async function saveAndPrintToken(shouldPrint) {
           newPaid: paid,
           note: difference > 0 ? `পেমেন্ট: ${difference} টাকা` : `ফেরত: ${Math.abs(difference)} টাকা`,
           timestamp: new Date().toISOString(),
-          createdBy: sessionStorage.getItem('adminEmail') || 'admin',
+          createdBy: preparedByName,
+          preparedBy: preparedByName,
           source: 'dashboard'
         });
       }
@@ -2971,12 +2973,14 @@ async function saveAndPrintToken(shouldPrint) {
         paymentHistory: paymentHistory,
         givenBy: givenBy,
         reference: givenBy,
+        preparedBy: existingData.preparedBy || preparedByName,
+        createdBy: existingData.createdBy || existingData.preparedBy || preparedByName,
         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
       };
 
       const currentPaymentSubcollection = existingDoc.ref.parent.id; // payment_new অথবা payment_old
       
-      // যদি সিলেক্ট করা টাইপ অনুযায়ী payment সাবকালেকশন বদলে যায়
+      // যদি সিলেক্ট করা টাইপ অনুযায়ী payment সাবকালেকশন বদলে যায়
       if (currentPaymentSubcollection !== subCollectionName) {
         // নতুন পেমেন্ট সাবকালেকশনে কপি করা
         const newPaymentDocRef = db.collection('paymentHistories').doc(yymmdd).collection(subCollectionName).doc(existingDoc.id);
@@ -3023,7 +3027,8 @@ async function saveAndPrintToken(shouldPrint) {
           method: 'নগদ',
           note: `টোকেন প্রদান - ${tokenNumber}`,
           timestamp: new Date().toISOString(),
-          createdBy: sessionStorage.getItem('adminEmail') || 'admin',
+          createdBy: preparedByName,
+          preparedBy: preparedByName,
           source: 'dashboard'
         }];
 
@@ -3052,11 +3057,12 @@ async function saveAndPrintToken(shouldPrint) {
           source: 'dashboard',
           givenBy: givenBy,
           reference: givenBy,
+          createdBy: preparedByName,
+          preparedBy: preparedByName,
           appointmentId: currentTokenId,
           serial: originalSerial,
           appointmentSerial: originalSerial,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          createdBy: sessionStorage.getItem('adminEmail') || 'admin'
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       });
       

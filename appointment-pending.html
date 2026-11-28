@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>সিরিয়াল রিকোয়েস্ট | অ্যাডমিন প্যানেল</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/grid.js"></script>
+  <style>
+    body {
+      font-family: 'Noto Sans Bengali', sans-serif;
+      background: #f1f5f9;
+      margin: 0;
+    }
+
+    .admin-layout {
+      display: flex;
+      min-height: calc(100vh - 64px);
+      padding-top: 64px;
+    }
+
+    @media (max-width: 768px) {
+      .admin-layout {
+        min-height: calc(100vh - 56px);
+        padding-top: 56px;
+      }
+    }
+
+    .admin-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .admin-content {
+      flex: 1;
+      padding: 16px 24px 24px;
+    }
+
+    @media (max-width: 768px) {
+      .admin-content {
+        padding: 16px;
+      }
+    }
+
+    #adminAssignGrid {
+      display: grid !important;
+      grid-template-columns: repeat(10, minmax(0, 1fr)) !important;
+      gap: 6px !important;
+    }
+
+    @media (max-width: 640px) {
+      #adminAssignGrid {
+        grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+        gap: 4px !important;
+      }
+    }
+
+    #adminAssignGrid .serial-item {
+      width: 100% !important;
+      min-width: 0 !important;
+      padding: 7px 2px !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      text-align: center !important;
+      border-radius: 6px !important;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-800">
+  <div id="header-container"></div>
+
+  <div class="admin-layout">
+    <div id="sidebar-container"></div>
+
+    <main class="admin-main">
+      <div class="admin-content">
+        <div class="max-w-4xl mx-auto">
+          <div class="bg-slate-900 text-white rounded-2xl p-5 mb-5 flex flex-wrap items-center justify-between gap-3 shadow">
+            <div>
+              <h1 class="text-xl font-bold">সিরিয়াল রিকোয়েস্ট</h1>
+              <p class="text-xs text-slate-300 mt-0.5">রোগীদের পাঠানো তথ্য যাচাই করে সিরিয়াল কনফার্ম করুন</p>
+            </div>
+            <span id="pendingCountBadge" class="bg-amber-500 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-full">
+              মোট পেন্ডিং: ০
+            </span>
+          </div>
+
+          <div id="pendingListContainer" class="space-y-3">
+            <div class="bg-white rounded-2xl p-8 text-center text-slate-500 text-sm shadow-sm">
+              লোড হচ্ছে...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="footer-container"></div>
+    </main>
+  </div>
+
+  <!-- Assign Serial & Accept Modal -->
+  <div id="assignModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-3 z-50">
+    <div class="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl">
+      <div class="bg-teal-700 text-white px-5 py-4 flex items-center justify-between sticky top-0 z-10">
+        <h2 class="text-lg font-bold">সিরিয়াল নির্ধারণ ও কনফার্ম করুন</h2>
+        <button type="button" onclick="closeAssignModal()" class="w-8 h-8 rounded-full bg-white/20 text-white hover:bg-white/30 transition">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div id="selectedPatientSummary" class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm space-y-1"></div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">রোগীর ধরন</label>
+            <select id="adminPatientType" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white">
+              <option value="new">নতুন রোগী</option>
+              <option value="old">পুরানো রোগী</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">দিন নির্বাচন করুন</label>
+            <select id="adminDay" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white">
+              <option value="">-- দিন --</option>
+              <option value="Thursday">বৃহস্পতিবার</option>
+              <option value="Friday">শুক্রবার</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">সময় নির্বাচন করুন</label>
+            <select id="adminTime" disabled class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white">
+              <option value="">-- সময় --</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-700">সিরিয়াল নির্বাচন করুন:</span>
+            <span id="chosenSerialBadge" class="text-xs font-bold text-teal-700">নির্বাচিত সিরিয়াল: নেই</span>
+          </div>
+          <div id="adminAssignGrid" class="p-2 border border-slate-200 rounded-xl min-h-[90px] bg-slate-50"></div>
+          <input type="hidden" id="adminSelectedSerial" />
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <button type="button" onclick="closeAssignModal()" class="px-4 py-2.5 rounded-xl bg-slate-200 text-slate-700 font-semibold text-sm hover:bg-slate-300 transition">
+            বাতিল
+          </button>
+          <button type="button" id="confirmAcceptBtn" onclick="confirmAndAcceptRequest()"
+            class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition">
+            কনফার্ম করুন
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="components-inline.js"></script>
+  <script>
+    // ==================== অথেন্টিকেশন ====================
+    function checkAuthentication() {
+      const isLoggedIn = sessionStorage.getItem('adminLoggedIn');
+      const loginTime = sessionStorage.getItem('loginTime');
+      if (!isLoggedIn || isLoggedIn !== 'true') {
+        alert('দয়া করে লগইন করুন!!');
+        window.location.href = '/login';
+        return false;
+      }
+      const currentTime = new Date().getTime();
+      if (currentTime - parseInt(loginTime, 10) > 2 * 60 * 60 * 1000) {
+        sessionStorage.clear();
+        alert('সেশন শেষ! আবার লগইন করুন।');
+        window.location.href = '/login';
+        return false;
+      }
+      return true;
+    }
+
+    if (!checkAuthentication()) {
+      throw new Error('Authentication failed');
+    }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUGkcHFSYVmA0KUSRHhY-ZFFAS6jpJe4M",
+      authDomain: "doctor-appointment-syste-23828.firebaseapp.com",
+      projectId: "doctor-appointment-syste-23828",
+      storageBucket: "doctor-appointment-syste-23828.appspot.com",
+      messagingSenderId: "79600391014",
+      appId: "1:79600391014:web:9688db8bb62f431ae16ea7"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.ComponentLoader) {
+        if (typeof window.ComponentLoader.loadAllComponents === 'function') {
+          window.ComponentLoader.loadAllComponents('সিরিয়াল রিকোয়েস্ট');
+        }
+        if (typeof window.ComponentLoader.initGlobalSidebarStats === 'function') {
+          window.ComponentLoader.initGlobalSidebarStats();
+        }
+      }
+    });
+
+    let serialRanges = {};
+    let disabledSlots = {};
+    let adminGridSystem = null;
+    let currentReqId = null;
+    let currentReqData = null;
+    const pendingRequestsMap = new Map();
+
+    db.collection('settings').doc('serialRanges').onSnapshot((doc) => {
+      if (doc.exists) {
+        serialRanges = doc.data() || {};
+        if (document.getElementById('adminDay').value) {
+          updateAdminTimeOptions();
+        }
+      }
+    });
+
+    db.collection('settings').doc('disabledSlots').onSnapshot((doc) => {
+      disabledSlots = doc.exists ? (doc.data() || {}) : {};
+      if (document.getElementById('adminDay').value) {
+        updateAdminTimeOptions();
+      }
+    });
+
+    function getNextDateByDay(targetDay) {
+      const daysMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+      const targetIndex = daysMap[targetDay];
+      const today = new Date();
+      let diff = targetIndex - today.getDay();
+      if (diff < 0) diff += 7;
+      const nextDate = new Date(today);
+      nextDate.setDate(today.getDate() + diff);
+
+      const y = nextDate.getFullYear();
+      const m = String(nextDate.getMonth() + 1).padStart(2, '0');
+      const d = String(nextDate.getDate()).padStart(2, '0');
+      const banglaMonths = ['জানুয়ারী', 'ফেব্রুয়ারী', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+      const banglaDays = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+
+      return {
+        dateString: `${y}-${m}-${d}`,
+        banglaDate: `${banglaDays[nextDate.getDay()]}, ${nextDate.getDate()} ${banglaMonths[nextDate.getMonth()]} ${y}`
+      };
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    db.collection('pendingRequests')
+      .where('status', '==', 'pending')
+      .onSnapshot((snap) => {
+        const container = document.getElementById('pendingListContainer');
+        document.getElementById('pendingCountBadge').textContent = `মোট পেন্ডিং: ${snap.size}`;
+        pendingRequestsMap.clear();
+
+        if (snap.empty) {
+          container.innerHTML = '<div class="bg-white rounded-2xl p-8 text-center text-slate-500 text-sm shadow-sm">কোনো পেন্ডিং রিকোয়েস্ট নেই।</div>';
+          return;
+        }
+
+        const docs = [];
+        snap.forEach((d) => {
+          const itemData = { id: d.id, ...d.data() };
+          pendingRequestsMap.set(d.id, itemData);
+          docs.push(itemData);
+        });
+        docs.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+
+        container.innerHTML = docs.map((item) => {
+          const typeBadge = item.patientType === 'new'
+            ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">নতুন রোগী</span>`
+            : `<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">পুরানো রোগী</span>`;
+
+          const autoNote = item.autoConvertedFromOld
+            ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">৩ মাস ওভার → অটো নতুন</span>`
+            : '';
+
+          return `
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div class="space-y-1 text-sm">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-bold text-base text-slate-900">${escapeHtml(item.name)}</span>
+                  ${typeBadge}
+                  ${autoNote}
+                </div>
+                <div class="text-slate-600 text-xs">
+                  <strong>বয়স:</strong> ${escapeHtml(item.ageDisplay || item.age || '-')} &nbsp;|&nbsp;
+                  <strong>ফোন:</strong> ${escapeHtml(item.phone)}
+                  ${item.lastVisitDate ? `&nbsp;|&nbsp; <strong>সর্বশেষ ভিজিট:</strong> ${escapeHtml(item.lastVisitDate)}` : ''}
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="openAssignModalById('${escapeHtml(item.id)}')"
+                  class="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-sm transition">
+                  কনফার্ম
+                </button>
+                <button type="button" onclick="rejectRequest('${escapeHtml(item.id)}')"
+                  class="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-xs transition">
+                  বাতিল
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      });
+
+    async function initAdminGrid() {
+      if (adminGridSystem || typeof window.RealTimeGridSystem !== 'function') return;
+      adminGridSystem = new window.RealTimeGridSystem({
+        db,
+        gridContainerId: 'adminAssignGrid',
+        selectedSerialInputId: 'adminSelectedSerial',
+        dayElementId: 'adminDay',
+        timeElementId: 'adminTime',
+        typeElementId: 'adminPatientType',
+        mode: 'admin',
+        onSerialClick(data) {
+          if (data.status === 'booked') {
+            alert('এই সিরিয়ালটি ইতিমধ্যে বুক করা আছে।');
+            return;
+          }
+          document.getElementById('adminSelectedSerial').value = data.serial;
+          document.getElementById('chosenSerialBadge').textContent = `নির্বাচিত সিরিয়াল: #${data.serial}`;
+        }
+      });
+      await adminGridSystem.init();
+    }
+
+    function extractTimeNumber(timeStr) {
+      if (!timeStr) return 0;
+      const time = timeStr.toUpperCase().trim();
+      let [timePart, modifier] = time.split(' ');
+      if (!modifier) {
+        modifier = time.includes('PM') ? 'PM' : time.includes('AM') ? 'AM' : '';
+        if (modifier) timePart = time.replace(modifier, '').trim();
+      }
+      const [hours, minutes] = timePart.split(':').map(Number);
+      let hour24 = hours || 0;
+      if (modifier === 'PM' && hour24 !== 12) hour24 += 12;
+      else if (modifier === 'AM' && hour24 === 12) hour24 = 0;
+      return hour24 * 100 + (minutes || 0);
+    }
+
+    function updateAdminTimeOptions() {
+      const day = document.getElementById('adminDay').value;
+      const type = document.getElementById('adminPatientType').value;
+      const timeEl = document.getElementById('adminTime');
+      timeEl.innerHTML = '<option value="">-- সময় --</option>';
+      timeEl.disabled = true;
+      document.getElementById('adminAssignGrid').innerHTML = '';
+      document.getElementById('adminSelectedSerial').value = '';
+      document.getElementById('chosenSerialBadge').textContent = 'নির্বাচিত সিরিয়াল: নেই';
+
+      if (day && type && serialRanges[day] && serialRanges[day][type]) {
+        const sortedTimes = Object.keys(serialRanges[day][type]).sort(
+          (a, b) => extractTimeNumber(a) - extractTimeNumber(b)
+        );
+
+        sortedTimes.forEach((t) => {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t + (disabledSlots[`${day}_${t}_${type}`] ? ' (বন্ধ)' : '');
+          timeEl.appendChild(opt);
+        });
+        timeEl.disabled = false;
+      }
+    }
+
+    document.getElementById('adminDay').addEventListener('change', updateAdminTimeOptions);
+    document.getElementById('adminPatientType').addEventListener('change', updateAdminTimeOptions);
+    document.getElementById('adminTime').addEventListener('change', () => {
+      document.getElementById('adminSelectedSerial').value = '';
+      document.getElementById('chosenSerialBadge').textContent = 'নির্বাচিত সিরিয়াল: নেই';
+      if (adminGridSystem && document.getElementById('adminTime').value) {
+        adminGridSystem.updateGrid();
+      }
+    });
+
+    function openAssignModalById(docId) {
+      const item = pendingRequestsMap.get(docId);
+      if (!item) {
+        alert('রিকোয়েস্টের তথ্য খুঁজে পাওয়া যায়নি।');
+        return;
+      }
+      openAssignModal(docId, item);
+    }
+
+    async function openAssignModal(docId, data) {
+      currentReqId = docId;
+      currentReqData = data;
+
+      document.getElementById('selectedPatientSummary').innerHTML = `
+        <div><strong>নাম:</strong> ${escapeHtml(data.name)} &nbsp;|&nbsp; <strong>বয়স:</strong> ${escapeHtml(data.ageDisplay || data.age || '-')}</div>
+        <div><strong>ফোন:</strong> ${escapeHtml(data.phone)} &nbsp;|&nbsp; <strong>সর্বশেষ ভিজিট:</strong> ${escapeHtml(data.lastVisitDate || 'প্রযোজ্য নয়')}</div>
+        ${data.autoConvertedFromOld ? '<div class="text-amber-700 font-semibold text-xs mt-1">⚠️ ৩ মাস অতিক্রান্ত হওয়ায় স্বয়ংক্রিয়ভাবে নতুন রোগী নির্বাচিত হয়েছে।</div>' : ''}
+      `;
+
+      const typeEl = document.getElementById('adminPatientType');
+      typeEl.value = data.patientType === 'old' ? 'old' : 'new';
+      document.getElementById('adminDay').value = '';
+      updateAdminTimeOptions();
+
+      const modal = document.getElementById('assignModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      await initAdminGrid();
+    }
+
+    function closeAssignModal() {
+      const modal = document.getElementById('assignModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      currentReqId = null;
+      currentReqData = null;
+    }
+
+async function rejectRequest(docId) {
+      const reqItem = pendingRequestsMap.get(docId);
+      const patientName = reqItem?.name ? ` (${escapeHtml(reqItem.name)})` : '';
+
+      if (typeof Swal !== 'undefined') {
+        const result = await Swal.fire({
+          icon: 'warning',
+          title: 'রিকোয়েস্ট বাতিল করবেন?',
+          text: `আপনি কি নিশ্চিত যে এই রিকোয়েস্টটি বাতিল করতে চান?${reqItem?.name ? ` (${reqItem.name})` : ''}`,
+          showCancelButton: true,
+          confirmButtonText: 'হ্যাঁ, বাতিল করুন',
+          cancelButtonText: 'না',
+          confirmButtonColor: '#dc2626',
+          cancelButtonColor: '#64748b'
+        });
+        if (!result.isConfirmed) return;
+      } else if (!confirm('আপনি কি নিশ্চিত যে এই রিকোয়েস্টটি বাতিল করতে চান?')) {
+        return;
+      }
+
+      try {
+        await db.collection('pendingRequests').doc(docId).delete();
+
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `রিকোয়েস্ট বাতিল করা হয়েছে${patientName}`,
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'error',
+            title: 'বাতিল করতে সমস্যা হয়েছে: ' + err.message,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true
+          });
+        } else {
+          alert('বাতিল করতে সমস্যা হয়েছে: ' + err.message);
+        }
+      }
+    }
+
+   async function confirmAndAcceptRequest() {
+      if (!currentReqId || !currentReqData) return;
+
+      // মাঝপথে currentReqData null হয়ে গেলে যেন সমস্যা না হয় তাই লোকাল কপি রাখা হলো
+      const reqId = currentReqId;
+      const reqData = { ...currentReqData };
+
+      const selectedType = document.getElementById('adminPatientType').value;
+      const selectedDay = document.getElementById('adminDay').value;
+      const selectedTime = document.getElementById('adminTime').value;
+      const selectedSerial = parseInt(document.getElementById('adminSelectedSerial').value, 10);
+
+      if (!selectedDay || !selectedTime || !selectedSerial) {
+        alert('অনুগ্রহ করে দিন, সময় এবং গ্রিড থেকে একটি সিরিয়াল নম্বর নির্বাচন করুন।');
+        return;
+      }
+
+      const btn = document.getElementById('confirmAcceptBtn');
+      btn.disabled = true;
+      btn.textContent = 'সেভ হচ্ছে...';
+
+      try {
+        const nextDateInfo = getNextDateByDay(selectedDay);
+        const yymmdd = nextDateInfo.dateString.replace(/-/g, '').slice(2);
+        const subCol = selectedType === 'new' ? 'new' : 'old';
+        const docId = `${yymmdd}-${String(selectedSerial).padStart(2, '0')}`;
+
+        const apptRef = db.collection('appointments').doc(yymmdd).collection(subCol).doc(docId);
+        const existing = await apptRef.get();
+        if (existing.exists) {
+          alert('এই সিরিয়াল নম্বরটি ইতিমধ্যে বুক হয়ে গেছে! অন্য সিরিয়াল বেছে নিন।');
+          return;
+        }
+
+        await db.collection('appointments').doc(yymmdd).set({
+          date: nextDateInfo.dateString,
+          dateDisplay: nextDateInfo.banglaDate,
+          day: selectedDay,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        await apptRef.set({
+          appointmentId: docId,
+          name: reqData.name,
+          phone: reqData.phone,
+          ageYears: reqData.ageYears || 0,
+          ageMonths: reqData.ageMonths || 0,
+          ageDays: reqData.ageDays || 0,
+          ageString: reqData.ageDisplay || reqData.age,
+          ageDisplay: reqData.ageDisplay || reqData.age,
+          age: reqData.ageDisplay || reqData.age,
+          patientType: subCol,
+          autoConvertedFromOld: Boolean(reqData.autoConvertedFromOld),
+          lastVisitDate: reqData.lastVisitDate || null,
+          day: selectedDay,
+          date: nextDateInfo.dateString,
+          appointmentDate: nextDateInfo.dateString,
+          appointmentDateDisplay: nextDateInfo.banglaDate,
+          timeSlot: selectedTime,
+          time: selectedTime,
+          serial: selectedSerial,
+          status: 'confirmed',
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        await db.collection('pendingRequests').doc(reqId).delete();
+
+        try {
+          const smsMessage = `Dear ${reqData.name},your Serial No: ${selectedSerial}, Date: ${nextDateInfo.dateString}, Estimated Time: ${selectedTime}. Thank you! For the next serial, visit: https://drmasum.netlify.app/`;
+          const apiKey = '74a82f2a949057f0e67fa4b672f75275';
+          const sender = '8809617635159';
+          const automasUrl = `https://api.automas.com.bd/smsapiv3?apikey=${apiKey}&sender=${sender}&msisdn=${reqData.phone}&smstext=${encodeURIComponent(smsMessage)}`;
+          fetch(automasUrl, { method: 'POST', mode: 'no-cors' }).catch(() => {});
+        } catch (_) {}
+
+        closeAssignModal();
+
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `সিরিয়াল #${selectedSerial} কনফার্ম হয়েছে (${escapeHtml(reqData.name)})`,
+            showConfirmButton: false,
+            timer: 2200,
+            timerProgressBar: true
+          });
+        } else {
+          alert(`✅ সিরিয়াল #${selectedSerial} সফলভাবে Accept ও বুক করা হয়েছে!`);
+        }
+      } catch (err) {
+        console.error(err);
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'error',
+            title: 'সেভ করতে সমস্যা হয়েছে: ' + err.message,
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true
+          });
+        } else {
+          alert('সেভ করতে সমস্যা হয়েছে: ' + err.message);
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'কনফার্ম করুন';
+      }
+    }
+  </script>
+</body>
+</html>

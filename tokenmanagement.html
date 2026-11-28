@@ -654,6 +654,8 @@ tr.row-seen .seen-check {
           </button>
         </div>
 
+         <div id="pending-tokens-container"></div>
+
         <div class="table-container">
           <div class="table-wrapper">
             <table>
@@ -670,6 +672,7 @@ tr.row-seen .seen-check {
                   <th>পরিশোধ</th>
                   <th>বাকি</th>
                   <th>স্ট্যাটাস</th>
+                  <th>প্রস্তুতকারী</th>
                   <th>রেফারেন্স</th>
                   <th>অ্যাকশন</th>
                 </tr>
@@ -763,8 +766,10 @@ tr.row-seen .seen-check {
     </div>
   </div>
 </div>
-  
+
   <script src="components-inline.js"></script>
+  <script src="pending-tokens.js"></script>
+
 <script>
    // ==================== অথেন্টিকেশন ====================
   function checkAuthentication() {
@@ -997,67 +1002,69 @@ async function loadTokenData() {
 }
 
   // ==================== টোকেন টেবিল রেন্ডার ====================
-  function renderTokenTable(tokens) {
-    const tbody = document.getElementById('tokenTableBody');
-    if (tokens.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;">কোনো টোকেন পাওয়া যায়নি</td></tr>';
-      return;
-    }
-    
-    tbody.innerHTML = tokens.map(token => {
-      const fee = token.tokenFee || 0;
-      const paid = token.tokenPaid || 0;
-      const due = fee - paid;
-      const status = due === 0 ? 'paid' : 'due';
-      const tokenNumber = token.tokenNumber || '—';
-      const serialNumber = token.serial || '—';
-      const givenBy = token.givenBy || token.reference || '—';
-      const isSeen = token.isCalled === true;
-      
-      return `
-        <tr
-  class="${isSeen ? 'row-seen' : ''}"
-  onmousedown="startRowLongPress(event, this, '${token.id}', ${isSeen})"
-  onmouseup="cancelRowLongPress()"
-  onmouseleave="cancelRowLongPress()"
-  ontouchstart="startRowLongPress(event, this, '${token.id}', ${isSeen})"
-  ontouchend="cancelRowLongPress()"
-  ontouchcancel="cancelRowLongPress()"
-  ontouchmove="cancelRowLongPress()"
-  ondblclick="handleRowDoubleClick(event, '${token.id}', ${isSeen})"
-  onclick="handleRowClickGuard(event)"
->
-  <td>${formatDate(token.tokenTimestamp)}</td>
-  <td><strong>${tokenNumber}</strong></td>
-  <td>${toBengaliNumber(serialNumber)}</td>
-  <td>
-    <span class="patient-name-wrap">
-      <strong>${escapeHtml(token.patientName || '—')}</strong>
-      <span class="seen-check">✓</span>
-    </span>
-  </td>
-  <td>${token.patientAge || '—'}</td>
-  <td>${token.patientPhone || '—'}</td>
-  <td>${token.patientType === 'new' ? 'নতুন' : 'পুরাতন'}</td>
-  <td>${toBengaliNumber(fee)} টাকা</td>
-  <td>${toBengaliNumber(paid)} টাকা</td>
-  <td>${toBengaliNumber(due)} টাকা</td>
-  <td><span class="status-badge ${status === 'paid' ? 'status-paid' : 'status-due'}">${status === 'paid' ? 'পরিশোধিত' : 'বাকি'}</span></td>
-  <td>${givenBy}</td>
-  <td>
-    <div class="action-buttons">
-      <button class="btn-view" onclick="viewTokenDetails('${token.id}')">
-        <i class="fas fa-eye"></i> বিস্তারিত
-      </button>
-      <button class="btn-delete" onclick="deleteToken('${token.id}', '${escapeHtml(token.patientName || 'এই টোকেন')}')">
-        <i class="fas fa-trash"></i> ডিলিট
-      </button>
-    </div>
-  </td>
-</tr>
-      `;
-    }).join('');
+function renderTokenTable(tokens) {
+  const tbody = document.getElementById('tokenTableBody');
+  if (tokens.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;">কোনো টোকেন পাওয়া যায়নি</td></tr>';
+    return;
   }
+
+  tbody.innerHTML = tokens.map(token => {
+    const fee = token.tokenFee || 0;
+    const paid = token.tokenPaid || 0;
+    const due = fee - paid;
+    const status = due === 0 ? 'paid' : 'due';
+    const tokenNumber = token.tokenNumber || '—';
+    const serialNumber = token.serial || '—';
+    const preparedBy = token.preparedBy || token.createdByName || token.createdBy || '—';
+    const givenBy = token.givenBy || token.reference || '—';
+    const isSeen = token.isCalled === true;
+
+    return `
+      <tr
+        class="${isSeen ? 'row-seen' : ''}"
+        onmousedown="startRowLongPress(event, this, '${token.id}', ${isSeen})"
+        onmouseup="cancelRowLongPress()"
+        onmouseleave="cancelRowLongPress()"
+        ontouchstart="startRowLongPress(event, this, '${token.id}', ${isSeen})"
+        ontouchend="cancelRowLongPress()"
+        ontouchcancel="cancelRowLongPress()"
+        ontouchmove="cancelRowLongPress()"
+        ondblclick="handleRowDoubleClick(event, '${token.id}', ${isSeen})"
+        onclick="handleRowClickGuard(event)"
+      >
+        <td>${formatDate(token.tokenTimestamp)}</td>
+        <td><strong>${tokenNumber}</strong></td>
+        <td>${toBengaliNumber(serialNumber)}</td>
+        <td>
+          <span class="patient-name-wrap">
+            <strong>${escapeHtml(token.patientName || '—')}</strong>
+            <span class="seen-check">✓</span>
+          </span>
+        </td>
+        <td>${token.patientAge || '—'}</td>
+        <td>${token.patientPhone || '—'}</td>
+        <td>${token.patientType === 'new' ? 'নতুন' : 'পুরাতন'}</td>
+        <td>${toBengaliNumber(fee)} টাকা</td>
+        <td>${toBengaliNumber(paid)} টাকা</td>
+        <td>${toBengaliNumber(due)} টাকা</td>
+        <td><span class="status-badge ${status === 'paid' ? 'status-paid' : 'status-due'}">${status === 'paid' ? 'পরিশোধিত' : 'বাকি'}</span></td>
+        <td>${escapeHtml(preparedBy)}</td>
+        <td>${escapeHtml(givenBy)}</td>
+        <td>
+          <div class="action-buttons">
+            <button class="btn-view" onclick="viewTokenDetails('${token.id}')">
+              <i class="fas fa-eye"></i> বিস্তারিত
+            </button>
+            <button class="btn-delete" onclick="deleteToken('${token.id}', '${escapeHtml(token.patientName || 'এই টোকেন')}')">
+              <i class="fas fa-trash"></i> ডিলিট
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
 
 function getFormattedAge(y, m, d) {
   let years = parseInt(y) || 0;
@@ -1219,6 +1226,7 @@ async function saveAndPrintNewToken() {
     const phone = document.getElementById('newTokenPhone').value;
     const givenBy = document.getElementById('newTokenGivenBy')?.value || '';
     const due = fee - paid;
+    const issuerName = sessionStorage.getItem('adminName') || sessionStorage.getItem('loggedInUser') || 'admin';
 
     // -------------------------------------------------------------
     // ১. ফায়ারবেস ট্রানজেকশন (Transaction) এর মাধ্যমে কাউন্টার হ্যান্ডেল করা
@@ -1271,6 +1279,7 @@ async function saveAndPrintNewToken() {
         source: 'tokenmanagement',
         givenBy: givenBy,
         reference: givenBy,
+        preparedBy: issuerName,
         serial: null,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         createdBy: sessionStorage.getItem('adminEmail') || 'admin'
@@ -1412,7 +1421,7 @@ async function toggleCalledStatus(tokenId, currentSeen) {
       }
       if (apptDoc.exists) {
         const apptUpdate = nextSeen
-          ? { status: 'visited', tokenGiven: true, tokenStatus: 'visited', visitedAt: firebase.firestore.FieldValue.serverTimestamp() }
+          ? { status: 'visited', tokenGiven: false, tokenStatus: 'visited', visitedAt: firebase.firestore.FieldValue.serverTimestamp() }
           : { status: 'pending', tokenGiven: true, tokenStatus: 'given', visitedAt: null };
         await apptRef.update(apptUpdate);
       }
